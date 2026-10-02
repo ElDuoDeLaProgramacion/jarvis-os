@@ -134,6 +134,65 @@ def es_pregunta(respuesta):
     return final.endswith("?") or bool(re.search(r"\?\s*(s[ií] o no|responde|dime)[^?]*$", normalizar(final)))
 
 
+# ---------- Navegación: cerrar pestañas y programas, sin pasar por Claude ----------
+
+PROGRAMAS = {
+    "chrome": "chrome.exe", "google chrome": "chrome.exe", "edge": "msedge.exe", "firefox": "firefox.exe",
+    "opera": "opera.exe", "brave": "brave.exe", "spotify": "Spotify.exe", "discord": "Discord.exe",
+    "whatsapp": "WhatsApp.exe", "telegram": "Telegram.exe", "word": "WINWORD.EXE", "excel": "EXCEL.EXE",
+    "powerpoint": "POWERPNT.EXE", "outlook": "OUTLOOK.EXE", "teams": "ms-teams.exe", "zoom": "Zoom.exe",
+    "visual studio code": "Code.exe", "vs code": "Code.exe", "code": "Code.exe", "cursor": "Cursor.exe",
+    "bloc de notas": "notepad.exe", "notepad": "notepad.exe", "obsidian": "Obsidian.exe", "steam": "steam.exe",
+    "vlc": "vlc.exe", "obs": "obs64.exe", "calculadora": "CalculatorApp.exe",
+}
+# Nunca: el propio JARVIS, la consola donde corre ni el escritorio de Windows.
+PROTEGIDOS = {"python.exe", "pythonw.exe", "wsl.exe", "wslhost.exe", "explorer.exe", "cmd.exe", "conhost.exe",
+              "windowsterminal.exe", "openconsole.exe", "powershell.exe", "pwsh.exe", "svchost.exe", "dwm.exe",
+              "winlogon.exe", "csrss.exe", "lsass.exe", "services.exe"}
+
+
+def accion_navegacion(pedido):
+    """'cierra esta pestaña' / 'cierra la ventana' / 'cierra Spotify' -> (tipo, objetivo) o None."""
+    plano = normalizar(pedido).strip(" .,!¡¿?")
+    if not plano.startswith("cierra"):
+        return None
+    resto = re.sub(r"^cierra(me)?\s+", "", plano).strip()
+    resto = re.sub(r"^(esta|este|la|el|las|los)\s+", "", resto).strip()
+    if re.match(r"pestanas?\b|tab\b", resto):
+        return ("tecla", "ctrl+w")
+    if resto in ("", "esto", "ventana", "programa", "aplicacion", "app", "ventana actual", "programa actual"):
+        return ("tecla", "alt+f4")
+    nombre = re.sub(r"^(programa|aplicacion|app)\s+(de\s+)?", "", resto).strip()
+    if nombre in PROGRAMAS:
+        return ("programa", PROGRAMAS[nombre])
+    if re.fullmatch(r"[a-z0-9._-]{2,30}", nombre):
+        # Nombre desconocido de una palabra: solo si de verdad hay un programa así abierto
+        # ("cierra el día" no es un programa: eso sigue a Claude).
+        return ("programa?", nombre + ".exe")
+    return None
+
+
+def programa_abierto(exe):
+    r = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {exe}", "/NH"], capture_output=True, text=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    return exe.lower() in r.stdout.lower()
+
+
+def ejecutar_navegacion(tipo, objetivo):
+    if tipo == "tecla":
+        import keyboard
+        time.sleep(0.2)
+        keyboard.send(objetivo)
+        return "Listo."
+    if objetivo.lower() in PROTEGIDOS:
+        return "Ese no lo cierro: es parte de Windows o del propio JARVIS."
+    # Sin /F: le pide al programa que se cierre, así puede preguntar si guardar.
+    r = subprocess.run(["taskkill", "/IM", objetivo], capture_output=True, text=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    nombre = objetivo.rsplit(".", 1)[0]
+    return f"Cerré {nombre}." if r.returncode == 0 else f"No encontré {nombre} abierto."
+
+
 # ---------- Pantalla: "Jarvis, lee mi pantalla" ----------
 
 PANTALLAS = COLA / "pantalla"
@@ -290,6 +349,22 @@ class Jarvis:
         estado_audio("ESCUCHANDO")
 
     def atender(self, pedido, origen="voz", reanudar=None):
+        navegacion = accion_navegacion(pedido) if origen in ("voz", "texto") and not reanudar else None
+        if navegacion and navegacion[0] == "programa?":
+            try:
+                navegacion = ("programa", navegacion[1]) if programa_abierto(navegacion[1]) else None
+            except OSError:
+                navegacion = None
+        if navegacion:
+            log(f"\nTú ({origen}): {pedido}")
+            try:
+                respuesta = ejecutar_navegacion(*navegacion)
+            except Exception as e:
+                log("No pude cerrar:", repr(e))
+                respuesta = "No pude hacerlo."
+            log(f"JARVIS: {respuesta}")
+            self.hablar(respuesta)
+            return
         if origen == "voz" and not reanudar and pide_analizar(pedido):
             self.abrir_analizar()
             return

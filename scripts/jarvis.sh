@@ -39,7 +39,7 @@ if [ -f .env ]; then set -a; . ./.env; set +a; fi
 permitidas=(
   Read Write Edit Glob Grep WebSearch WebFetch
   "Bash(date:*)" "Bash(mkdir:*)" "Bash(ls:*)" "Bash(mv:*)"
-  "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git checkout -b:*)"
+  "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git init:*)" "Bash(git checkout -b:*)"
   "Bash(git add:*)" "Bash(git commit:*)" "Bash(npm test:*)" "Bash(python3:*)" "Bash(pdftotext:*)"
 )
 # Conectores de claude.ai: "claude.ai Gmail" → mcp__claude_ai_Gmail (se listan ambas grafías por si acaso).
@@ -63,6 +63,11 @@ for servidor in claude_ai_Google_Calendar claude.ai_Google_Calendar; do
 done
 
 opciones=(-p "$pedido" --output-format json --allowedTools "$(IFS=,; echo "${permitidas[*]}")")
+# Además del repo, JARVIS puede trabajar en las carpetas de David (boveda/wiki/perfil.md):
+# los proyectos en P:\ y sus archivos personales.
+for carpeta in /mnt/p /mnt/c/Users/Usuario; do
+  if [ -d "$carpeta" ]; then opciones+=(--add-dir "$carpeta"); fi
+done
 if [ -n "$reanudar" ]; then opciones+=(--resume "$reanudar"); fi
 
 salida=$(claude "${opciones[@]}")
