@@ -71,7 +71,7 @@ O abre `claude` en la carpeta y habla con él normalmente: las habilidades se ca
 
 ## Hablar con JARVIS
 
-Instala la voz siguiendo [voz/README.md](voz/README.md). Luego abre `P:\jarvis-os\voz\jarvis.bat` y di "Jarvis" seguido de lo que necesitas, o muéstrale un gesto a la cámara.
+Instala la voz siguiendo [voz/README.md](voz/README.md). Luego abre `P:\jarvis-os\voz\jarvis.bat` y di "Jarvis" seguido de lo que necesitas, o maneja el ratón con la mano frente a la cámara.
 
 No hay comandos fijos: le hablas normal. Ejemplos:
 

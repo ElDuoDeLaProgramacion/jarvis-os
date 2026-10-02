@@ -1,3 +1,4 @@
-# Gestos con la cámara (opcional). MediaPipe 0.10.14 necesita Python 3.9 a 3.12.
+# Gestos con la camara (opcional). MediaPipe 0.10.14 necesita Python 3.9 a 3.12.
 opencv-python>=4.8
 mediapipe==0.10.14
+pyautogui>=0.9.54

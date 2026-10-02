@@ -1,10 +1,10 @@
 # Voz y gestos de JARVIS (Windows)
 
-Di **"Jarvis"** seguido de lo que necesitas ("Jarvis, plan de hoy"), o solo "Jarvis" y espera el "¿Sí?". JARVIS transcribe tu voz en local, ejecuta la petición en WSL y **siempre** te contesta en voz alta. También entiende gestos de la mano frente a la cámara.
+Di **"Jarvis"** seguido de lo que necesitas ("Jarvis, plan de hoy"), o solo "Jarvis" y espera el "¿Sí?". JARVIS transcribe tu voz en local, ejecuta la petición en WSL y **siempre** te contesta en voz alta. Con la cámara, tu mano maneja el ratón: mover, clic, clic derecho, Tab y cambio de pestaña.
 
 ```
 micrófono → faster-whisper (local) → "¿empieza por Jarvis?" → wsl: scripts/jarvis.sh → Claude Code + habilidades → voz de Windows
-cámara    → MediaPipe (local) → gesto mantenido 1 s → la misma orden
+cámara    → MediaPipe (local) → gestos de Hands-Free Navigator → ratón y teclado
 ```
 
 El audio y la imagen nunca salen de tu máquina: la transcripción, los gestos y la voz son locales. Solo el texto de la orden va a Claude.
@@ -28,20 +28,19 @@ Doble clic en `jarvis.bat` (o se abre solo al iniciar sesión, ver [rutinas](../
 
 ## Gestos
 
-Mantén el gesto **1 segundo** frente a la cámara. No mueve el ratón ni el teclado: solo da órdenes a JARVIS.
+Los gestos básicos de [Hands-Free Navigator](https://github.com/ElDuoDeLaProgramacion/Hands-Free-Navigator): la mano maneja el ratón y el teclado. Índice y medio son los dedos de trabajo; anular y meñique van cerrados.
 
-| Gesto | Qué hace |
+| Gesto | Acción |
 |---|---|
-| Palma abierta | JARVIS te escucha sin decir "Jarvis" ("¿Sí?") |
-| Pulgar abajo | Que se calle ya |
-| Pulgar arriba | Resumen matutino |
-| V (índice y medio separados) | Plan de hoy |
-| Solo el índice | Revisa pendientes y correos que esperan respuesta |
-| Tres dedos | Resume mis correos de hoy |
-| Cuernos (índice y meñique) | Pausar o reanudar los gestos |
+| Índice + medio arriba y **juntos** | Mover el cursor (como un touchpad) |
+| ...bajar **ambos** dedos y subirlos | Clic izquierdo (dos veces seguidas: doble clic) |
+| ...bajar **solo el medio** y subirlo | Clic derecho |
+| Índice + medio **separados** (V), bajar el dedo **derecho** / **izquierdo** | Tab: siguiente / anterior aplicación (Alt+Tab). Se elige al dejar 2 s |
+| Palma abierta deslizada a izquierda / derecha | Pestaña anterior / siguiente |
 | Puño | Reposo, no hace nada |
+| **Cuernos** (índice + meñique) 1 s | Activar / pausar los gestos (JARVIS te dice "Gestos activos" o "Gestos en pausa") |
 
-Cambia lo que hace cada gesto en `voz\gestos.csv` (columna `accion`: `escuchar`, `callar`, `pausar` o cualquier pedido). La lectura de los dedos viene de [Hands-Free Navigator](https://github.com/ElDuoDeLaProgramacion/Hands-Free-Navigator).
+Arrancan **en pausa** para no mover el ratón al encender el PC: haz los cuernos para activarlos. Scroll, arrastrar, zoom y grabar pantalla se quedan solo en Hands-Free Navigator. Los umbrales están en `voz\manos\config.py` (copia del de Hands-Free Navigator).
 
 ## Opciones
 
@@ -74,5 +73,5 @@ Para una voz más natural con Piper:
 - **No responde a "Jarvis"**: mira la ventana; si aparece "(oído) ..." con otra palabra, dilo más claro o usa `--modelo medium`. Si no aparece nada, prueba `--sensibilidad 2`.
 - **Hace la acción pero no habla**: revisa `P:\jarvis-os\logs\voz.log`; ahí queda el motivo. Si la voz sale en inglés, instala una voz española en Configuración → Hora e idioma → Voz.
 - **"Error de JARVIS"**: prueba `./scripts/jarvis.sh "hola"` en Ubuntu; si ahí falla, el problema es de Claude Code, no de la voz.
-- **Los gestos no hacen nada**: abre con `--ver-camara` para ver qué gesto detecta. Si dice que no están instalados, mira "Instalar".
+- **Los gestos no hacen nada**: arrancan en pausa, haz los cuernos 1 s. Abre con `--ver-camara` para ver qué detecta. Si dice que no están instalados, mira "Instalar".
 - **Tarda en responder**: la mayor parte del tiempo es Claude trabajando. Para transcribir más rápido usa `--modelo base`.

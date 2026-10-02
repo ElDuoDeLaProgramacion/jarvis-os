@@ -2,7 +2,7 @@
 JARVIS por voz y gestos (Windows).
 
 Di "Jarvis" seguido de lo que quieras ("Jarvis, plan de hoy"), o solo "Jarvis"
-y espera el "¿Sí?". También puedes mostrar gestos a la cámara (voz/gestos.csv).
+y espera el "¿Sí?". Con la cámara, la mano maneja el ratón (voz/gestos.py).
 1. Escucha el micrófono todo el tiempo y corta cada frase por los silencios.
 2. Transcribe en local con faster-whisper (el audio no sale de la máquina) y
    solo atiende las frases que empiezan por "Jarvis".
@@ -215,7 +215,7 @@ class Jarvis:
         self.voz = Voz(args.piper)
         self.turno = threading.Lock()          # una orden a la vez
         self.ocupado = threading.Event()       # mientras piensa o habla, el micro no escucha
-        self.esperando_hasta = 0.0             # tras "Jarvis" a secas o la palma: la frase siguiente es la orden
+        self.esperando_hasta = 0.0             # tras "Jarvis" a secas: la frase siguiente es la orden
 
     def hablar(self, texto):
         self.ocupado.set()
@@ -245,21 +245,6 @@ class Jarvis:
             self.voz.decir(respuesta)
             estado_audio("EN ESPERA")
             self.ocupado.clear()
-
-    def al_gesto(self, gesto, acciones):
-        accion = acciones.get(gesto)
-        log(f"Gesto: {gesto} -> {accion or 'sin acción'}")
-        if not accion:
-            return
-        if accion == "callar":
-            self.voz.callar.set()
-        elif accion == "pausar":
-            pass  # Ojos ya alterna la pausa; aquí solo se registra
-        elif accion == "escuchar":
-            if not self.turno.locked():
-                self.escuchar_orden()
-        elif not self.turno.locked():
-            threading.Thread(target=self.atender, args=(accion, "gesto"), daemon=True).start()
 
     def frase(self, texto):
         """Decide qué hacer con una frase transcrita."""
@@ -371,17 +356,20 @@ def escuchar_con_tecla(jarvis, modelo, tecla):
 
 
 def arrancar_gestos(jarvis, args):
+    """Ratón y teclado con la mano (gestos básicos de Hands-Free Navigator)."""
     try:
+        import cv2, mediapipe, pyautogui  # noqa: F401  (solo comprobar que están)
         import gestos
-        acciones = gestos.leer_acciones(gestos.RUTA_ACCIONES)
-        ojos = gestos.Ojos(lambda g: jarvis.al_gesto(g, acciones), args.camara, args.ver_camara)
     except ImportError:
         log("Gestos: no están instalados (mira voz/README.md). Sigo solo con voz.")
         return
-    except OSError as e:
-        log("Gestos: no pude leer gestos.csv:", e)
-        return
-    ojos.start()
+
+    def al_cambiar_pausa(pausado):
+        log("Gestos:", "en pausa" if pausado else "activos")
+        if not jarvis.ocupado.is_set():
+            jarvis.hablar("Gestos en pausa." if pausado else "Gestos activos.")
+
+    gestos.Ojos(args.camara, args.ver_camara, al_cambiar_pausa).start()
 
 
 def main():
