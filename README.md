@@ -86,6 +86,13 @@ No hay comandos fijos: le hablas normal. Ejemplos:
 - "Recuerda que la reunión con el cliente es el lunes" → "¿qué sé del cliente?"
 - "Cierra el día"
 
+## Arranque automático
+
+- Las rutinas de 7, 9, 14 y 19 h: `rutinas\instalar-rutinas.ps1`.
+- El HUD y la voz al iniciar sesión: `rutinas\instalar-inicio.ps1`.
+
+Detalles en [rutinas/README.md](rutinas/README.md).
+
 ## HUD
 
 Doble clic en `P:\jarvis-os\hud\abrir-hud.bat` y se abre la pantalla de JARVIS en el navegador: vitales, panel de comandos, agenda, pendientes, actividad de la cola y la bóveda en vivo. Detalles en [hud/README.md](hud/README.md).
