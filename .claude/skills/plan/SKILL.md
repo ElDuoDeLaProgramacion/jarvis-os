@@ -26,4 +26,4 @@ description: Escribe las 3 prioridades del día (o de mañana, o la revisión se
 5. Responde en voz con las 3 prioridades, una frase cada una.
 
 ## Revisión semanal
-Lee planes, cierres y tareas completadas de los últimos 7 días. Escribe `boveda/outputs/planes/AAAA-Wnn-revision.md` con logros por área, pendientes que se repiten y una propuesta para la semana siguiente.
+Primero sigue la habilidad `suscripciones` en modo revisar, para tener al día cobros y renovaciones. Luego lee planes, cierres y tareas completadas de los últimos 7 días. Escribe `boveda/outputs/planes/AAAA-Wnn-revision.md` con logros por área, pendientes que se repiten, gasto en suscripciones y lo que se renueva la semana próxima, y una propuesta para la semana siguiente.

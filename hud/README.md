@@ -12,12 +12,16 @@ Los botones y la caja de texto **encolan** la intención y arrancan el corredor 
 
 ## Abrir
 
-Desde Windows: doble clic en `P:\jarvis-os\hud\abrir-hud.bat` (arranca el servidor en WSL y abre el navegador).
-Si tu distribución no se llama `Ubuntu`: `abrir-hud.bat NombreExacto`.
+El HUD es un programa aparte, con su propia ventana: no usa el navegador.
 
-Desde Ubuntu: `./scripts/hud.sh` y abre http://localhost:7777 en el navegador de Windows.
+1. Una sola vez: doble clic en `P:\jarvis-os\hud\instalar.bat` (instala `pywebview` en `hud\.venv`).
+2. Cada vez: doble clic en `P:\jarvis-os\hud\abrir-hud.bat`. Arranca el servidor en WSL sin consola, abre la ventana "JARVIS" maximizada y, al cerrarla, apaga el servidor.
 
-No hay que instalar nada: el servidor usa solo Python 3 de Ubuntu, y solo escucha en `localhost`.
+Opciones: `abrir-hud.bat --pantalla-completa` y `abrir-hud.bat --distro NombreExacto` si tu distribución no se llama `Ubuntu`.
+
+Para que se abra solo al iniciar sesión, mira [Arranque automático](../rutinas/README.md#arranque-automático-del-hud-y-la-voz).
+
+La ventana usa el motor web que ya trae Windows 10 y 11 (WebView2). El servidor usa solo Python 3 de Ubuntu y solo escucha en `localhost`; si quieres, también puedes abrir http://localhost:7777 a mano tras `./scripts/hud.sh`.
 
 ## Cambiar los botones
 

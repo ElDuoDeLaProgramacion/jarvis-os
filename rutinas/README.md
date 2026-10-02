@@ -36,3 +36,16 @@ Edita `rutinas.csv` y vuelve a ejecutar `instalar-rutinas.ps1` (reemplaza las ta
 ```powershell
 powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\desinstalar-rutinas.ps1
 ```
+
+## Arranque automático del HUD y la voz
+
+Para que al iniciar sesión en Windows se abra el programa del HUD (su propia ventana, sin navegador) y la voz quede escuchando F9 (ventana minimizada):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\instalar-inicio.ps1
+```
+
+- Instala antes el HUD (`hud\instalar.bat`) y la voz (`voz\instalar.bat`). Si solo quieres el HUD, añade `-SinVoz`.
+- Para que el HUD ocupe toda la pantalla, añade `-PantallaCompleta`.
+- Si tu distribución de WSL no se llama `Ubuntu`, añade `-Distro "NombreExacto"`.
+- Para quitarlo: `powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\desinstalar-inicio.ps1`

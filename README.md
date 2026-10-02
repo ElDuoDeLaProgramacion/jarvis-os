@@ -26,7 +26,7 @@ boveda/           vault de Obsidian
 scripts/          jarvis.sh (petición directa), encolar.sh, corredor.sh, rutina.sh
 cola/             intenciones pendientes, en curso, hechas y fallidas
 rutinas/          horarios del día real para el Programador de tareas de Windows
-hud/              la pantalla de JARVIS (servidor local + página)
+hud/              la pantalla de JARVIS (programa de Windows + servidor local)
 ```
 
 ## Requisitos (Windows + WSL)
@@ -83,12 +83,20 @@ No hay comandos fijos: le hablas normal. Ejemplos:
 - "Investiga las mejores librerías de detección facial en Python"
 - "¿Qué hay de nuevo en inversiones esta semana?"
 - "¿Cómo van mis canales?"
+- "Revisa mis suscripciones" → "¿cuánto pago al mes?" → "¿cómo cancelo Netflix?"
 - "Recuerda que la reunión con el cliente es el lunes" → "¿qué sé del cliente?"
 - "Cierra el día"
 
+## Arranque automático
+
+- Las rutinas de 7, 9, 14 y 19 h: `rutinas\instalar-rutinas.ps1`.
+- El HUD y la voz al iniciar sesión: `rutinas\instalar-inicio.ps1`.
+
+Detalles en [rutinas/README.md](rutinas/README.md).
+
 ## HUD
 
-Doble clic en `P:\jarvis-os\hud\abrir-hud.bat` y se abre la pantalla de JARVIS en el navegador: vitales, panel de comandos, agenda, pendientes, actividad de la cola y la bóveda en vivo. Detalles en [hud/README.md](hud/README.md).
+Instala una vez con `P:\jarvis-os\hud\instalar.bat` y luego abre `hud\abrir-hud.bat`: la pantalla de JARVIS sale en su propia ventana, sin navegador, con vitales, panel de comandos, agenda, pendientes, actividad de la cola y la bóveda en vivo. Detalles en [hud/README.md](hud/README.md).
 
 ## Fuentes reales
 
@@ -116,6 +124,7 @@ Para probar los canales: `python3 scripts/canales.py`.
 | `plan` | Las 3 prioridades de hoy y la revisión semanal | `outputs/planes/` |
 | `tendencias` | Lo que se mueve en tus temas | `outputs/tendencias/` |
 | `canales` | Números de tus redes y canales | `outputs/canales/` |
+| `suscripciones` | Cobros recurrentes desde los recibos de Gmail: total al mes, renovaciones próximas y cómo cancelar | `wiki/suscripciones.md`, `outputs/suscripciones/` |
 | `boveda` | Lee y escribe memoria; mantiene el grafo enlazado | `raw/`, `wiki/` |
 | `cierre-dia` | Reflexión del día y cola de mañana | `outputs/diario/` |
 
