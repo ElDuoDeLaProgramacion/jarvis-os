@@ -30,9 +30,9 @@ while true; do
   pedido=$(sed -n 's/^pedido: "\(.*\)"$/\1/p' "$en_curso" | sed 's/\\"/"/g')
   origen=$(sed -n 's/^origen: //p' "$en_curso")
 
-  # Las rutinas corren sin nadie delante: JARVIS no debe esperar respuesta.
-  if [ "$origen" = "rutina" ]; then
-    pedido="$pedido (Ejecución automática de una rutina: nadie está mirando. No hagas preguntas; si te falta un dato, déjalo marcado como pendiente en la nota.)"
+  # Lo que llega de rutinas o del HUD corre sin conversación: JARVIS no puede esperar respuesta.
+  if [ "$origen" != "manual" ]; then
+    pedido="$pedido (Ejecución automática desde la cola ($origen): nadie puede responderte. No hagas preguntas; si te falta un dato, déjalo marcado como pendiente en la nota.)"
   fi
 
   echo "$(date -Iseconds) corredor > $nombre: $pedido" >> logs/corredor.log

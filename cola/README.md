@@ -9,7 +9,7 @@ hechas/      terminadas, con la respuesta de JARVIS al final
 fallidas/    con error, con el mensaje al final
 ```
 
-- Encolar: `./scripts/encolar.sh "plan de hoy"`
+- Encolar: `./scripts/encolar.sh "plan de hoy"` (o desde el HUD)
 - Ejecutar todo lo pendiente: `./scripts/corredor.sh`
 
 El contenido de estas carpetas no se sube a git; lo que importa queda en la bóveda.
