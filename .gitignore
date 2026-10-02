@@ -10,4 +10,5 @@ cola/.corredor.lock
 cola/voz-estado.txt
 cola/pantalla/
 cola/analizar-*
+cola/reproducir.txt
 boveda/raw/analisis/

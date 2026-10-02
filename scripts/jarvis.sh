@@ -13,19 +13,21 @@ export PATH="$HOME/.local/bin:$PATH"
 #   --sesion        imprime "SESION=<id>" por stderr para poder reanudar después
 #   --confirmado    David acaba de contestar "sí" en voz alta a un "¿lo envío?": se permite
 #                   enviar ese correo. Solo vale junto con --reanudar y solo la pone la voz.
-reanudar=""; sesion=0; confirmado=0
+#   --voz           pedido hablado: usa el modelo rápido (JARVIS_MODELO_VOZ en .env, por defecto sonnet)
+reanudar=""; sesion=0; confirmado=0; voz=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --reanudar) reanudar="$2"; shift 2 ;;
     --sesion) sesion=1; shift ;;
     --confirmado) confirmado=1; shift ;;
+    --voz) voz=1; shift ;;
     --) shift; break ;;
     *) break ;;
   esac
 done
 
 if [ $# -eq 0 ]; then
-  echo "Uso: $0 [--reanudar ID] [--sesion] [--confirmado] \"tu petición\"" >&2
+  echo "Uso: $0 [--reanudar ID] [--sesion] [--confirmado] [--voz] \"tu petición\"" >&2
   exit 1
 fi
 
@@ -60,6 +62,12 @@ for servidor in claude_ai_Gmail claude.ai_Gmail; do
     done
   fi
 done
+# Spotify: buscar, ver qué suena, crear listas y guardar en la biblioteca. Quitar de la biblioteca, nunca.
+for servidor in claude_ai_Spotify claude.ai_Spotify; do
+  for h in search get_currently_playing generate_playlist save_to_library; do
+    permitidas+=("mcp__${servidor}__$h")
+  done
+done
 for servidor in claude_ai_Google_Calendar claude.ai_Google_Calendar; do
   for h in list_calendars list_events get_event search_events suggest_time; do
     permitidas+=("mcp__${servidor}__$h")
@@ -79,6 +87,8 @@ for carpeta in /mnt/p /mnt/c/Users/Usuario; do
   if [ -d "$carpeta" ]; then opciones+=(--add-dir "$carpeta"); fi
 done
 if [ -n "$reanudar" ]; then opciones+=(--resume "$reanudar"); fi
+# Por voz importa la rapidez: un modelo más ágil. Las rutinas y la terminal usan el de siempre.
+if [ "$voz" = "1" ]; then opciones+=(--model "${JARVIS_MODELO_VOZ:-sonnet}"); fi
 
 salida=$(claude "${opciones[@]}")
 # La salida JSON trae la respuesta ("result") y la conversación ("session_id").
