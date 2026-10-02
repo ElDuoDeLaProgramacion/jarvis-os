@@ -8,6 +8,8 @@ Solo usa la biblioteca estándar de Python, así que no hay nada que instalar.
 """
 
 import argparse
+import base64
+import binascii
 import json
 import os
 import re
@@ -212,6 +214,75 @@ def encolar(pedido):
     return True
 
 
+# ---------- Analizar fuentes (ventana tipo "agregar fuentes") ----------
+
+ABRIR_ANALIZAR = COLA / "analizar-abrir"        # lo deja la voz al oír "Jarvis, analiza..."
+PEDIDO_ANALIZAR = COLA / "analizar-pedido.json"  # lo recoge la voz para responder hablando
+MAX_ANALIZAR = 300 * 1024 * 1024                 # 300 MB por análisis
+MEDIOS = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".opus", ".mp4", ".mkv", ".mov", ".webm", ".avi"}
+
+
+def pedir_abrir_analizar():
+    """True una sola vez cuando la voz pidió abrir la ventana de análisis."""
+    try:
+        ABRIR_ANALIZAR.unlink()
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def nombre_seguro(nombre):
+    nombre = Path(str(nombre)).name
+    nombre = re.sub(r"[^\w.\- ]+", "_", nombre, flags=re.UNICODE).strip(" .")
+    return nombre[:120] or "archivo"
+
+
+def guardar_fuentes(datos):
+    """Guarda archivos, enlaces y texto en boveda/raw/analisis/<fecha-hora>/ y arma el pedido."""
+    fuentes = datos.get("fuentes") or []
+    if not fuentes:
+        raise ValueError("Agrega al menos una fuente.")
+    carpeta = BOVEDA / "raw" / "analisis" / datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    carpeta.mkdir(parents=True, exist_ok=True)
+    rel = carpeta.relative_to(RAIZ).as_posix()
+    lineas, medios, usados = [], [], set()
+    for f in fuentes:
+        tipo = f.get("tipo")
+        if tipo == "archivo":
+            nombre = nombre_seguro(f.get("nombre"))
+            base, ext = os.path.splitext(nombre)
+            k = 1
+            while nombre in usados:
+                nombre, k = f"{base}-{k}{ext}", k + 1
+            usados.add(nombre)
+            (carpeta / nombre).write_bytes(base64.b64decode(f.get("datos") or ""))
+            lineas.append(f"- Archivo: `{rel}/{nombre}`")
+            if ext.lower() in MEDIOS:
+                medios.append(f"{rel}/{nombre}")
+        elif tipo == "enlace":
+            url = str(f.get("url", "")).strip()
+            if re.match(r"https?://", url):
+                lineas.append(f"- Enlace: {url}")
+        elif tipo == "texto":
+            texto = str(f.get("texto", "")).strip()
+            if texto:
+                n = sum(1 for l in lineas if l.startswith("- Texto")) + 1
+                (carpeta / f"texto-{n}.md").write_text(texto, encoding="utf-8")
+                lineas.append(f"- Texto copiado: `{rel}/texto-{n}.md`")
+    if not lineas:
+        raise ValueError("No había ninguna fuente válida.")
+    pregunta = str(datos.get("pregunta") or "").strip()
+    (carpeta / "fuentes.md").write_text(
+        f"---\nfecha: {date.today().isoformat()}\ntipo: fuentes\ntags: [analisis]\n---\n"
+        f"# Fuentes para analizar\n\n" + "\n".join(lineas) +
+        (f"\n\nPregunta de David: {pregunta}\n" if pregunta else "\n"),
+        encoding="utf-8")
+    pedido = f"analiza las fuentes de {rel}/fuentes.md"
+    if pregunta:
+        pedido += f". Lo que quiero saber: {pregunta[:300]}"
+    return pedido, medios
+
+
 def rutinas():
     archivo = RAIZ / "rutinas" / "rutinas.csv"
     if not archivo.exists():
@@ -265,6 +336,8 @@ class Manejador(BaseHTTPRequestHandler):
             self.wfile.write(cuerpo)
         elif url.path == "/api/estado":
             self._json(estado_completo())
+        elif url.path == "/api/analizar/abrir":
+            self._json({"abrir": pedir_abrir_analizar()})
         elif url.path == "/api/grafo":
             self._json(grafo())
         elif url.path == "/api/nota":
@@ -276,7 +349,10 @@ class Manejador(BaseHTTPRequestHandler):
             self._json({"error": "no existe"}, 404)
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/encolar":
+        ruta = urlparse(self.path).path
+        if ruta == "/api/analizar":
+            return self._analizar()
+        if ruta != "/api/encolar":
             return self._json({"error": "no existe"}, 404)
         largo = int(self.headers.get("Content-Length", 0))
         try:
@@ -285,6 +361,23 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"error": "JSON inválido"}, 400)
         ok = encolar(pedido)
         self._json({"ok": ok}, 200 if ok else 400)
+
+    def _analizar(self):
+        largo = int(self.headers.get("Content-Length", 0))
+        if largo > MAX_ANALIZAR * 4 // 3 + 65536:
+            return self._json({"error": "Es demasiado grande: máximo 300 MB por análisis."}, 413)
+        try:
+            datos = json.loads(self.rfile.read(largo) or b"{}")
+            pedido, medios = guardar_fuentes(datos)
+        except (json.JSONDecodeError, ValueError, binascii.Error) as e:
+            return self._json({"error": str(e) or "Petición inválida"}, 400)
+        if datos.get("para_voz"):
+            # La voz está esperando: transcribe audio y video y responde hablando.
+            PEDIDO_ANALIZAR.write_text(json.dumps({"pedido": pedido, "medios": medios}, ensure_ascii=False),
+                                       encoding="utf-8")
+            return self._json({"ok": True, "voz": True})
+        ok = encolar(pedido)
+        self._json({"ok": ok, "voz": False}, 200 if ok else 400)
 
     def log_message(self, formato, *args):
         pass  # silencio: el HUD consulta cada pocos segundos

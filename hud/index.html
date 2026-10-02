@@ -79,6 +79,32 @@
     main { height: 70vh; }
     aside.izq, aside.der { border-width: 1px 0 0; }
   }
+
+  /* Ventana "Analiza con JARVIS" */
+  #analizar { width: min(820px, 94vw); max-height: 90vh; border-radius: 22px; padding: 28px 26px 22px; background: #1f2023; border: 1px solid #2c2e33; color: #e3e5e8; }
+  #analizar h3 { margin: 0 0 18px; text-align: center; font-size: 21px; font-weight: 400; line-height: 1.35; }
+  #analizar h3 span { color: var(--acento); }
+  #analizar .cerrar { position: absolute; top: 18px; right: 18px; border: 0; font-size: 22px; color: #aab; padding: 4px 8px; }
+  .caja { background: #141518; border-radius: 18px; padding: 14px 16px 12px; }
+  .caja input { width: 100%; background: transparent; border: 0; padding: 4px 0 12px; font-size: 14px; }
+  .caja .fila { display: flex; gap: 8px; align-items: center; }
+  .caja .fila .chip { border-radius: 999px; }
+  .caja .ir { margin-left: auto; border-radius: 50%; width: 38px; height: 38px; text-align: center; padding: 0; background: #23252a; border: 0; font-size: 18px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 22px 0; }
+  .chip { border-radius: 999px; padding: 9px 18px; border: 1px solid #3a3c42; color: #e3e5e8; font-size: 13px; }
+  .soltar { border: 1px dashed #3a3c42; border-radius: 16px; padding: 30px 20px; text-align: center; color: #9a9ea6; cursor: pointer; }
+  .soltar.encima { border-color: var(--acento); color: var(--acento); }
+  .soltar .flecha { font-size: 24px; display: block; margin-bottom: 8px; color: #cfd2d6; }
+  #a-texto { display: none; width: 100%; min-height: 90px; margin-top: 12px; background: #141518; color: var(--texto); border: 1px solid #3a3c42; border-radius: 12px; padding: 10px; font: inherit; }
+  #a-lista { list-style: none; margin: 14px 0 0; padding: 0; max-height: 150px; overflow: auto; }
+  #a-lista li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 10px; border-bottom: 1px solid #2c2e33; }
+  #a-lista li small { color: var(--tenue); }
+  #a-lista li button { border: 0; padding: 0 4px; color: var(--tenue); }
+  .pie { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  .barra { flex: 1; height: 8px; background: #2c2e33; border-radius: 99px; overflow: hidden; }
+  .barra i { display: block; height: 100%; width: 0; background: var(--acento); }
+  #a-ir { background: var(--acento); color: var(--fondo); border-color: var(--acento); border-radius: 999px; padding: 9px 20px; }
+  #a-ir:disabled { opacity: .4; cursor: default; }
 </style>
 </head>
 <body>
@@ -107,6 +133,7 @@
   <form id="pedir">
     <input id="pedido" placeholder="Pídele algo a JARVIS… (se encola y se ejecuta)" autocomplete="off">
     <button>Enviar</button>
+    <button type="button" id="abrir-analizar" title="Analizar archivos, enlaces o texto">＋ Analizar</button>
   </form>
 </main>
 
@@ -130,6 +157,30 @@
 </aside>
 
 <dialog id="visor"><header><span id="visor-titulo"></span><button onclick="visor.close()">Cerrar</button></header><pre id="visor-texto"></pre></dialog>
+<dialog id="analizar">
+  <button class="cerrar" type="button" onclick="analizar.close()" aria-label="Cerrar">✕</button>
+  <h3>Analiza con JARVIS<br><span>tus archivos, enlaces y textos</span></h3>
+  <div class="caja">
+    <input id="a-entrada" placeholder="Pega un enlace (web o YouTube) o escribe qué quieres saber" autocomplete="off">
+    <div class="fila">
+      <span class="sub" id="a-modo">Enter con un enlace lo agrega como fuente; con texto, es tu pregunta</span>
+      <button class="ir" type="button" id="a-agregar" title="Agregar">→</button>
+    </div>
+  </div>
+  <div class="chips">
+    <button type="button" class="chip" id="a-subir">⇪ Subir archivos</button>
+    <button type="button" class="chip" id="a-web">🔗 Sitios web y YouTube</button>
+    <button type="button" class="chip" id="a-pegar">📋 Texto copiado</button>
+  </div>
+  <input type="file" id="a-archivos" multiple hidden>
+  <div class="soltar" id="a-soltar"><span class="flecha">⇪</span>Arrastra y suelta archivos para subirlos. Tipos admitidos: PDFs, imágenes, documentos, hojas de cálculo, audio y video, entre otros.</div>
+  <textarea id="a-texto" placeholder="Pega aquí el texto y pulsa Analizar (o → para agregarlo)"></textarea>
+  <ul id="a-lista"></ul>
+  <div class="pie">
+    <div class="barra"><i id="a-barra"></i></div><span class="sub" id="a-cuenta">0/50</span>
+    <button type="button" id="a-ir" disabled>Analizar</button>
+  </div>
+</dialog>
 <div id="aviso"></div>
 
 <script>
@@ -286,6 +337,94 @@ function animar() {
   ctx.globalAlpha = 1;
   requestAnimationFrame(animar);
 }
+
+// ---------- Analizar fuentes ----------
+const MAX_FUENTES = 50;
+let fuentes = [], pregunta = "", paraVoz = false;
+const esEnlace = t => /^https?:\/\/\S+$/i.test(t.trim());
+function pintarFuentes() {
+  $("a-lista").innerHTML = fuentes.map((f, i) => `<li><span>${esc(f.etiqueta)}</span><span><small>${esc(f.tipoVisible)}</small> <button type="button" data-quitar="${i}" title="Quitar">✕</button></span></li>`).join("")
+    + (pregunta ? `<li><span>¿${esc(pregunta)}?</span><small>tu pregunta</small></li>` : "");
+  $("a-cuenta").textContent = `${fuentes.length}/${MAX_FUENTES}`;
+  $("a-barra").style.width = (100 * fuentes.length / MAX_FUENTES) + "%";
+  $("a-ir").disabled = !fuentes.length && !$("a-texto").value.trim();
+}
+function abrirAnalizar(desdeVoz) {
+  paraVoz = !!desdeVoz;
+  fuentes = []; pregunta = ""; $("a-entrada").value = ""; $("a-texto").value = ""; $("a-texto").style.display = "none";
+  pintarFuentes();
+  if (!analizar.open) analizar.showModal();
+  $("a-entrada").focus();
+  if (paraVoz && window.pywebview && window.pywebview.api) window.pywebview.api.traer_al_frente();
+}
+function agregarArchivos(lista) {
+  for (const a of lista) {
+    if (fuentes.length >= MAX_FUENTES) { aviso("Máximo " + MAX_FUENTES + " fuentes"); break; }
+    fuentes.push({tipo: "archivo", archivo: a, etiqueta: a.name, tipoVisible: (a.size / 1048576).toFixed(1) + " MB"});
+  }
+  pintarFuentes();
+}
+function agregarEntrada() {
+  const t = $("a-entrada").value.trim();
+  if (!t) {
+    const texto = $("a-texto").value.trim();
+    if (texto) { fuentes.push({tipo: "texto", texto, etiqueta: texto.slice(0, 60) + (texto.length > 60 ? "…" : ""), tipoVisible: "texto"}); $("a-texto").value = ""; }
+  } else if (esEnlace(t)) {
+    fuentes.push({tipo: "enlace", url: t, etiqueta: t, tipoVisible: /youtu\.?be/.test(t) ? "YouTube" : "web"});
+  } else {
+    pregunta = t.replace(/^¿|\?$/g, "");
+  }
+  $("a-entrada").value = "";
+  pintarFuentes();
+}
+const leerBase64 = archivo => new Promise((ok, mal) => {
+  const r = new FileReader();
+  r.onload = () => ok(String(r.result).split(",")[1] || "");
+  r.onerror = mal;
+  r.readAsDataURL(archivo);
+});
+async function enviarAnalisis() {
+  agregarEntrada();
+  if (!fuentes.length) return;
+  $("a-ir").disabled = true; $("a-ir").textContent = "Subiendo…";
+  try {
+    const lista = [];
+    for (const f of fuentes) {
+      if (f.tipo === "archivo") lista.push({tipo: "archivo", nombre: f.archivo.name, datos: await leerBase64(f.archivo)});
+      else lista.push(f.tipo === "enlace" ? {tipo: "enlace", url: f.url} : {tipo: "texto", texto: f.texto});
+    }
+    const r = await fetch("/api/analizar", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({fuentes: lista, pregunta, para_voz: paraVoz})});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "No se pudo");
+    analizar.close();
+    aviso(d.voz ? "JARVIS lo está analizando y te responde en voz" : "En cola: el análisis aparecerá en Actividad");
+    refrescar();
+  } catch (e) {
+    aviso("Error: " + e.message);
+  } finally {
+    $("a-ir").textContent = "Analizar"; pintarFuentes();
+  }
+}
+$("abrir-analizar").onclick = () => abrirAnalizar(false);
+$("a-subir").onclick = () => $("a-archivos").click();
+$("a-archivos").onchange = e => { agregarArchivos(e.target.files); e.target.value = ""; };
+$("a-web").onclick = () => { $("a-entrada").placeholder = "Pega el enlace (https://...) y pulsa Enter"; $("a-entrada").focus(); };
+$("a-pegar").onclick = () => { $("a-texto").style.display = "block"; $("a-texto").focus(); };
+$("a-texto").oninput = pintarFuentes;
+$("a-agregar").onclick = agregarEntrada;
+$("a-entrada").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); agregarEntrada(); } };
+$("a-lista").onclick = e => { const i = e.target.dataset.quitar; if (i != null) { fuentes.splice(+i, 1); pintarFuentes(); } };
+$("a-ir").onclick = enviarAnalisis;
+const zona = $("a-soltar");
+zona.onclick = () => $("a-archivos").click();
+zona.ondragover = e => { e.preventDefault(); zona.classList.add("encima"); };
+zona.ondragleave = () => zona.classList.remove("encima");
+zona.ondrop = e => { e.preventDefault(); zona.classList.remove("encima"); agregarArchivos(e.dataTransfer.files); };
+// "Jarvis, analiza..." pide abrir esta ventana desde la voz.
+setInterval(async () => {
+  try { if ((await (await fetch("/api/analizar/abrir")).json()).abrir) abrirAnalizar(true); } catch {}
+}, 1000);
 
 refrescar();
 setInterval(refrescar, 3000);

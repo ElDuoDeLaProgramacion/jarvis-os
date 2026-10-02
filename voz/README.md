@@ -23,6 +23,11 @@ Doble clic en `jarvis.bat` (o se abre solo al iniciar sesión, ver [rutinas](../
 - "Jarvis, plan de hoy" → dice "Enseguida", trabaja y te lee la respuesta.
 - "Jarvis" a secas → "¿Sí?" → dices la orden en los 8 segundos siguientes.
 - Lo que digas sin "Jarvis" al principio se ignora (aparece como "(oído)" en la ventana).
+- **Si JARVIS te pregunta algo** ("¿Lo agendo?"), contesta sin decir "Jarvis" en los 20 segundos siguientes: sigue la misma conversación.
+- **Enviar un correo**: JARVIS redacta, te lo resume y pregunta "¿Lo envío? Sí o no." Si contestas "sí" (o "dale", "envíalo") en esos 20 segundos, lo envía; con "no", "espera" o "mejor no" queda como borrador. Solo envía en esa respuesta tuya, nunca desde rutinas ni botones del HUD. Las cancelaciones de suscripciones por correo funcionan igual.
+- **Cerrar al navegar** (lo hace al instante, sin pasar por Claude): "Jarvis, cierra esta pestaña" (Ctrl+W), "Jarvis, cierra la ventana" o "cierra esto" (Alt+F4 en la ventana activa) y "Jarvis, cierra Spotify / Chrome / Word..." (le pide al programa que se cierre, así que si hay algo sin guardar te pregunta). Nunca cierra el propio JARVIS, la consola ni el escritorio de Windows.
+- **"Jarvis, lee mi pantalla"** (o cualquier pedido con la palabra "pantalla"): hace una captura, JARVIS la mira y te dice qué hacer. Las últimas 10 capturas quedan en `cola\pantalla\` y no se suben a git.
+- **"Jarvis, analiza este archivo"** (o PDF, enlace, video...): se abre la ventana de análisis en el HUD. Agrega archivos, enlaces o texto, pulsa Analizar y JARVIS te responde en voz. El audio y el video se transcriben aquí mismo con Whisper.
 - Mientras JARVIS piensa o habla no escucha, para no oírse a sí mismo.
 - Si tienes el HUD abierto, "Audio E/S" muestra ESCUCHANDO, PENSANDO o HABLANDO, y cada conversación aparece en "Actividad".
 
@@ -37,10 +42,11 @@ Los gestos básicos de [Hands-Free Navigator](https://github.com/ElDuoDeLaProgra
 | ...bajar **solo el medio** y subirlo | Clic derecho |
 | Índice + medio **separados** (V), bajar el dedo **derecho** / **izquierdo** | Tab: siguiente / anterior aplicación (Alt+Tab). Se elige al dejar 2 s |
 | Palma abierta deslizada a izquierda / derecha | Pestaña anterior / siguiente |
+| Puño con el pulgar **arriba** / **abajo** (mantener) | Scroll arriba / abajo |
 | Puño | Reposo, no hace nada |
 | **Cuernos** (índice + meñique) 1 s | Activar / pausar los gestos (JARVIS te dice "Gestos activos" o "Gestos en pausa") |
 
-Arrancan **en pausa** para no mover el ratón al encender el PC: haz los cuernos para activarlos. Scroll, arrastrar, zoom y grabar pantalla se quedan solo en Hands-Free Navigator. Los umbrales están en `voz\manos\config.py` (copia del de Hands-Free Navigator).
+Arrancan **en pausa** para no mover el ratón al encender el PC: haz los cuernos para activarlos. Arrastrar, zoom y grabar pantalla se quedan solo en Hands-Free Navigator. Los umbrales están en `voz\manos\config.py` (copia del de Hands-Free Navigator).
 
 ## Opciones
 

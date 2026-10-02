@@ -9,10 +9,11 @@ Solo los gestos básicos (índice y medio son los dedos de trabajo):
   Índice + medio SEPARADOS (V)
      bajar el dedo derecho / izquierdo -> Tab: siguiente / anterior aplicación (Alt+Tab)
   Palma abierta deslizada              -> pestaña anterior / siguiente
+  Puño con el pulgar arriba / abajo    -> scroll arriba / abajo (mientras lo mantengas)
   Cuernos (índice + meñique) 1 s       -> activar / pausar los gestos
 
 Arranca en pausa para no mover el ratón al encender el PC: haz los cuernos para activar.
-Scroll, arrastrar, zoom y grabar pantalla de Hands-Free Navigator quedan fuera.
+Arrastrar, zoom y grabar pantalla de Hands-Free Navigator quedan fuera.
 """
 
 import threading
@@ -25,6 +26,7 @@ BASICOS = {
     Gesture.CLICK, Gesture.DOUBLE_CLICK, Gesture.RIGHT_CLICK,
     Gesture.SWIPE_LEFT, Gesture.SWIPE_RIGHT,
     Gesture.APP_NEXT, Gesture.APP_PREV,
+    Gesture.SCROLL_UP, Gesture.SCROLL_DOWN,
 }
 
 

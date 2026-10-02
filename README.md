@@ -103,7 +103,7 @@ Instala una vez con `P:\jarvis-os\hud\instalar.bat` y luego abre `hud\abrir-hud.
 | Fuente | Cómo se conecta | Qué puede hacer JARVIS |
 |---|---|---|
 | Gmail | Conector **Gmail** en claude.ai (Configuración → Conectores). Claude Code lo recibe solo si iniciaste sesión con la misma cuenta | Leer, buscar y crear borradores. Nunca envía, reenvía ni borra sin tu "sí" |
-| Google Calendar | Conector **Google Calendar** en claude.ai | Ver la agenda del día para el resumen y el plan. No crea ni mueve eventos sin pedírselo |
+| Google Calendar | Conector **Google Calendar** en claude.ai | Ver la agenda del día para el resumen y el plan, y crear o cambiar eventos cuando se lo pides ("Jarvis, agéndame..."). Las rutinas solo leen; borrar eventos no puede |
 | GitHub | API pública, sin configurar nada | Seguidores, repos y estrellas |
 | YouTube | Clave gratis de YouTube Data API en `.env` (copia `.env.example`) | Suscriptores, vistas y videos |
 | TikTok / Instagram | Página pública del perfil | Seguidores (puede fallar si la plataforma lo bloquea; entonces dice "sin dato") |
@@ -115,7 +115,7 @@ Para probar los canales: `python3 scripts/canales.py`.
 
 | Habilidad | Qué hace | Escribe en |
 |---|---|---|
-| `correo` | Resume la bandeja, busca correos, redacta respuestas (nunca envía sin confirmar) | `outputs/correo/` |
+| `correo` | Resume la bandeja, busca correos, redacta respuestas y solo envía cuando contestas "sí" a "¿Lo envío?" | `outputs/correo/` |
 | `archivos` | Busca, resume, ordena y convierte archivos en tus carpetas | `outputs/archivos/` |
 | `programacion` | Explica y arregla código, crea scripts, corre pruebas (en ramas, sin push sin confirmar) | `outputs/programacion/` |
 | `busqueda` | Investiga en la web y deja un informe con fuentes | `outputs/busquedas/` |
@@ -124,6 +124,7 @@ Para probar los canales: `python3 scripts/canales.py`.
 | `plan` | Las 3 prioridades de hoy y la revisión semanal | `outputs/planes/` |
 | `tendencias` | Lo que se mueve en tus temas | `outputs/tendencias/` |
 | `canales` | Números de tus redes y canales | `outputs/canales/` |
+| `analizar` | Analiza archivos, PDFs, enlaces, YouTube, audio, video y texto desde la ventana de análisis | `outputs/analisis/` |
 | `suscripciones` | Cobros recurrentes desde los recibos de Gmail: total al mes, renovaciones próximas y cómo cancelar | `wiki/suscripciones.md`, `outputs/suscripciones/` |
 | `boveda` | Lee y escribe memoria; mantiene el grafo enlazado | `raw/`, `wiki/` |
 | `cierre-dia` | Reflexión del día y cola de mañana | `outputs/diario/` |

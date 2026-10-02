@@ -8,3 +8,6 @@ node_modules/
 cola/*/*.md
 cola/.corredor.lock
 cola/voz-estado.txt
+cola/pantalla/
+cola/analizar-*
+boveda/raw/analisis/
