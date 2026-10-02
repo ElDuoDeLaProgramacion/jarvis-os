@@ -4,7 +4,7 @@ description: Cierra el día de David. Registra una reflexión y deja en cola lo 
 ---
 # Cierre del día
 
-1. Lee el plan de hoy en `boveda/outputs/planes/` y lo que se produjo hoy en `boveda/outputs/`.
+1. Lee el plan de hoy en `boveda/outputs/planes/`, las tareas completadas hoy en `boveda/wiki/tareas.md` y lo que se produjo hoy en `boveda/outputs/`.
 2. Pregunta a David (si no lo dijo ya) cómo le fue, en una sola pregunta corta.
 3. Escribe `boveda/outputs/diario/AAAA-MM-DD.md`:
    ```
@@ -18,7 +18,7 @@ description: Cierra el día de David. Registra una reflexión y deja en cola lo 
    ## Reflexión
    ...
    ## En cola para mañana
-   - ...
+   - ... (también se añade a `boveda/wiki/tareas.md`)
    Plan: [[AAAA-MM-DD]]
    ```
 4. Responde en voz: cuántas prioridades se cumplieron y la primera cosa en cola para mañana.

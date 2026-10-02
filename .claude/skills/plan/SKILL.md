@@ -1,13 +1,13 @@
 ---
 name: plan
-description: Escribe las 3 prioridades del día (o de mañana, o la revisión semanal) en la bóveda. Úsala para "plan de hoy", "plan de mañana", "prioridades" o "revisión semanal".
+description: Escribe las 3 prioridades del día (o de mañana, o la revisión semanal) a partir de tareas, correo, proyectos y metas. Úsala para "plan de hoy", "plan de mañana", "prioridades" o "revisión semanal".
 ---
 # Plan
 
 ## Plan de hoy / mañana
-1. Lee: `boveda/wiki/perfil.md` (metas), el último cierre en `boveda/outputs/diario/` (lo que quedó en cola) y el plan anterior en `boveda/outputs/planes/`.
-2. Elige exactamente 3 prioridades. Cada una concreta y terminable en el día, ligada a una meta.
-3. Si hay calendario disponible, añade la agenda por horas.
+1. Lee: metas y proyectos en `boveda/wiki/perfil.md`, pendientes en `boveda/wiki/tareas.md`, la cola del último cierre en `boveda/outputs/diario/`, y el resumen matutino de hoy si existe.
+2. Elige exactamente 3 prioridades, de cualquier área (correo, programación, archivos, canales...). Cada una concreta y terminable en el día.
+3. Si hay calendario, añade la agenda por horas.
 4. Escribe `boveda/outputs/planes/AAAA-MM-DD.md`:
    ```
    ---
@@ -26,4 +26,4 @@ description: Escribe las 3 prioridades del día (o de mañana, o la revisión se
 5. Responde en voz con las 3 prioridades, una frase cada una.
 
 ## Revisión semanal
-Lee los planes y cierres de los últimos 7 días, cuenta prioridades cumplidas vs. totales, y escribe `boveda/outputs/planes/AAAA-Wnn-revision.md` con logros, pendientes recurrentes y una propuesta para la semana siguiente.
+Lee planes, cierres y tareas completadas de los últimos 7 días. Escribe `boveda/outputs/planes/AAAA-Wnn-revision.md` con logros por área, pendientes que se repiten y una propuesta para la semana siguiente.
