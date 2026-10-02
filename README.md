@@ -8,7 +8,7 @@ Asistente de trabajo por voz. Tú hablas, JARVIS ejecuta el trabajo: correos, ar
 |---|---|---|
 | Claude Code | El motor: enruta cada petición a la habilidad adecuada | `CLAUDE.md`, `.claude/skills/` |
 | Obsidian | La memoria: todo aterriza como Markdown enlazado | `boveda/` |
-| Voz local | Oídos y boca: STT entra, TTS sale, 100% privado | `voz/` (fase 4) |
+| Voz local | Oídos y boca: STT entra, TTS sale, 100% privado | `voz/` |
 | HUD | La cara: una pantalla con vitales, agenda y comandos | `hud/` |
 
 Sin base de datos. Solo archivos Markdown que puedes leer y editar a mano.
@@ -69,6 +69,23 @@ cd /mnt/p/jarvis-os
 
 O abre `claude` en la carpeta y habla con él normalmente: las habilidades se cargan solas.
 
+## Hablar con JARVIS
+
+Instala la voz siguiendo [voz/README.md](voz/README.md). Luego abre `P:\jarvis-os\voz\jarvis.bat`, mantén **F9**, habla y suelta.
+
+No hay comandos fijos: le hablas normal. Ejemplos:
+
+- "Ponme al día" / "resumen matutino"
+- "Plan de hoy" / "¿qué tengo pendiente?"
+- "Anota la tarea: terminar el bot de WhatsApp para el viernes"
+- "Revisa el estado del proyecto Hands-Free Navigator"
+- "Busca en Descargas el PDF de la factura de septiembre"
+- "Investiga las mejores librerías de detección facial en Python"
+- "¿Qué hay de nuevo en inversiones esta semana?"
+- "¿Cómo van mis canales?"
+- "Recuerda que la reunión con el cliente es el lunes" → "¿qué sé del cliente?"
+- "Cierra el día"
+
 ## HUD
 
 Doble clic en `P:\jarvis-os\hud\abrir-hud.bat` y se abre la pantalla de JARVIS en el navegador: vitales, panel de comandos, agenda, pendientes, actividad de la cola y la bóveda en vivo. Detalles en [hud/README.md](hud/README.md).
@@ -110,5 +127,5 @@ Para dejar algo en cola tú mismo: `./scripts/encolar.sh "investiga X"` y luego 
 1. **Cerebro + memoria** (hecha): habilidades, bóveda, enrutador.
 2. **Corredor y rutinas** (hecha): cola de intenciones y horarios automáticos.
 3. **HUD** (hecha): panel oscuro de una sola pantalla servido en local.
-4. **Voz**: push-to-talk, STT local (faster-whisper) y TTS local (Piper).
+4. **Voz** (hecha): push-to-talk en Windows, STT local (faster-whisper) y TTS local (voces de Windows o Piper).
 5. **Fuentes reales**: correo, calendario, almacenamiento en la nube, redes.

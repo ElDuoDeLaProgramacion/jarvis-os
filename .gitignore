@@ -4,5 +4,7 @@ logs/
 .env
 __pycache__/
 node_modules/
+.venv/
 cola/*/*.md
 cola/.corredor.lock
+cola/voz-estado.txt
