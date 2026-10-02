@@ -84,6 +84,8 @@ def opciones():
     p.add_argument("--piper", default=None,
                    help="ruta a un modelo .onnx de Piper; si no se da, usa las voces de Windows")
     p.add_argument("--sin-gestos", action="store_true", help="no usar la cámara")
+    p.add_argument("--sin-copiloto", action="store_true",
+                   help="arrancar sin recomendaciones automáticas (se activan con 'Jarvis, activa el copiloto')")
     p.add_argument("--camara", type=int, default=0, help="número de cámara para los gestos")
     p.add_argument("--ver-camara", action="store_true", help="mostrar la cámara con el gesto detectado")
     p.add_argument("--sensibilidad", type=float, default=3.0,
@@ -108,6 +110,18 @@ def separar_pedido(texto):
 
 
 # ---------- Cerebro: JARVIS en WSL ----------
+
+def copiloto_a_jarvis(texto, distro, repo):
+    """Pregunta del copiloto: solo puede mirar (Read), nada de escribir, correo ni calendario."""
+    cmd = ["wsl.exe", "-d", distro, "--cd", repo, "--exec", "./scripts/jarvis.sh", "--copiloto", "--", texto]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.TimeoutExpired) as e:
+        log("Copiloto: no pude preguntar a JARVIS:", repr(e))
+        return ""
+    return r.stdout.strip() if r.returncode == 0 else ""
+
 
 def preguntar_a_jarvis(texto, distro, repo, reanudar=None, confirmado=False):
     """Devuelve (respuesta, id de conversación). Con reanudar, sigue esa conversación."""
@@ -170,6 +184,10 @@ def accion_navegacion(pedido):
         return None
     resto = re.sub(r"^cierra(me)?\s+", "", plano).strip()
     resto = re.sub(r"^(esta|este|la|el|las|los)\s+", "", resto).strip()
+    m = re.match(r"(todas )?(las )?(pestanas|tabs) (de|del|con|que tengan|que digan) (la |el |los |las )?(.+)", resto)
+    if m:
+        cual = m.group(6).strip()
+        return ("pestanas", ALIAS_PESTANAS.get(cual, [cual]))
     if re.match(r"pestanas?\b|tab\b", resto):
         return ("tecla", "ctrl+w")
     if resto in ("", "esto", "ventana", "programa", "aplicacion", "app", "ventana actual", "programa actual"):
@@ -182,6 +200,63 @@ def accion_navegacion(pedido):
         # ("cierra el día" no es un programa: eso sigue a Claude).
         return ("programa?", nombre + ".exe")
     return None
+
+
+def ventana_activa():
+    """Título de la ventana que está al frente en Windows ("" si no se puede leer)."""
+    try:
+        import ctypes
+        u32 = ctypes.windll.user32
+        hwnd = u32.GetForegroundWindow()
+        largo = u32.GetWindowTextLengthW(hwnd)
+        buf = ctypes.create_unicode_buffer(largo + 1)
+        u32.GetWindowTextW(hwnd, buf, largo + 1)
+        return buf.value
+    except Exception:
+        return ""
+
+
+NAVEGADORES = re.compile(r"(google chrome|microsoft.? edge|brave|mozilla firefox|opera)\s*$", re.I)
+# "las pestañas de búsqueda de Google" -> qué buscar en el título de cada pestaña
+ALIAS_PESTANAS = {
+    "busqueda de google": ["buscar con google", "google search"],
+    "busquedas de google": ["buscar con google", "google search"],
+    "busquedas": ["buscar con google", "google search", "bing", "duckduckgo"],
+    "google": ["buscar con google", "google search"],
+}
+
+
+def cerrar_pestanas(patrones, volver=False, maximo=80):
+    """Recorre las pestañas del navegador al frente (Ctrl+Tab) y cierra (Ctrl+W) las que coinciden."""
+    import keyboard
+    titulo = ventana_activa()
+    if volver and not NAVEGADORES.search(titulo):
+        keyboard.send("alt+tab")   # escrito desde el HUD: el navegador suele ser la ventana anterior
+        time.sleep(0.5)
+        titulo = ventana_activa()
+    if not NAVEGADORES.search(titulo):
+        return "Pon el navegador al frente y vuelve a pedírmelo."
+    cerradas, vistas, racha = 0, set(), 0
+    for _ in range(maximo):
+        titulo = ventana_activa()
+        if not NAVEGADORES.search(titulo):
+            break                       # se cerró la última pestaña o cambió la ventana
+        pagina = normalizar(NAVEGADORES.sub("", titulo))
+        if any(p in pagina for p in patrones):
+            keyboard.send("ctrl+w")
+            cerradas += 1
+            racha = 0
+            time.sleep(0.35)
+            continue
+        vistas.add(pagina)
+        racha += 1
+        if racha > len(vistas):         # dimos la vuelta completa sin cerrar nada más
+            break
+        keyboard.send("ctrl+tab")
+        time.sleep(0.25)
+    if cerradas == 0:
+        return "No encontré pestañas así."
+    return "Cerré una pestaña." if cerradas == 1 else f"Cerré {cerradas} pestañas."
 
 
 def programa_abierto(exe):
@@ -421,6 +496,8 @@ class Jarvis:
         self.esperando_hasta = 0.0             # tras "Jarvis" a secas: la frase siguiente es la orden
         self.seguimiento = None                # (id de conversación, hasta cuándo) si JARVIS preguntó algo
         self.modelo = None                     # Whisper, para transcribir audio y video al analizar
+        self.copiloto = None                   # recomendaciones sin que se las pidas (Copiloto)
+        self.ultima_orden = 0.0                # el copiloto no interrumpe justo después de una orden
 
     def hablar(self, texto):
         self.ocupado.set()
@@ -443,6 +520,12 @@ class Jarvis:
                 navegacion = ("programa", navegacion[1]) if programa_abierto(navegacion[1]) else None
             except OSError:
                 navegacion = None
+        copiloto = accion_copiloto(pedido) if origen in ("voz", "texto") and not reanudar else None
+        if copiloto is not None and self.copiloto is not None:
+            self.copiloto.activo = copiloto
+            log(f"\nTú ({origen}): {pedido}")
+            self.hablar("Copiloto activo. Te aviso si veo algo útil." if copiloto else "Copiloto apagado.")
+            return
         musica = accion_musica(pedido) if origen in ("voz", "texto") and not reanudar else None
         if musica:
             log(f"\nTú ({origen}): {pedido}")
@@ -457,7 +540,10 @@ class Jarvis:
         if navegacion:
             log(f"\nTú ({origen}): {pedido}")
             try:
-                respuesta = ejecutar_navegacion(*navegacion)
+                if navegacion[0] == "pestanas":
+                    respuesta = cerrar_pestanas(navegacion[1], volver=origen == "texto")
+                else:
+                    respuesta = ejecutar_navegacion(*navegacion)
             except Exception as e:
                 log("No pude cerrar:", repr(e))
                 respuesta = "No pude hacerlo."
@@ -467,6 +553,7 @@ class Jarvis:
         if origen == "voz" and not reanudar and pide_analizar(pedido):
             self.abrir_analizar()
             return
+        self.ultima_orden = time.monotonic()
         with self.turno:
             self.ocupado.set()
             log(f"\nTú ({origen}): {pedido}")
@@ -662,6 +749,102 @@ def escuchar_con_tecla(jarvis, modelo, tecla):
             jarvis.hablar("No te entendí.")
 
 
+# ---------- Copiloto: recomendaciones sin que se las pidas ----------
+
+# Contexto -> (patrón en el título de la ventana, cada cuántos segundos mirar como mínimo)
+CONTEXTOS = {
+    "ajedrez": (re.compile(r"chess\.com|lichess|ajedrez|\bchess\b", re.I), 45),
+    "programacion": (re.compile(r"visual studio|\bcursor\b|pycharm|intellij|sublime|notepad\+\+|"
+                                r"\.(py|js|ts|tsx|jsx|java|cs|cpp|go|rs|html|css)\b", re.I), 180),
+}
+SIN_COMENTARIO = re.compile(r"^\W*nada\W*$", re.I)
+
+
+def accion_copiloto(pedido):
+    """'activa el copiloto' -> True, 'apaga el copiloto' -> False, otra cosa -> None."""
+    plano = normalizar(pedido).strip(" .,!¡¿?")
+    if not re.search(r"\bcopiloto\b|\brecomendaciones\b", plano):
+        return None
+    if re.search(r"\b(apaga|desactiva|quita|para|silencia|calla|deten)\w*\b|\bsin\b|\bno\b", plano):
+        return False
+    if re.search(r"\b(activa|enciende|prende|pon|vuelve|dame|quiero)\w*\b", plano):
+        return True
+    return None
+
+
+def detectar_contexto(titulo):
+    for nombre, (patron, _) in CONTEXTOS.items():
+        if patron.search(titulo):
+            return nombre
+    return None
+
+
+class Copiloto(threading.Thread):
+    """Mira la ventana activa; en ajedrez o programación, cada cierto tiempo y solo si la pantalla
+    cambió, le pregunta a JARVIS si hay algo útil que decirte. Si responde NADA, se queda callado."""
+
+    def __init__(self, jarvis, activo=True):
+        super().__init__(daemon=True)
+        self.jarvis = jarvis
+        self.activo = activo
+        self.mirado = {}            # contexto -> última vez que miró
+        self.ultima_huella = None
+        self.ultimo_consejo = ""
+        self.ultimo_hablado = 0.0
+
+    def huella(self):
+        """Miniatura gris de la pantalla para saber si algo cambió sin gastar a Claude."""
+        import mss
+        with mss.mss() as sct:
+            img = sct.grab(sct.monitors[1])
+        a = np.frombuffer(img.rgb, dtype=np.uint8).reshape(img.height, img.width, 3)
+        return a[::24, ::24].mean(axis=2)
+
+    def cambio(self, huella):
+        if self.ultima_huella is None or self.ultima_huella.shape != huella.shape:
+            return True
+        return float(np.abs(huella - self.ultima_huella).mean()) > 1.5
+
+    def run(self):
+        while True:
+            time.sleep(10)
+            try:
+                self.paso()
+            except Exception as e:  # el copiloto nunca tumba la voz
+                log("Copiloto:", repr(e))
+
+    def paso(self):
+        j = self.jarvis
+        ahora = time.monotonic()
+        if not self.activo or j.ocupado.is_set() or j.seguimiento or ahora - j.ultima_orden < 30:
+            return
+        titulo = ventana_activa()
+        contexto = detectar_contexto(titulo)
+        if not contexto or ahora - self.mirado.get(contexto, -1e9) < CONTEXTOS[contexto][1]:
+            return
+        if ahora - self.ultimo_hablado < 60:
+            return
+        huella = self.huella()
+        if not self.cambio(huella):
+            return
+        self.ultima_huella, self.mirado[contexto] = huella, ahora
+        ruta = capturar_pantalla()
+        texto = (f"Modo copiloto (usa la habilidad copiloto). Contexto: {contexto}. Ventana: {titulo[:120]}. "
+                 f"Captura: {ruta}. Último consejo que diste: {self.ultimo_consejo or 'ninguno'}.")
+        respuesta = copiloto_a_jarvis(texto, j.args.distro, j.args.repo)
+        if not respuesta or SIN_COMENTARIO.match(respuesta) or respuesta == self.ultimo_consejo:
+            return
+        if not j.turno.acquire(blocking=False):
+            return                      # David pidió algo mientras tanto: eso va primero
+        try:
+            self.ultimo_consejo, self.ultimo_hablado = respuesta, time.monotonic()
+            log(f"\nJARVIS (copiloto, {contexto}): {respuesta}")
+            registrar(f"(copiloto: {contexto})", respuesta, "copiloto")
+            j.hablar(respuesta)
+        finally:
+            j.turno.release()
+
+
 VOZ_VIVA = COLA / "voz-viva"
 ESCRITOS = COLA / "escritos"
 
@@ -722,6 +905,8 @@ def main():
                           compute_type="int8" if args.dispositivo == "cpu" else "float16")
     jarvis.modelo = modelo
     threading.Thread(target=atender_escritos, args=(jarvis,), daemon=True).start()
+    jarvis.copiloto = Copiloto(jarvis, activo=not args.sin_copiloto)
+    jarvis.copiloto.start()
     if not args.sin_gestos:
         arrancar_gestos(jarvis, args)
     jarvis.hablar("JARVIS en línea.")
