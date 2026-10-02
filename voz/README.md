@@ -20,10 +20,12 @@ Necesitas Python **para Windows** (no el de WSL): https://www.python.org/downloa
 
 Doble clic en `jarvis.bat` (o se abre solo al iniciar sesión, ver [rutinas](../rutinas/README.md)). La primera vez descarga el modelo de voz (unos 500 MB para `small`). Cuando diga "JARVIS en línea":
 
-- "Jarvis, plan de hoy" → dice "Enseguida", trabaja y te lee la respuesta.
+- "Jarvis, plan de hoy" → suena un pitido corto, trabaja y te lee la respuesta. Por voz usa un modelo más rápido (Sonnet); para cambiarlo pon `JARVIS_MODELO_VOZ=opus` (o `haiku`) en `.env`.
 - "Jarvis" a secas → "¿Sí?" → dices la orden en los 8 segundos siguientes.
 - Lo que digas sin "Jarvis" al principio se ignora (aparece como "(oído)" en la ventana).
 - **Si JARVIS te pregunta algo** ("¿Lo agendo?"), contesta sin decir "Jarvis" en los 20 segundos siguientes: sigue la misma conversación.
+- **Música** (al instante, sin pasar por Claude ni gastar uso): "Jarvis, abre Spotify", "pausa", "play", "siguiente canción", "canción anterior", "sube el volumen", "baja el volumen".
+- **"Jarvis, pon ..."** (una canción, un artista, "algo para concentrarme"): JARVIS lo busca con el conector de Spotify y lo abre en tu Spotify. Si es una lista o un álbum y no arranca solo, di "Jarvis, play".
 - **Enviar un correo**: JARVIS redacta, te lo resume y pregunta "¿Lo envío? Sí o no." Si contestas "sí" (o "dale", "envíalo") en esos 20 segundos, lo envía; con "no", "espera" o "mejor no" queda como borrador. Solo envía en esa respuesta tuya, nunca desde rutinas ni botones del HUD. Las cancelaciones de suscripciones por correo funcionan igual.
 - **Cerrar al navegar** (lo hace al instante, sin pasar por Claude): "Jarvis, cierra esta pestaña" (Ctrl+W), "Jarvis, cierra la ventana" o "cierra esto" (Alt+F4 en la ventana activa) y "Jarvis, cierra Spotify / Chrome / Word..." (le pide al programa que se cierre, así que si hay algo sin guardar te pregunta). Nunca cierra el propio JARVIS, la consola ni el escritorio de Windows.
 - **"Jarvis, lee mi pantalla"** (o cualquier pedido con la palabra "pantalla"): hace una captura, JARVIS la mira y te dice qué hacer. Las últimas 10 capturas quedan en `cola\pantalla\` y no se suben a git.

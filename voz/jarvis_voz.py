@@ -111,7 +111,7 @@ def separar_pedido(texto):
 
 def preguntar_a_jarvis(texto, distro, repo, reanudar=None, confirmado=False):
     """Devuelve (respuesta, id de conversación). Con reanudar, sigue esa conversación."""
-    cmd = ["wsl.exe", "-d", distro, "--cd", repo, "--exec", "./scripts/jarvis.sh", "--sesion"]
+    cmd = ["wsl.exe", "-d", distro, "--cd", repo, "--exec", "./scripts/jarvis.sh", "--sesion", "--voz"]
     if reanudar:
         cmd += ["--reanudar", reanudar]
         if confirmado:
@@ -205,6 +205,59 @@ def ejecutar_navegacion(tipo, objetivo):
     return f"Cerré {nombre}." if r.returncode == 0 else f"No encontré {nombre} abierto."
 
 
+# ---------- Música: Spotify al instante, sin pasar por Claude ----------
+
+REPRODUCIR = COLA / "reproducir.txt"   # la habilidad musica deja aquí el spotify:... que encontró
+URI_SPOTIFY = re.compile(r"^spotify:(track|album|playlist|artist|show|episode):[A-Za-z0-9]{10,40}$")
+MUSICA = "(la )?(musica|cancion|tema|spotify|rola)"
+
+
+def accion_musica(pedido):
+    """'abre Spotify', 'pausa la música', 'siguiente canción', 'sube el volumen' -> (tipo, objetivo, veces)."""
+    plano = normalizar(pedido).strip(" .,!¡¿?")
+    if re.fullmatch(r"(abre|abreme|abrir|inicia) (el )?spotify", plano):
+        return ("abrir", "spotify:", 1)
+    if re.fullmatch(rf"(pausa|pausar|para|deten|detén|quita)( {MUSICA})?|pon pausa|dale pausa", plano):
+        return ("tecla", "play/pause media", 1)
+    if re.fullmatch(rf"(sigue|reanuda|continua|play|dale play|ponle play)( {MUSICA})?", plano):
+        return ("tecla", "play/pause media", 1)
+    if re.fullmatch(rf"(siguiente|pasa|salta|cambia)( de)? {MUSICA}|(la )?siguiente (cancion|tema)|"
+                    r"siguiente|next", plano):
+        return ("tecla", "next track", 1)
+    if re.fullmatch(rf"(anterior|vuelve a)( la)? {MUSICA}|(la )?(cancion|tema) anterior|anterior", plano):
+        return ("tecla", "previous track", 1)
+    if re.fullmatch(r"(sube|subele|subir)( el| al)? (volumen|musica)( un poco)?", plano):
+        return ("tecla", "volume up", 5)
+    if re.fullmatch(r"(baja|bajale|bajar)( el| al)? (volumen|musica)( un poco)?", plano):
+        return ("tecla", "volume down", 5)
+    return None
+
+
+def ejecutar_musica(tipo, objetivo, veces):
+    if tipo == "abrir":
+        import os
+        os.startfile(objetivo)
+        return "Listo."
+    import keyboard
+    for _ in range(veces):
+        keyboard.send(objetivo)
+        time.sleep(0.03)
+    return ""   # las teclas de música no necesitan respuesta: se oye el cambio
+
+
+def abrir_lo_encontrado():
+    """Si la habilidad musica dejó un spotify:... en la cola, lo abre en Spotify de Windows."""
+    if not REPRODUCIR.exists():
+        return
+    uri = REPRODUCIR.read_text(encoding="utf-8").strip()
+    REPRODUCIR.unlink(missing_ok=True)
+    if URI_SPOTIFY.match(uri):
+        import os
+        os.startfile(uri)
+    else:
+        log("No abro esto en Spotify, no es una dirección spotify: válida:", uri[:80])
+
+
 # ---------- Pantalla: "Jarvis, lee mi pantalla" ----------
 
 PANTALLAS = COLA / "pantalla"
@@ -275,6 +328,14 @@ class Voz:
         if modelo_piper:
             from piper import PiperVoice  # opcional: pip install piper-tts
             self.piper = PiperVoice.load(modelo_piper)
+
+    def tono(self):
+        """Un pitido corto y suave en vez de decir "Enseguida"."""
+        try:
+            import winsound
+            winsound.Beep(880, 70)
+        except Exception:
+            pass
 
     def decir(self, texto):
         texto = limpiar_para_voz(texto)
@@ -368,6 +429,17 @@ class Jarvis:
                 navegacion = ("programa", navegacion[1]) if programa_abierto(navegacion[1]) else None
             except OSError:
                 navegacion = None
+        musica = accion_musica(pedido) if origen in ("voz", "texto") and not reanudar else None
+        if musica:
+            log(f"\nTú ({origen}): {pedido}")
+            try:
+                respuesta = ejecutar_musica(*musica)
+            except Exception as e:
+                log("No pude manejar la música:", repr(e))
+                respuesta = "No pude hacerlo."
+            if respuesta:
+                self.hablar(respuesta)
+            return
         if navegacion:
             log(f"\nTú ({origen}): {pedido}")
             try:
@@ -385,7 +457,7 @@ class Jarvis:
             self.ocupado.set()
             log(f"\nTú ({origen}): {pedido}")
             estado_audio("PENSANDO")
-            self.voz.decir("Enseguida.")
+            self.voz.tono()  # un toque corto: te oí y estoy en ello (sin decir "Enseguida")
             texto = pedido
             if pide_pantalla(pedido):
                 try:
@@ -395,6 +467,10 @@ class Jarvis:
                 except Exception as e:
                     log("No pude capturar la pantalla:", repr(e))
             respuesta, sesion = preguntar_a_jarvis(texto, self.args.distro, self.args.repo, reanudar, confirmado)
+            try:
+                abrir_lo_encontrado()   # "pon música de..." : abre en Spotify lo que JARVIS encontró
+            except Exception as e:
+                log("No pude abrir Spotify:", repr(e))
             if not respuesta:
                 respuesta = "Listo, ya está hecho. Los detalles quedaron en la bóveda."
             log(f"JARVIS: {respuesta}\n")
