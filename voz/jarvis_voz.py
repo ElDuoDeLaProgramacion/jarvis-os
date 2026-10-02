@@ -13,6 +13,7 @@ Uso:  python jarvis_voz.py            (ver opciones con --help)
 """
 
 import argparse
+import json
 import queue
 import re
 import subprocess
@@ -108,18 +109,74 @@ def separar_pedido(texto):
 
 # ---------- Cerebro: JARVIS en WSL ----------
 
-def preguntar_a_jarvis(texto, distro, repo):
-    cmd = ["wsl.exe", "-d", distro, "--cd", repo, "--exec", "./scripts/jarvis.sh", texto]
+def preguntar_a_jarvis(texto, distro, repo, reanudar=None):
+    """Devuelve (respuesta, id de conversación). Con reanudar, sigue esa conversación."""
+    cmd = ["wsl.exe", "-d", distro, "--cd", repo, "--exec", "./scripts/jarvis.sh", "--sesion"]
+    if reanudar:
+        cmd += ["--reanudar", reanudar]
+    cmd += ["--", texto]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     except OSError as e:
         log("Error al llamar a WSL:", e)
-        return "No pude hablar con Ubuntu. Revisa que WSL esté instalado."
+        return "No pude hablar con Ubuntu. Revisa que WSL esté instalado.", None
+    sesion = next((l[7:].strip() for l in r.stderr.splitlines() if l.startswith("SESION=")), None)
     if r.returncode != 0:
         detalle = (r.stderr or r.stdout).strip().splitlines()
         log("Error de JARVIS:", "\n".join(detalle[-5:]))
-        return "Hubo un error al ejecutar la petición. Lo dejé anotado en el registro de la voz."
-    return r.stdout.strip()
+        return "Hubo un error al ejecutar la petición. Lo dejé anotado en el registro de la voz.", None
+    return r.stdout.strip(), sesion
+
+
+def es_pregunta(respuesta):
+    """JARVIS espera respuesta si termina preguntando ("¿Lo envío? Sí o no.")."""
+    final = respuesta.strip()[-160:]
+    return final.endswith("?") or bool(re.search(r"\?\s*(s[ií] o no|responde|dime)[^?]*$", normalizar(final)))
+
+
+# ---------- Pantalla: "Jarvis, lee mi pantalla" ----------
+
+PANTALLAS = COLA / "pantalla"
+
+
+def pide_pantalla(pedido):
+    return "pantalla" in normalizar(pedido)
+
+
+def capturar_pantalla():
+    """Guarda una captura de toda la pantalla en cola/pantalla/ y devuelve su ruta relativa al repo."""
+    import mss
+    import mss.tools
+    PANTALLAS.mkdir(parents=True, exist_ok=True)
+    destino = PANTALLAS / f"{datetime.now():%Y%m%d-%H%M%S}.png"
+    with mss.mss() as sct:
+        imagen = sct.grab(sct.monitors[0])  # 0 = todas las pantallas juntas
+        mss.tools.to_png(imagen.rgb, imagen.size, output=str(destino))
+    for vieja in sorted(PANTALLAS.glob("*.png"))[:-10]:  # solo guardamos las 10 últimas
+        vieja.unlink(missing_ok=True)
+    return destino.relative_to(RAIZ).as_posix()
+
+
+# ---------- Analizar: "Jarvis, analiza este archivo" ----------
+
+ABRIR_ANALIZAR = COLA / "analizar-abrir"
+PEDIDO_ANALIZAR = COLA / "analizar-pedido.json"
+MEDIOS = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".opus", ".mp4", ".mkv", ".mov", ".webm", ".avi"}
+
+
+def pide_analizar(pedido):
+    plano = normalizar(pedido)
+    return bool(re.match(r"\s*(analiza|analizar|analisis|resume este|resumeme este|revisa este)", plano)) \
+        and "pantalla" not in plano and "http" not in plano
+
+
+def hud_responde():
+    import urllib.request
+    try:
+        with urllib.request.urlopen("http://localhost:7777/api/estado", timeout=2):
+            return True
+    except OSError:
+        return False
 
 
 def limpiar_para_voz(texto):
@@ -216,6 +273,8 @@ class Jarvis:
         self.turno = threading.Lock()          # una orden a la vez
         self.ocupado = threading.Event()       # mientras piensa o habla, el micro no escucha
         self.esperando_hasta = 0.0             # tras "Jarvis" a secas: la frase siguiente es la orden
+        self.seguimiento = None                # (id de conversación, hasta cuándo) si JARVIS preguntó algo
+        self.modelo = None                     # Whisper, para transcribir audio y video al analizar
 
     def hablar(self, texto):
         self.ocupado.set()
@@ -230,26 +289,96 @@ class Jarvis:
         self.esperando_hasta = time.monotonic() + 8
         estado_audio("ESCUCHANDO")
 
-    def atender(self, pedido, origen="voz"):
+    def atender(self, pedido, origen="voz", reanudar=None):
+        if origen == "voz" and not reanudar and pide_analizar(pedido):
+            self.abrir_analizar()
+            return
         with self.turno:
             self.ocupado.set()
             log(f"\nTú ({origen}): {pedido}")
             estado_audio("PENSANDO")
             self.voz.decir("Enseguida.")
-            respuesta = preguntar_a_jarvis(pedido, self.args.distro, self.args.repo)
+            texto = pedido
+            if pide_pantalla(pedido):
+                try:
+                    ruta = capturar_pantalla()
+                    texto += (f" (Captura de mi pantalla de ahora mismo: {ruta}. Ábrela con Read, "
+                              "mira qué estoy haciendo y dime en pocas frases qué hacer.)")
+                except Exception as e:
+                    log("No pude capturar la pantalla:", repr(e))
+            respuesta, sesion = preguntar_a_jarvis(texto, self.args.distro, self.args.repo, reanudar)
             if not respuesta:
                 respuesta = "Listo, ya está hecho. Los detalles quedaron en la bóveda."
             log(f"JARVIS: {respuesta}\n")
             registrar(pedido, respuesta, origen)
+            # Si JARVIS pregunta algo, la respuesta no necesita "Jarvis" durante 20 segundos.
+            self.seguimiento = (sesion, time.monotonic() + 20) if sesion and es_pregunta(respuesta) else None
             estado_audio("HABLANDO")
             self.voz.decir(respuesta)
-            estado_audio("EN ESPERA")
+            if self.seguimiento:
+                self.seguimiento = (self.seguimiento[0], time.monotonic() + 20)  # cuenta desde que calla
+            estado_audio("ESCUCHANDO" if self.seguimiento else "EN ESPERA")
             self.ocupado.clear()
+
+    def abrir_analizar(self):
+        """Abre la ventana de análisis del HUD y espera lo que David agregue allí."""
+        PEDIDO_ANALIZAR.unlink(missing_ok=True)
+        ABRIR_ANALIZAR.write_text(datetime.now().isoformat(), encoding="utf-8")
+        if not hud_responde():
+            abrir = RAIZ / "hud" / "abrir-hud.bat"
+            subprocess.Popen(["cmd", "/c", str(abrir), "--distro", self.args.distro],
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.hablar("Te abrí la ventana de análisis. Agrega lo que quieras y pulsa Analizar.")
+        threading.Thread(target=self._esperar_analisis, daemon=True).start()
+
+    def _esperar_analisis(self, minutos=15):
+        limite = time.monotonic() + minutos * 60
+        while time.monotonic() < limite:
+            if PEDIDO_ANALIZAR.exists():
+                try:
+                    datos = json.loads(PEDIDO_ANALIZAR.read_text(encoding="utf-8"))
+                finally:
+                    PEDIDO_ANALIZAR.unlink(missing_ok=True)
+                pedido = datos["pedido"]
+                transcripciones = self._transcribir_medios(datos.get("medios", []))
+                if transcripciones:
+                    pedido += " Transcripciones del audio y video (hechas en local): " + ", ".join(transcripciones) + "."
+                self.atender(pedido, "analisis")
+                return
+            time.sleep(1)
+        ABRIR_ANALIZAR.unlink(missing_ok=True)
+
+    def _transcribir_medios(self, medios):
+        """Audio y video se transcriben aquí, con el mismo Whisper de la voz."""
+        hechas = []
+        if not medios or self.modelo is None:
+            return hechas
+        self.hablar("Transcribo el audio primero.")
+        for rel in medios:
+            origen = RAIZ / rel
+            if origen.suffix.lower() not in MEDIOS or not origen.exists():
+                continue
+            try:
+                segmentos, _ = self.modelo.transcribe(str(origen), vad_filter=True)
+                texto = "\n".join(s.text.strip() for s in segmentos)
+                destino = origen.with_name(origen.name + ".txt")
+                destino.write_text(texto, encoding="utf-8")
+                hechas.append(destino.relative_to(RAIZ).as_posix())
+            except Exception as e:
+                log("No pude transcribir", rel, repr(e))
+        return hechas
 
     def frase(self, texto):
         """Decide qué hacer con una frase transcrita."""
         if not texto:
             return
+        if self.seguimiento and time.monotonic() < self.seguimiento[1]:
+            # JARVIS acaba de preguntar algo ("¿Lo envío?"): la respuesta va sin "Jarvis".
+            sesion, self.seguimiento = self.seguimiento[0], None
+            activada, pedido = separar_pedido(texto)
+            self.atender(pedido if activada and pedido else texto, reanudar=sesion)
+            return
+        self.seguimiento = None
         if time.monotonic() < self.esperando_hasta:
             self.esperando_hasta = 0.0
             activada, pedido = separar_pedido(texto)
@@ -381,12 +510,14 @@ def main():
         while True:
             texto = input("> ").strip()
             if texto:
-                jarvis.atender(texto, "texto")
+                seguir = jarvis.seguimiento[0] if jarvis.seguimiento else None
+                jarvis.atender(texto, "texto", reanudar=seguir)
 
     from faster_whisper import WhisperModel
     log(f"Cargando el modelo de voz '{args.modelo}' (la primera vez se descarga)...")
     modelo = WhisperModel(args.modelo, device=args.dispositivo,
                           compute_type="int8" if args.dispositivo == "cpu" else "float16")
+    jarvis.modelo = modelo
     if not args.sin_gestos:
         arrancar_gestos(jarvis, args)
     jarvis.hablar("JARVIS en línea.")

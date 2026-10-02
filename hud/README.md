@@ -23,6 +23,13 @@ Para que se abra solo al iniciar sesión, mira [Arranque automático](../rutinas
 
 La ventana usa el motor web que ya trae Windows 10 y 11 (WebView2). El servidor usa solo Python 3 de Ubuntu y solo escucha en `localhost`; si quieres, también puedes abrir http://localhost:7777 a mano tras `./scripts/hud.sh`.
 
+## Analizar fuentes
+
+El botón **＋ Analizar** (o decir "Jarvis, analiza este archivo") abre una ventana para agregar fuentes: subir o arrastrar archivos (PDF, imágenes, documentos, hojas de cálculo, audio, video), pegar enlaces web o de YouTube, pegar texto y escribir qué quieres saber. Las fuentes se guardan en `boveda/raw/analisis/<fecha-hora>/` (no se suben a git) y el informe queda en `boveda/outputs/analisis/`.
+
+- Abierta por voz: JARVIS transcribe audio y video y te responde hablando.
+- Abierta con el botón: el análisis va a la cola y aparece en "Actividad" (audio y video sin transcribir).
+
 ## Cambiar los botones
 
 Edita la lista `COMANDOS` al inicio de `hud/servidor.py`: cada entrada es `("Etiqueta", "pedido que se encola")`.

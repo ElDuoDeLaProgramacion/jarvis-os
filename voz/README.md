@@ -23,6 +23,9 @@ Doble clic en `jarvis.bat` (o se abre solo al iniciar sesión, ver [rutinas](../
 - "Jarvis, plan de hoy" → dice "Enseguida", trabaja y te lee la respuesta.
 - "Jarvis" a secas → "¿Sí?" → dices la orden en los 8 segundos siguientes.
 - Lo que digas sin "Jarvis" al principio se ignora (aparece como "(oído)" en la ventana).
+- **Si JARVIS te pregunta algo** ("¿Lo agendo?"), contesta sin decir "Jarvis" en los 20 segundos siguientes: sigue la misma conversación.
+- **"Jarvis, lee mi pantalla"** (o cualquier pedido con la palabra "pantalla"): hace una captura, JARVIS la mira y te dice qué hacer. Las últimas 10 capturas quedan en `cola\pantalla\` y no se suben a git.
+- **"Jarvis, analiza este archivo"** (o PDF, enlace, video...): se abre la ventana de análisis en el HUD. Agrega archivos, enlaces o texto, pulsa Analizar y JARVIS te responde en voz. El audio y el video se transcriben aquí mismo con Whisper.
 - Mientras JARVIS piensa o habla no escucha, para no oírse a sí mismo.
 - Si tienes el HUD abierto, "Audio E/S" muestra ESCUCHANDO, PENSANDO o HABLANDO, y cada conversación aparece en "Actividad".
 

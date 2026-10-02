@@ -63,6 +63,26 @@ PANTALLA = (
 )
 
 
+class Api:
+    """Funciones que la página del HUD puede llamar (window.pywebview.api...)."""
+
+    _ventana = None  # con guion bajo: pywebview no lo expone a la página
+
+    def traer_al_frente(self):
+        """La voz pidió la ventana de análisis: mostrar el HUD encima de todo un momento."""
+        v = self._ventana
+        if v is None:
+            return
+        try:
+            v.restore()
+            v.show()
+            v.on_top = True
+            time.sleep(0.5)
+            v.on_top = False
+        except Exception:
+            pass
+
+
 def main():
     p = argparse.ArgumentParser(description="HUD de JARVIS")
     p.add_argument("--distro", default="Ubuntu")
@@ -72,13 +92,16 @@ def main():
     # Si ya hay un servidor (abierto a mano, por ejemplo), lo usamos y no lo apagamos.
     servidor = None if responde() else arrancar_servidor(args.distro)
 
+    api = Api()
     ventana = webview.create_window(
         "JARVIS",
+        js_api=api,
         html=PANTALLA.format(texto="JARVIS arrancando..."),
         width=1600, height=900, min_size=(1100, 700),
         background_color=FONDO,
         fullscreen=args.pantalla_completa,
     )
+    api._ventana = ventana
     if not args.pantalla_completa:
         ventana.events.shown += lambda: ventana.maximize()
 

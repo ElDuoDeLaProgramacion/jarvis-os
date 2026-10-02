@@ -8,8 +8,21 @@ cd "$(dirname "$0")/.."
 # La voz y las rutinas llaman a este script sin cargar ~/.bashrc, así que aseguramos dónde está claude.
 export PATH="$HOME/.local/bin:$PATH"
 
+# Opciones de la voz (van antes de la petición):
+#   --reanudar ID   sigue la conversación ID (respuestas a una pregunta de JARVIS)
+#   --sesion        imprime "SESION=<id>" por stderr para poder reanudar después
+reanudar=""; sesion=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --reanudar) reanudar="$2"; shift 2 ;;
+    --sesion) sesion=1; shift ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+
 if [ $# -eq 0 ]; then
-  echo "Uso: $0 \"tu petición\"" >&2
+  echo "Uso: $0 [--reanudar ID] [--sesion] \"tu petición\"" >&2
   exit 1
 fi
 
@@ -49,7 +62,21 @@ for servidor in claude_ai_Google_Calendar claude.ai_Google_Calendar; do
   fi
 done
 
-respuesta=$(claude -p "$pedido" --allowedTools "$(IFS=,; echo "${permitidas[*]}")")
+opciones=(-p "$pedido" --output-format json --allowedTools "$(IFS=,; echo "${permitidas[*]}")")
+if [ -n "$reanudar" ]; then opciones+=(--resume "$reanudar"); fi
+
+salida=$(claude "${opciones[@]}")
+# La salida JSON trae la respuesta ("result") y la conversación ("session_id").
+if datos=$(printf '%s' "$salida" | python3 -c 'import json, sys
+d = json.load(sys.stdin)
+print(d.get("session_id") or "")
+print(d.get("result") or "")' 2>/dev/null); then
+  id_sesion=$(printf '%s\n' "$datos" | head -n 1)
+  respuesta=$(printf '%s\n' "$datos" | tail -n +2)
+else
+  id_sesion=""; respuesta="$salida"
+fi
+if [ "$sesion" = "1" ] && [ -n "$id_sesion" ]; then echo "SESION=$id_sesion" >&2; fi
 
 echo "$(date -Iseconds) < $respuesta" >> logs/jarvis.log
 echo "$respuesta"
