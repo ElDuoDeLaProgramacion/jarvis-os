@@ -4,3 +4,5 @@ logs/
 .env
 __pycache__/
 node_modules/
+cola/*/*.md
+cola/.corredor.lock
