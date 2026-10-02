@@ -5,7 +5,7 @@ description: Cierra el día de David. Registra una reflexión y deja en cola lo 
 # Cierre del día
 
 1. Lee el plan de hoy en `boveda/outputs/planes/`, las tareas completadas hoy en `boveda/wiki/tareas.md` y lo que se produjo hoy en `boveda/outputs/`.
-2. Pregunta a David (si no lo dijo ya) cómo le fue, en una sola pregunta corta.
+2. Si David está presente, pregúntale cómo le fue, en una sola pregunta corta. Si es una ejecución automática (rutina), no preguntes: escribe la reflexión con lo que muestran los archivos y deja una línea `Reflexión de David: (pendiente)` para que la complete.
 3. Escribe `boveda/outputs/diario/AAAA-MM-DD.md`:
    ```
    ---

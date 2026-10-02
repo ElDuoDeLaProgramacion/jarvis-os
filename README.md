@@ -23,7 +23,9 @@ boveda/           vault de Obsidian
   raw/            todo lo capturado (sin procesar)
   wiki/           conocimiento depurado
   outputs/        todo lo que JARVIS entrega (reportes, planes, resúmenes)
-scripts/jarvis.sh punto de entrada por texto (la voz lo usará después)
+scripts/          jarvis.sh (petición directa), encolar.sh, corredor.sh, rutina.sh
+cola/             intenciones pendientes, en curso, hechas y fallidas
+rutinas/          horarios del día real para el Programador de tareas de Windows
 ```
 
 ## Requisitos (Windows + WSL)
@@ -78,20 +80,24 @@ O abre `claude` en la carpeta y habla con él normalmente: las habilidades se ca
 
 Regla: habilidades pequeñas de un solo propósito superan a un prompt gigante.
 
-## Día real
+## Día real (rutinas automáticas)
 
-| Hora | Comando | Qué pasa |
+| Hora | Rutina | Qué pasa |
 |---|---|---|
-| 7:00 | "Resumen matutino" | Bandeja, calendario y noticias de IA, leído en voz alta |
+| 7:00 | "Resumen matutino" | Correo, agenda, pendientes y noticias, en `outputs/resumenes/` |
 | 9:00 | "Plan de hoy" | Las 3 prioridades aterrizan en la bóveda |
 | 14:00 | "Revisa pendientes" | Tareas del día y correos que esperan respuesta |
 | 19:00 | "Cierra el día" | Reflexión registrada, mañana en cola |
 | Siempre | Cualquier pregunta | La bóveda recuerda todo |
 
+Instálalas una vez en Windows siguiendo [rutinas/README.md](rutinas/README.md). Funcionan así: el Programador de tareas encola la intención en `cola/` y el corredor la ejecuta.
+
+Para dejar algo en cola tú mismo: `./scripts/encolar.sh "investiga X"` y luego `./scripts/corredor.sh`.
+
 ## Hoja de ruta
 
-1. **Cerebro + memoria** (este repo hoy): habilidades, bóveda, enrutador.
-2. **Corredor y rutinas**: cola de intenciones y horarios automáticos.
+1. **Cerebro + memoria** (hecha): habilidades, bóveda, enrutador.
+2. **Corredor y rutinas** (hecha): cola de intenciones y horarios automáticos.
 3. **HUD**: panel oscuro de una sola pantalla servido en local.
 4. **Voz**: push-to-talk, STT local (faster-whisper) y TTS local (Piper).
 5. **Fuentes reales**: correo, calendario, almacenamiento en la nube, redes.
