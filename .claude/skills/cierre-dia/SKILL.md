@@ -1,0 +1,24 @@
+---
+name: cierre-dia
+description: Cierra el día de David. Registra una reflexión y deja en cola lo de mañana. Úsala para "cierra el día", "cierre", "reflexión" o "diario".
+---
+# Cierre del día
+
+1. Lee el plan de hoy en `boveda/outputs/planes/` y lo que se produjo hoy en `boveda/outputs/`.
+2. Pregunta a David (si no lo dijo ya) cómo le fue, en una sola pregunta corta.
+3. Escribe `boveda/outputs/diario/AAAA-MM-DD.md`:
+   ```
+   ---
+   fecha: AAAA-MM-DD
+   tipo: diario
+   tags: [diario]
+   ---
+   ## Prioridades
+   - [x] / [ ] cada una del plan
+   ## Reflexión
+   ...
+   ## En cola para mañana
+   - ...
+   Plan: [[AAAA-MM-DD]]
+   ```
+4. Responde en voz: cuántas prioridades se cumplieron y la primera cosa en cola para mañana.
