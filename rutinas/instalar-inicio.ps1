@@ -4,6 +4,7 @@
 param(
     [string]$Distro = "Ubuntu",
     [switch]$SinVoz,
+    [switch]$SinWhatsApp,
     [switch]$PantallaCompleta
 )
 
@@ -35,6 +36,14 @@ if (-not $SinVoz) {
     }
     # La voz queda en una ventana minimizada escuchando "Jarvis" y los gestos.
     Registrar "Voz" "cmd.exe" "/c start `"JARVIS voz`" /min `"$repo\voz\jarvis.bat`" --distro $Distro" "PT30S"
+}
+
+# WhatsApp de JARVIS (whatsapp/README.md): solo si ya pusiste la clave de Kapso en .env.
+$env_ = Get-Content "$repo\.env" -ErrorAction SilentlyContinue
+if (-not $SinWhatsApp -and ($env_ -match '^KAPSO_API_KEY=.+')) {
+    Registrar "WhatsApp" "cmd.exe" "/c start `"JARVIS WhatsApp`" /min wsl.exe -d $Distro --cd /mnt/p/jarvis-os --exec ./whatsapp/iniciar.sh" "PT40S"
+} elseif (-not $SinWhatsApp) {
+    Write-Host "WhatsApp: aún sin configurar (falta KAPSO_API_KEY en .env). Ver whatsapp\README.md."
 }
 
 Write-Host ""
