@@ -28,9 +28,11 @@ permitidas=(
   "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git checkout -b:*)"
   "Bash(git add:*)" "Bash(git commit:*)" "Bash(npm test:*)" "Bash(python3:*)" "Bash(pdftotext:*)"
 )
-# El conector "claude.ai Gmail" aparece como mcp__claude_ai_Gmail (se listan ambas grafías por si acaso).
+# Conectores de claude.ai: "claude.ai Gmail" → mcp__claude_ai_Gmail (se listan ambas grafías por si acaso).
+# Fuera a propósito: send_message, reply, forward, trash_*, *_spam, *label* y delete_draft (Gmail);
+# create_event, update_event, delete_event y respond_to_event (Calendar).
 for servidor in claude_ai_Gmail claude.ai_Gmail; do
-  for h in search_threads search_messages get_thread get_message list_labels list_drafts get_profile create_draft; do
+  for h in search_threads get_thread get_message list_labels list_drafts get_draft create_draft update_draft; do
     permitidas+=("mcp__${servidor}__$h")
   done
 done
