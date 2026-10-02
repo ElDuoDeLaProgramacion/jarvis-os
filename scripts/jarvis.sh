@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Punto de entrada por texto: ./scripts/jarvis.sh "plan de hoy"
-# La voz (voz/jarvis_voz.py) llama a este mismo script con el texto transcrito.
+# El corredor de la cola (scripts/corredor.sh) y la voz (voz/jarvis_voz.py) llaman a este mismo script.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# La voz llama a este script sin cargar ~/.bashrc, así que aseguramos dónde está claude.
+# La voz y las rutinas llaman a este script sin cargar ~/.bashrc, así que aseguramos dónde está claude.
 export PATH="$HOME/.local/bin:$PATH"
 
 if [ $# -eq 0 ]; then
