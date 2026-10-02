@@ -9,7 +9,7 @@ Asistente de trabajo por voz. Tú hablas, JARVIS ejecuta el trabajo: correos, ar
 | Claude Code | El motor: enruta cada petición a la habilidad adecuada | `CLAUDE.md`, `.claude/skills/` |
 | Obsidian | La memoria: todo aterriza como Markdown enlazado | `boveda/` |
 | Voz local | Oídos y boca: STT entra, TTS sale, 100% privado | `voz/` (fase 4) |
-| HUD | La cara: una pantalla con vitales, agenda y comandos | `hud/` (fase 3) |
+| HUD | La cara: una pantalla con vitales, agenda y comandos | `hud/` |
 
 Sin base de datos. Solo archivos Markdown que puedes leer y editar a mano.
 Totalmente modular: cualquier pieza se puede intercambiar.
@@ -26,6 +26,7 @@ boveda/           vault de Obsidian
 scripts/          jarvis.sh (petición directa), encolar.sh, corredor.sh, rutina.sh
 cola/             intenciones pendientes, en curso, hechas y fallidas
 rutinas/          horarios del día real para el Programador de tareas de Windows
+hud/              la pantalla de JARVIS (servidor local + página)
 ```
 
 ## Requisitos (Windows + WSL)
@@ -68,6 +69,10 @@ cd /mnt/p/jarvis-os
 
 O abre `claude` en la carpeta y habla con él normalmente: las habilidades se cargan solas.
 
+## HUD
+
+Doble clic en `P:\jarvis-os\hud\abrir-hud.bat` y se abre la pantalla de JARVIS en el navegador: vitales, panel de comandos, agenda, pendientes, actividad de la cola y la bóveda en vivo. Detalles en [hud/README.md](hud/README.md).
+
 ## Habilidades
 
 | Habilidad | Qué hace | Escribe en |
@@ -104,6 +109,6 @@ Para dejar algo en cola tú mismo: `./scripts/encolar.sh "investiga X"` y luego 
 
 1. **Cerebro + memoria** (hecha): habilidades, bóveda, enrutador.
 2. **Corredor y rutinas** (hecha): cola de intenciones y horarios automáticos.
-3. **HUD**: panel oscuro de una sola pantalla servido en local.
+3. **HUD** (hecha): panel oscuro de una sola pantalla servido en local.
 4. **Voz**: push-to-talk, STT local (faster-whisper) y TTS local (Piper).
 5. **Fuentes reales**: correo, calendario, almacenamiento en la nube, redes.

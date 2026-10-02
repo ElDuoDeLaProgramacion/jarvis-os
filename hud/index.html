@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS · HUD</title>
+<style>
+  :root {
+    --fondo: #07080a;
+    --panel: #0d0f12;
+    --linea: #1d2127;
+    --texto: #c9cdd3;
+    --tenue: #6b727c;
+    --acento: #c6e84b;
+    --acento-2: #8b6cf2;
+    --peligro: #f06b5b;
+    --fuente: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--fondo); color: var(--texto); font: 12px/1.45 var(--fuente); }
+  body { display: grid; grid-template-columns: 300px 1fr 340px; height: 100vh; overflow: hidden; }
+  aside, main { min-height: 0; }
+  aside { padding: 18px 16px; overflow-y: auto; border-color: var(--linea); border-style: solid; border-width: 0; }
+  aside.izq { border-right-width: 1px; }
+  aside.der { border-left-width: 1px; }
+  h1 { font-size: 22px; letter-spacing: .35em; margin: 0; font-weight: 600; color: #eef0f2; }
+  .sub { color: var(--tenue); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; }
+  h2 { font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--acento); margin: 22px 0 8px; font-weight: 500; border-bottom: 1px solid var(--linea); padding-bottom: 4px; }
+  .vital { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--linea); }
+  .vital b { font-size: 20px; font-weight: 500; color: #eef0f2; }
+  .vital span { color: var(--tenue); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
+  canvas.spark { width: 100%; height: 34px; display: block; margin-top: 6px; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { padding: 3px 0; }
+  .lista li::before { content: "› "; color: var(--acento-2); }
+  .informe { display: flex; justify-content: space-between; cursor: pointer; }
+  .informe:hover { color: var(--acento); }
+  .informe small { color: var(--tenue); }
+  main { position: relative; display: flex; flex-direction: column; }
+  nav { text-align: center; padding: 14px; color: var(--tenue); font-size: 10px; letter-spacing: .25em; text-transform: uppercase; }
+  nav b { color: var(--acento); font-weight: 500; }
+  #esfera { flex: 1; width: 100%; min-height: 0; display: block; }
+  .contador { position: absolute; left: 0; right: 0; bottom: 92px; text-align: center; pointer-events: none; }
+  .contador .sub { display: block; }
+  .contador b { font-size: 54px; font-weight: 300; color: #f4f6f8; letter-spacing: .02em; }
+  form { display: flex; gap: 8px; padding: 16px 22px 22px; }
+  input { flex: 1; background: var(--panel); border: 1px solid var(--linea); color: var(--texto); font: inherit; padding: 10px 12px; outline: none; }
+  input:focus { border-color: var(--acento); }
+  button { background: transparent; color: var(--texto); border: 1px solid var(--linea); font: inherit; padding: 6px 8px; cursor: pointer; text-align: left; }
+  button:hover { border-color: var(--acento); color: var(--acento); }
+  form button { padding: 10px 16px; color: var(--fondo); background: var(--acento); border-color: var(--acento); }
+  form button:hover { color: var(--fondo); filter: brightness(1.1); }
+  .reloj { text-align: right; }
+  .reloj b { font-size: 34px; font-weight: 400; color: #f4f6f8; }
+  .reloj b small { font-size: 18px; color: var(--acento-2); }
+  .comandos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .comandos button::before { content: "● "; color: var(--acento-2); font-size: 9px; }
+  .nota { color: var(--tenue); font-size: 10px; margin-top: 6px; }
+  .agenda li { display: flex; gap: 10px; }
+  .agenda time { color: var(--acento-2); min-width: 40px; }
+  .hecha { color: var(--tenue); text-decoration: line-through; }
+  .vencida { color: var(--peligro); }
+  .estado { font-size: 13px; letter-spacing: .15em; }
+  .estado.activo { color: var(--acento); animation: pulso 1.2s ease-in-out infinite; }
+  @keyframes pulso { 50% { opacity: .4; } }
+  .reciente { border-left: 2px solid var(--linea); padding: 4px 0 4px 8px; margin: 6px 0; }
+  .reciente.fallidas { border-color: var(--peligro); }
+  .reciente.hechas { border-color: var(--acento); }
+  .reciente p { margin: 2px 0 0; color: var(--tenue); max-height: 3.2em; overflow: hidden; }
+  .vacio { color: var(--tenue); font-style: italic; }
+  dialog { background: var(--panel); color: var(--texto); border: 1px solid var(--linea); width: min(760px, 92vw); max-height: 82vh; padding: 0; }
+  dialog::backdrop { background: rgba(0,0,0,.7); }
+  dialog header { display: flex; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--linea); color: var(--acento); }
+  dialog pre { margin: 0; padding: 14px; white-space: pre-wrap; overflow: auto; max-height: calc(82vh - 44px); font: inherit; }
+  #aviso { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--acento); color: var(--fondo); padding: 8px 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #aviso.visible { opacity: 1; }
+  @media (max-width: 1100px) {
+    body { grid-template-columns: 1fr; height: auto; overflow: auto; }
+    main { height: 70vh; }
+    aside.izq, aside.der { border-width: 1px 0 0; }
+  }
+</style>
+</head>
+<body>
+<aside class="izq">
+  <h1>J.A.R.V.I.S.</h1>
+  <div class="sub">Inteligencia centralizada</div>
+
+  <h2>Vitales del sistema</h2>
+  <div class="vital"><div><b id="v-cpu">–</b><br><span>Uso de CPU</span></div><span id="v-carga"></span></div>
+  <canvas class="spark" id="spark-cpu"></canvas>
+  <div class="vital"><div><b id="v-mem">–</b><br><span>Memoria</span></div></div>
+  <div class="vital"><div><b id="v-disco">–</b><br><span>Disco</span></div></div>
+  <div class="vital"><div><b id="v-hechas">–</b><br><span>Tareas resueltas</span></div><span id="v-fallidas"></span></div>
+
+  <h2>Rutinas</h2>
+  <ul class="lista" id="rutinas"></ul>
+
+  <h2>Informes</h2>
+  <ul id="informes"></ul>
+</aside>
+
+<main>
+  <nav>Núcleo · Bóveda · Cola · <b id="actividad">En espera</b></nav>
+  <canvas id="esfera"></canvas>
+  <div class="contador"><span class="sub">Notas en la bóveda</span><b id="notas">0</b></div>
+  <form id="pedir">
+    <input id="pedido" placeholder="Pídele algo a JARVIS… (se encola y se ejecuta)" autocomplete="off">
+    <button>Enviar</button>
+  </form>
+</main>
+
+<aside class="der">
+  <div class="reloj"><b id="reloj">--:--<small>:--</small></b><div class="sub">Hora del sistema</div></div>
+
+  <h2>Panel de comandos</h2>
+  <div class="comandos" id="comandos"></div>
+  <div class="nota">Las intenciones se escriben en la cola · el corredor las ejecuta</div>
+
+  <h2>Agenda / hoy</h2>
+  <ul class="agenda" id="agenda"></ul>
+
+  <h2>Pendientes</h2>
+  <ul class="lista" id="tareas"></ul>
+
+  <h2>Actividad</h2>
+  <div class="estado" id="estado">EN ESPERA</div>
+  <div id="recientes"></div>
+</aside>
+
+<dialog id="visor"><header><span id="visor-titulo"></span><button onclick="visor.close()">Cerrar</button></header><pre id="visor-texto"></pre></dialog>
+<div id="aviso"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const historialCpu = [];
+
+function aviso(texto) {
+  $("aviso").textContent = texto;
+  $("aviso").classList.add("visible");
+  setTimeout(() => $("aviso").classList.remove("visible"), 2200);
+}
+
+async function encolar(pedido) {
+  const r = await fetch("/api/encolar", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({pedido})});
+  aviso(r.ok ? "En cola: " + pedido : "No se pudo encolar");
+  refrescar();
+}
+
+async function abrirNota(ruta) {
+  const r = await fetch("/api/nota?ruta=" + encodeURIComponent(ruta));
+  const d = await r.json();
+  $("visor-titulo").textContent = ruta;
+  $("visor-texto").textContent = d.texto ?? "No se encontró la nota.";
+  $("visor").showModal();
+}
+
+function pct(v) { return v == null ? "–" : v + "%"; }
+
+function dibujarSpark() {
+  const c = $("spark-cpu"), ctx = c.getContext("2d");
+  c.width = c.clientWidth * devicePixelRatio; c.height = c.clientHeight * devicePixelRatio;
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (historialCpu.length < 2) return;
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--acento");
+  ctx.lineWidth = 1.5 * devicePixelRatio;
+  ctx.beginPath();
+  historialCpu.forEach((v, i) => {
+    const x = i / 59 * c.width, y = c.height - (v / 100) * (c.height - 4) - 2;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.stroke();
+}
+
+let comandosPintados = false;
+async function refrescar() {
+  let d;
+  try { d = await (await fetch("/api/estado")).json(); } catch { $("actividad").textContent = "Sin conexión"; return; }
+
+  const v = d.vitales;
+  $("v-cpu").textContent = pct(v.cpu);
+  $("v-mem").textContent = pct(v.memoria);
+  $("v-disco").textContent = pct(v.disco);
+  $("v-carga").textContent = v.carga != null ? "carga " + v.carga : "";
+  $("v-hechas").textContent = d.cola.hechas;
+  $("v-fallidas").textContent = d.cola.fallidas ? d.cola.fallidas + " con error" : "";
+  if (v.cpu != null) { historialCpu.push(v.cpu); if (historialCpu.length > 60) historialCpu.shift(); dibujarSpark(); }
+
+  $("notas").textContent = d.boveda.notas.toLocaleString("es-CO");
+  $("actividad").textContent = d.actividad;
+  $("estado").textContent = d.actividad + (d.cola.pendientes ? ` · ${d.cola.pendientes} en cola` : "");
+  $("estado").classList.toggle("activo", d.actividad !== "EN ESPERA");
+
+  $("rutinas").innerHTML = d.rutinas.map(r => `<li>${esc(r.hora)} ${esc(r.nombre)}</li>`).join("") || `<li class="vacio">Sin rutinas</li>`;
+  $("informes").innerHTML = d.informes.map(i =>
+    `<li class="informe" data-ruta="${esc(i.ruta)}"><span>${esc(i.nombre)}</span><small>${esc(i.tipo)} →</small></li>`).join("")
+    || `<li class="vacio">Aún no hay informes</li>`;
+
+  if (!comandosPintados) {
+    $("comandos").innerHTML = d.comandos.map(c => `<button data-pedido="${esc(c.pedido)}">${esc(c.etiqueta)}</button>`).join("");
+    comandosPintados = true;
+  }
+
+  const p = d.plan;
+  const agenda = p.agenda.map(a => `<li><time>${esc(a.hora)}</time><span>${esc(a.texto)}</span></li>`);
+  const prioridades = p.prioridades.map(x => `<li><time>★</time><span class="${x.hecha ? "hecha" : ""}">${esc(x.texto)}</span></li>`);
+  $("agenda").innerHTML = [...prioridades, ...agenda].join("")
+    || `<li class="vacio">Sin plan para hoy. Pulsa “Plan de hoy”.</li>`;
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  $("tareas").innerHTML = d.tareas.slice(0, 8).map(t =>
+    `<li class="${t.fecha && t.fecha < hoy ? "vencida" : ""}">${esc(t.texto)}${t.fecha ? ` <small>${esc(t.fecha)}</small>` : ""}</li>`).join("")
+    || `<li class="vacio">Nada pendiente</li>`;
+
+  const enCurso = d.cola.en_curso.map(x => `<div class="reciente"><b>▶ ${esc(x.pedido)}</b><p>ejecutando…</p></div>`);
+  const recientes = d.cola.recientes.map(x =>
+    `<div class="reciente ${x.estado}"><b>${esc(x.pedido)}</b><p>${esc(x.respuesta)}</p></div>`);
+  $("recientes").innerHTML = [...enCurso, ...recientes].join("") || `<p class="vacio">Sin actividad todavía</p>`;
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-pedido]"); if (b) encolar(b.dataset.pedido);
+  const n = e.target.closest("[data-ruta]"); if (n) abrirNota(n.dataset.ruta);
+});
+$("pedir").addEventListener("submit", e => {
+  e.preventDefault();
+  const t = $("pedido").value.trim();
+  if (t) { encolar(t); $("pedido").value = ""; }
+});
+
+setInterval(() => {
+  const a = new Date();
+  const hm = a.toLocaleTimeString("es-CO", {hour: "2-digit", minute: "2-digit", hour12: false});
+  $("reloj").innerHTML = `${hm}<small>:${String(a.getSeconds()).padStart(2, "0")}</small>`;
+}, 250);
+
+// ---------- Esfera: la bóveda como grafo 3D ----------
+const lienzo = $("esfera"), ctx = lienzo.getContext("2d");
+let puntos = [], aristas = [];
+const COLORES = {wiki: "#c6e84b", outputs: "#8b6cf2", raw: "#5fb3a1"};
+
+async function cargarGrafo() {
+  const g = await (await fetch("/api/grafo")).json();
+  // Las notas reales van sobre la esfera; se añaden partículas de polvo para dar cuerpo.
+  const total = Math.max(g.nodos.length, 1);
+  puntos = g.nodos.map((n, i) => {
+    const y = 1 - (i + 0.5) / total * 2, r = Math.sqrt(1 - y * y), t = i * 2.39996;
+    return {x: Math.cos(t) * r, y, z: Math.sin(t) * r, color: COLORES[n.grupo] || "#c9cdd3", tam: 3.2, nombre: n.nombre};
+  });
+  for (let i = 0; i < 1800; i++) {
+    const u = Math.random() * 2 - 1, t = Math.random() * Math.PI * 2, rad = Math.cbrt(Math.random()) * 0.98;
+    const r = Math.sqrt(1 - u * u) * rad;
+    puntos.push({x: Math.cos(t) * r, y: u * rad, z: Math.sin(t) * r, color: "#c6e84b", tam: 1, polvo: true});
+  }
+  aristas = g.aristas;
+}
+
+let angulo = 0;
+function animar() {
+  const w = lienzo.width = lienzo.clientWidth * devicePixelRatio;
+  const h = lienzo.height = lienzo.clientHeight * devicePixelRatio;
+  const radio = Math.min(w, h) * 0.4, cx = w / 2, cy = h * 0.46;
+  const activo = $("estado").classList.contains("activo");
+  angulo += activo ? 0.006 : 0.0018;
+  const s = Math.sin(angulo), c = Math.cos(angulo);
+  const proy = puntos.map(p => {
+    const x = p.x * c - p.z * s, z = p.x * s + p.z * c, esc3 = 1 / (1.9 - z * 0.6);
+    return {sx: cx + x * radio * esc3 * 1.3, sy: cy + p.y * radio * esc3 * 1.3, z, p};
+  });
+  ctx.lineWidth = devicePixelRatio * 0.6;
+  for (const [a, b] of aristas) {
+    const A = proy[a], B = proy[b];
+    ctx.strokeStyle = `rgba(139,108,242,${0.25 + 0.3 * (A.z + B.z + 2) / 4})`;
+    ctx.beginPath(); ctx.moveTo(A.sx, A.sy); ctx.lineTo(B.sx, B.sy); ctx.stroke();
+  }
+  for (const q of proy.sort((m, n) => m.z - n.z)) {
+    const alfa = q.p.polvo ? 0.12 + 0.35 * (q.z + 1) / 2 : 0.6 + 0.4 * (q.z + 1) / 2;
+    ctx.globalAlpha = alfa;
+    ctx.fillStyle = q.p.color;
+    ctx.beginPath(); ctx.arc(q.sx, q.sy, q.p.tam * devicePixelRatio, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(animar);
+}
+
+refrescar();
+setInterval(refrescar, 3000);
+cargarGrafo().then(animar);
+setInterval(cargarGrafo, 60000);
+</script>
+</body>
+</html>
