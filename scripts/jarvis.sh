@@ -15,7 +15,7 @@ mkdir -p logs
 echo "$(date -Iseconds) > $pedido" >> logs/jarvis.log
 
 respuesta=$(claude -p "$pedido" \
-  --allowedTools "Read,Write,Edit,Glob,Grep,WebSearch,WebFetch,Bash(date:*),Bash(mkdir:*)")
+  --allowedTools "Read,Write,Edit,Glob,Grep,WebSearch,WebFetch,Bash(date:*),Bash(mkdir:*),Bash(ls:*),Bash(mv:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git checkout -b:*),Bash(git add:*),Bash(git commit:*),Bash(npm test:*),Bash(python3:*),Bash(pdftotext:*)")
 
 echo "$(date -Iseconds) < $respuesta" >> logs/jarvis.log
 echo "$respuesta"

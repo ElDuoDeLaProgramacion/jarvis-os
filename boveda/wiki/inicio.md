@@ -6,6 +6,7 @@ tags: [jarvis]
 
 Mapa de la bóveda de JARVIS.
 
-- [[perfil]]: quién es David, metas, temas y fuentes
-- Entregables en `outputs/`: planes, resúmenes, métricas, tendencias, diario
+- [[perfil]]: áreas, proyectos, carpetas, metas, temas y canales
+- [[tareas]]: lista de pendientes por área
+- Entregables en `outputs/`: correo, archivos, programación, búsquedas, planes, resúmenes, tendencias, canales, diario
 - Capturas sin procesar en `raw/`

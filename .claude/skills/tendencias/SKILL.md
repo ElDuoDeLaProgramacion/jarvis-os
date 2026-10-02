@@ -1,15 +1,15 @@
 ---
 name: tendencias
-description: Escanea lo que se está moviendo en los temas de David (IA, programación, GitHub trending, YouTube). Úsala para "tendencias", "qué se mueve", "tendencias GH" o "YT semanal".
+description: Escanea lo que se está moviendo en los temas de David (tecnología, IA, programación, su sector, GitHub trending). Úsala para "tendencias", "qué hay de nuevo en...", "tendencias GH" o el escaneo semanal.
 ---
 # Tendencias
 
-1. Lee "Temas a vigilar" en `boveda/wiki/perfil.md`.
-2. Fuentes según la petición:
-   - General: WebSearch de cada tema, últimos 7 días.
-   - "GH": https://github.com/trending (WebFetch), filtra por los temas.
-   - "YT": búsqueda de vídeos recientes sobre los temas.
-3. Elige máximo 5 hallazgos. Para cada uno: qué es, por qué importa a David, enlace.
-4. Escribe `boveda/outputs/tendencias/AAAA-MM-DD-<fuente>.md` con frontmatter y enlaza notas de `wiki/` relacionadas si existen.
-5. Si algo merece guardarse a largo plazo, sugiere pasarlo a `wiki/` (no lo hagas sin que lo pida).
-6. Responde en voz con los 2 hallazgos más importantes.
+1. Lee "Temas" en `boveda/wiki/perfil.md` (o usa el tema que David diga).
+2. Fuentes:
+   - General: WebSearch por tema, últimos 7 días.
+   - "GH": https://github.com/trending con WebFetch, filtrado por los temas.
+3. Elige máximo 5 hallazgos: qué es, por qué le importa a David, enlace.
+4. Escribe `boveda/outputs/tendencias/AAAA-MM-DD.md` con frontmatter y enlaces a notas de `wiki/` relacionadas.
+5. Responde en voz con los 2 hallazgos más importantes.
+
+Para una pregunta puntual, usa `busqueda`.
