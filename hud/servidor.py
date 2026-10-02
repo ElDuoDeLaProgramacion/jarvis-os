@@ -201,6 +201,26 @@ def estado_audio():
         return "VOZ APAGADA"
 
 
+VOZ_VIVA = COLA / "voz-viva"     # la voz lo toca cada pocos segundos mientras corre
+ESCRITOS = COLA / "escritos"     # lo que David escribe en el HUD, para que la voz lo atienda
+
+
+def voz_viva():
+    try:
+        return time.time() - VOZ_VIVA.stat().st_mtime < 15
+    except OSError:
+        return False
+
+
+def a_la_voz(pedido):
+    """Lo escrito en el HUD lo atiende la voz como si lo dijeras: comandos al instante, Spotify, respuesta hablada."""
+    ESCRITOS.mkdir(parents=True, exist_ok=True)
+    nombre = f"{datetime.now():%Y%m%d-%H%M%S-%f}"
+    temporal = ESCRITOS / f"{nombre}.tmp"
+    temporal.write_text(pedido, encoding="utf-8")
+    temporal.replace(ESCRITOS / f"{nombre}.txt")  # la voz solo lee .txt completos
+
+
 def encolar(pedido):
     pedido = pedido.strip()[:500]
     if not pedido:
@@ -356,11 +376,15 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"error": "no existe"}, 404)
         largo = int(self.headers.get("Content-Length", 0))
         try:
-            pedido = json.loads(self.rfile.read(largo) or b"{}").get("pedido", "")
+            datos = json.loads(self.rfile.read(largo) or b"{}")
+            pedido, escrito = str(datos.get("pedido", "")), bool(datos.get("escrito"))
         except json.JSONDecodeError:
             return self._json({"error": "JSON inválido"}, 400)
+        if escrito and pedido.strip() and voz_viva():
+            a_la_voz(pedido.strip()[:500])
+            return self._json({"ok": True, "via": "voz"})
         ok = encolar(pedido)
-        self._json({"ok": ok}, 200 if ok else 400)
+        self._json({"ok": ok, "via": "cola"}, 200 if ok else 400)
 
     def _analizar(self):
         largo = int(self.headers.get("Content-Length", 0))

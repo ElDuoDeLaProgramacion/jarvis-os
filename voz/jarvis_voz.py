@@ -210,13 +210,24 @@ def ejecutar_navegacion(tipo, objetivo):
 REPRODUCIR = COLA / "reproducir.txt"   # la habilidad musica deja aquí el spotify:... que encontró
 URI_SPOTIFY = re.compile(r"^spotify:(track|album|playlist|artist|show|episode):[A-Za-z0-9]{10,40}$")
 MUSICA = "(la )?(musica|cancion|tema|spotify|rola)"
+# "Jarvis, abre ...": nombre dicho -> lo que Windows sabe abrir (programa registrado o enlace de la app).
+ABRIBLES = {
+    "spotify": "spotify:", "chrome": "chrome.exe", "google chrome": "chrome.exe", "edge": "msedge.exe",
+    "firefox": "firefox.exe", "brave": "brave.exe", "word": "winword.exe", "excel": "excel.exe",
+    "powerpoint": "powerpnt.exe", "outlook": "outlook.exe", "teams": "msteams:", "whatsapp": "whatsapp:",
+    "discord": "discord:", "obsidian": "obsidian:", "steam": "steam:", "bloc de notas": "notepad.exe",
+    "notepad": "notepad.exe", "calculadora": "calc.exe", "visual studio code": "code", "vs code": "code",
+    "code": "code", "explorador": "explorer.exe", "explorador de archivos": "explorer.exe",
+    "configuracion": "ms-settings:",
+}
 
 
 def accion_musica(pedido):
     """'abre Spotify', 'pausa la música', 'siguiente canción', 'sube el volumen' -> (tipo, objetivo, veces)."""
     plano = normalizar(pedido).strip(" .,!¡¿?")
-    if re.fullmatch(r"(abre|abreme|abrir|inicia) (el )?spotify", plano):
-        return ("abrir", "spotify:", 1)
+    m = re.fullmatch(r"(abre|abreme|abrir|inicia|abri) (el |la |el programa |la app )?(.+)", plano)
+    if m and m.group(3) in ABRIBLES:
+        return ("abrir", ABRIBLES[m.group(3)], 1)
     if re.fullmatch(rf"(pausa|pausar|para|deten|detén|quita)( {MUSICA})?|pon pausa|dale pausa", plano):
         return ("tecla", "play/pause media", 1)
     if re.fullmatch(rf"(sigue|reanuda|continua|play|dale play|ponle play)( {MUSICA})?", plano):
@@ -236,7 +247,10 @@ def accion_musica(pedido):
 def ejecutar_musica(tipo, objetivo, veces):
     if tipo == "abrir":
         import os
-        os.startfile(objetivo)
+        try:
+            os.startfile(objetivo)
+        except OSError:
+            return "No lo encontré instalado."
         return "Listo."
     import keyboard
     for _ in range(veces):
@@ -648,6 +662,31 @@ def escuchar_con_tecla(jarvis, modelo, tecla):
             jarvis.hablar("No te entendí.")
 
 
+VOZ_VIVA = COLA / "voz-viva"
+ESCRITOS = COLA / "escritos"
+
+
+def atender_escritos(jarvis):
+    """Lo que David escribe en el HUD llega aquí (hud/servidor.py) y se atiende igual que si lo dijera."""
+    ultimo_latido = 0.0
+    while True:
+        try:
+            if time.monotonic() - ultimo_latido > 5:   # el HUD sabe que la voz está viva
+                VOZ_VIVA.write_text(datetime.now().isoformat(timespec="seconds"), encoding="utf-8")
+                ultimo_latido = time.monotonic()
+            for archivo in sorted(ESCRITOS.glob("*.txt")) if ESCRITOS.exists() else []:
+                texto = archivo.read_text(encoding="utf-8", errors="replace").strip()
+                archivo.unlink(missing_ok=True)
+                if texto:
+                    vigente = jarvis.seguimiento and time.monotonic() < jarvis.seguimiento[1]
+                    seguir = jarvis.seguimiento[0] if vigente else None
+                    jarvis.seguimiento = None
+                    jarvis.atender(texto, "texto", reanudar=seguir)
+        except Exception as e:  # nunca tumbar la voz por un archivo raro
+            log("Error con un pedido escrito:", repr(e))
+        time.sleep(0.5)
+
+
 def arrancar_gestos(jarvis, args):
     """Ratón y teclado con la mano (gestos básicos de Hands-Free Navigator)."""
     try:
@@ -682,6 +721,7 @@ def main():
     modelo = WhisperModel(args.modelo, device=args.dispositivo,
                           compute_type="int8" if args.dispositivo == "cpu" else "float16")
     jarvis.modelo = modelo
+    threading.Thread(target=atender_escritos, args=(jarvis,), daemon=True).start()
     if not args.sin_gestos:
         arrancar_gestos(jarvis, args)
     jarvis.hablar("JARVIS en línea.")
