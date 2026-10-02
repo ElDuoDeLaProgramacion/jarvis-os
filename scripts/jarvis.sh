@@ -17,8 +17,30 @@ pedido="$*"
 mkdir -p logs
 echo "$(date -Iseconds) > $pedido" >> logs/jarvis.log
 
-respuesta=$(claude -p "$pedido" \
-  --allowedTools "Read,Write,Edit,Glob,Grep,WebSearch,WebFetch,Bash(date:*),Bash(mkdir:*),Bash(ls:*),Bash(mv:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git checkout -b:*),Bash(git add:*),Bash(git commit:*),Bash(npm test:*),Bash(python3:*),Bash(pdftotext:*)")
+# Claves locales (por ejemplo YOUTUBE_API_KEY) para scripts como canales.py.
+if [ -f .env ]; then set -a; . ./.env; set +a; fi
+
+# Herramientas que JARVIS puede usar sin preguntar. Las de Gmail y Calendar son solo de
+# lectura y borradores: enviar, reenviar, borrar o crear eventos queda fuera a propósito.
+permitidas=(
+  Read Write Edit Glob Grep WebSearch WebFetch
+  "Bash(date:*)" "Bash(mkdir:*)" "Bash(ls:*)" "Bash(mv:*)"
+  "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git checkout -b:*)"
+  "Bash(git add:*)" "Bash(git commit:*)" "Bash(npm test:*)" "Bash(python3:*)" "Bash(pdftotext:*)"
+)
+# El conector "claude.ai Gmail" aparece como mcp__claude_ai_Gmail (se listan ambas grafías por si acaso).
+for servidor in claude_ai_Gmail claude.ai_Gmail; do
+  for h in search_threads search_messages get_thread get_message list_labels list_drafts get_profile create_draft; do
+    permitidas+=("mcp__${servidor}__$h")
+  done
+done
+for servidor in claude_ai_Google_Calendar claude.ai_Google_Calendar; do
+  for h in list_calendars list_events get_event search_events suggest_time; do
+    permitidas+=("mcp__${servidor}__$h")
+  done
+done
+
+respuesta=$(claude -p "$pedido" --allowedTools "$(IFS=,; echo "${permitidas[*]}")")
 
 echo "$(date -Iseconds) < $respuesta" >> logs/jarvis.log
 echo "$respuesta"

@@ -90,6 +90,19 @@ No hay comandos fijos: le hablas normal. Ejemplos:
 
 Doble clic en `P:\jarvis-os\hud\abrir-hud.bat` y se abre la pantalla de JARVIS en el navegador: vitales, panel de comandos, agenda, pendientes, actividad de la cola y la bóveda en vivo. Detalles en [hud/README.md](hud/README.md).
 
+## Fuentes reales
+
+| Fuente | Cómo se conecta | Qué puede hacer JARVIS |
+|---|---|---|
+| Gmail | Conector **Gmail** en claude.ai (Configuración → Conectores). Claude Code lo recibe solo si iniciaste sesión con la misma cuenta | Leer, buscar y crear borradores. Nunca envía, reenvía ni borra sin tu "sí" |
+| Google Calendar | Conector **Google Calendar** en claude.ai | Ver la agenda del día para el resumen y el plan. No crea ni mueve eventos sin pedírselo |
+| GitHub | API pública, sin configurar nada | Seguidores, repos y estrellas |
+| YouTube | Clave gratis de YouTube Data API en `.env` (copia `.env.example`) | Suscriptores, vistas y videos |
+| TikTok / Instagram | Página pública del perfil | Seguidores (puede fallar si la plataforma lo bloquea; entonces dice "sin dato") |
+
+Para comprobar los conectores: abre `claude` en la carpeta y escribe `/mcp`. Deben aparecer "claude.ai Gmail" y "claude.ai Google Calendar".
+Para probar los canales: `python3 scripts/canales.py`.
+
 ## Habilidades
 
 | Habilidad | Qué hace | Escribe en |
@@ -128,4 +141,4 @@ Para dejar algo en cola tú mismo: `./scripts/encolar.sh "investiga X"` y luego 
 2. **Corredor y rutinas** (hecha): cola de intenciones y horarios automáticos.
 3. **HUD** (hecha): panel oscuro de una sola pantalla servido en local.
 4. **Voz** (hecha): push-to-talk en Windows, STT local (faster-whisper) y TTS local (voces de Windows o Piper).
-5. **Fuentes reales**: correo, calendario, almacenamiento en la nube, redes.
+5. **Fuentes reales** (hecha): Gmail y Google Calendar por conectores de claude.ai; GitHub, YouTube, TikTok e Instagram con `scripts/canales.py`.

@@ -7,7 +7,7 @@ description: Escribe las 3 prioridades del día (o de mañana, o la revisión se
 ## Plan de hoy / mañana
 1. Lee: metas y proyectos en `boveda/wiki/perfil.md`, pendientes en `boveda/wiki/tareas.md`, la cola del último cierre en `boveda/outputs/diario/`, y el resumen matutino de hoy si existe.
 2. Elige exactamente 3 prioridades, de cualquier área (correo, programación, archivos, canales...). Cada una concreta y terminable en el día.
-3. Si hay calendario, añade la agenda por horas.
+3. Añade la agenda por horas con los eventos del día del conector **claude.ai Google Calendar** (zona horaria de Bogotá). Si no está disponible, deja solo las prioridades. Nunca crees, muevas ni borres eventos sin que David lo pida.
 4. Escribe `boveda/outputs/planes/AAAA-MM-DD.md`:
    ```
    ---

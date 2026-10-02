@@ -5,8 +5,9 @@ description: Trabaja con el correo de David. Leer y resumir la bandeja, buscar u
 # Correo
 
 ## Fuente
-- Si hay un conector de correo (Gmail, Outlook) disponible, úsalo.
-- Si no, trabaja con correos guardados en `boveda/raw/correo/` y di que el correo no está conectado.
+- El conector **claude.ai Gmail** (cuenta elduodelaprogramacion@gmail.com). Sus herramientas aparecen como `mcp__claude_ai_Gmail__...`.
+- Úsalo solo para leer, buscar y crear borradores. Aunque el conector tenga herramientas para reenviar, etiquetar, filtrar o borrar, no las uses sin un "sí" explícito de David en esta conversación.
+- Si el conector no está disponible, trabaja con correos guardados en `boveda/raw/correo/` y di que Gmail no está conectado.
 
 ## Resumir la bandeja
 1. No leídos de las últimas 24 h (o el rango que pida).
