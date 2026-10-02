@@ -71,7 +71,7 @@ O abre `claude` en la carpeta y habla con él normalmente: las habilidades se ca
 
 ## Hablar con JARVIS
 
-Instala la voz siguiendo [voz/README.md](voz/README.md). Luego abre `P:\jarvis-os\voz\jarvis.bat`, mantén **F9**, habla y suelta.
+Instala la voz siguiendo [voz/README.md](voz/README.md). Luego abre `P:\jarvis-os\voz\jarvis.bat` y di "Jarvis" seguido de lo que necesitas, o muéstrale un gesto a la cámara.
 
 No hay comandos fijos: le hablas normal. Ejemplos:
 
@@ -149,5 +149,5 @@ Para dejar algo en cola tú mismo: `./scripts/encolar.sh "investiga X"` y luego 
 1. **Cerebro + memoria** (hecha): habilidades, bóveda, enrutador.
 2. **Corredor y rutinas** (hecha): cola de intenciones y horarios automáticos.
 3. **HUD** (hecha): panel oscuro de una sola pantalla servido en local.
-4. **Voz** (hecha): push-to-talk en Windows, STT local (faster-whisper) y TTS local (voces de Windows o Piper).
+4. **Voz** (hecha): palabra de activación "Jarvis" y gestos con la cámara en Windows, STT local (faster-whisper) y TTS local (voces de Windows o Piper).
 5. **Fuentes reales** (hecha): Gmail y Google Calendar por conectores de claude.ai; GitHub, YouTube, TikTok e Instagram con `scripts/canales.py`.

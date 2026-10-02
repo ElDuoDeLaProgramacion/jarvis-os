@@ -1,35 +1,61 @@
-# Voz de JARVIS (Windows)
+# Voz y gestos de JARVIS (Windows)
 
-Mantén pulsada **F9**, habla, suelta. JARVIS transcribe tu voz en local, ejecuta la petición en WSL y te responde en voz alta.
+Di **"Jarvis"** seguido de lo que necesitas ("Jarvis, plan de hoy"), o solo "Jarvis" y espera el "¿Sí?". JARVIS transcribe tu voz en local, ejecuta la petición en WSL y **siempre** te contesta en voz alta. También entiende gestos de la mano frente a la cámara.
 
 ```
-micrófono → faster-whisper (local) → wsl: scripts/jarvis.sh → Claude Code + habilidades → voz de Windows
+micrófono → faster-whisper (local) → "¿empieza por Jarvis?" → wsl: scripts/jarvis.sh → Claude Code + habilidades → voz de Windows
+cámara    → MediaPipe (local) → gesto mantenido 1 s → la misma orden
 ```
 
-El audio nunca sale de tu máquina: la transcripción y la voz son locales. Solo el texto transcrito va a Claude.
+El audio y la imagen nunca salen de tu máquina: la transcripción, los gestos y la voz son locales. Solo el texto de la orden va a Claude.
 
 ## Instalar (una vez)
 
-Necesitas Python 3.10+ **para Windows** (no el de WSL): https://www.python.org/downloads/ (marca "Add python.exe to PATH").
+Necesitas Python **para Windows** (no el de WSL): https://www.python.org/downloads/ (marca "Add python.exe to PATH"). Para los gestos tiene que ser **3.9 a 3.12** (MediaPipe aún no funciona con 3.13); la 3.11 es la más segura.
 
 1. Antes, comprueba que JARVIS ya funciona por texto en Ubuntu: `cd /mnt/p/jarvis-os && ./scripts/jarvis.sh "hola"`.
-2. En el Explorador abre `P:\jarvis-os\voz` y haz doble clic en `instalar.bat`.
+2. En el Explorador abre `P:\jarvis-os\voz` y haz doble clic en `instalar.bat`. Si al final sale el aviso de que los gestos no se instalaron, instala Python 3.11, borra la carpeta `voz\.venv` y vuelve a ejecutarlo.
 
 ## Usar
 
-Doble clic en `jarvis.bat`. La primera vez descarga el modelo de voz (unos 500 MB para `small`). Luego:
+Doble clic en `jarvis.bat` (o se abre solo al iniciar sesión, ver [rutinas](../rutinas/README.md)). La primera vez descarga el modelo de voz (unos 500 MB para `small`). Cuando diga "JARVIS en línea":
 
-- Mantén **F9**, di "plan de hoy", suelta.
-- Verás la transcripción y la respuesta en la ventana, y la oirás.
+- "Jarvis, plan de hoy" → dice "Enseguida", trabaja y te lee la respuesta.
+- "Jarvis" a secas → "¿Sí?" → dices la orden en los 8 segundos siguientes.
+- Lo que digas sin "Jarvis" al principio se ignora (aparece como "(oído)" en la ventana).
+- Mientras JARVIS piensa o habla no escucha, para no oírse a sí mismo.
 - Si tienes el HUD abierto, "Audio E/S" muestra ESCUCHANDO, PENSANDO o HABLANDO, y cada conversación aparece en "Actividad".
 
-Opciones (se añaden al final, por ejemplo `jarvis.bat --tecla f8`):
+## Gestos
+
+Mantén el gesto **1 segundo** frente a la cámara. No mueve el ratón ni el teclado: solo da órdenes a JARVIS.
+
+| Gesto | Qué hace |
+|---|---|
+| Palma abierta | JARVIS te escucha sin decir "Jarvis" ("¿Sí?") |
+| Pulgar abajo | Que se calle ya |
+| Pulgar arriba | Resumen matutino |
+| V (índice y medio separados) | Plan de hoy |
+| Solo el índice | Revisa pendientes y correos que esperan respuesta |
+| Tres dedos | Resume mis correos de hoy |
+| Cuernos (índice y meñique) | Pausar o reanudar los gestos |
+| Puño | Reposo, no hace nada |
+
+Cambia lo que hace cada gesto en `voz\gestos.csv` (columna `accion`: `escuchar`, `callar`, `pausar` o cualquier pedido). La lectura de los dedos viene de [Hands-Free Navigator](https://github.com/ElDuoDeLaProgramacion/Hands-Free-Navigator).
+
+## Opciones
+
+Se añaden al final, por ejemplo `jarvis.bat --modelo base`:
 
 | Opción | Para qué |
 |---|---|
-| `--tecla f8` | Cambiar la tecla para hablar |
+| `--tecla f9` | Volver a hablar manteniendo una tecla en vez de decir "Jarvis" |
+| `--sensibilidad 2` | Si no detecta tu voz (más bajo = más sensible; por defecto 3) |
 | `--modelo base` | Modelo más rápido (menos preciso). `medium` es más preciso y más lento |
 | `--dispositivo cuda` | Usar la tarjeta gráfica NVIDIA si tienes |
+| `--sin-gestos` | No usar la cámara |
+| `--ver-camara` | Ver la cámara con el gesto que detecta (para ajustar) |
+| `--camara 1` | Otra cámara |
 | `--distro Ubuntu-22.04` | Si tu distribución de WSL tiene otro nombre (míralo con `wsl -l`) |
 | `--piper ruta\voz.onnx` | Voz más natural con Piper (ver abajo) |
 | `--solo-texto` | Escribir en vez de hablar, para probar sin micrófono |
@@ -45,6 +71,8 @@ Para una voz más natural con Piper:
 
 ## Problemas comunes
 
-- **No pasa nada al pulsar F9**: ejecuta `jarvis.bat` como administrador (algunas apps bloquean la captura de teclas).
+- **No responde a "Jarvis"**: mira la ventana; si aparece "(oído) ..." con otra palabra, dilo más claro o usa `--modelo medium`. Si no aparece nada, prueba `--sensibilidad 2`.
+- **Hace la acción pero no habla**: revisa `P:\jarvis-os\logs\voz.log`; ahí queda el motivo. Si la voz sale en inglés, instala una voz española en Configuración → Hora e idioma → Voz.
 - **"Error de JARVIS"**: prueba `./scripts/jarvis.sh "hola"` en Ubuntu; si ahí falla, el problema es de Claude Code, no de la voz.
+- **Los gestos no hacen nada**: abre con `--ver-camara` para ver qué gesto detecta. Si dice que no están instalados, mira "Instalar".
 - **Tarda en responder**: la mayor parte del tiempo es Claude trabajando. Para transcribir más rápido usa `--modelo base`.
