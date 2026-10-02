@@ -36,6 +36,7 @@ COMANDOS = [
     ("Tendencias", "tendencias de mis temas esta semana"),
     ("Tendencias GH", "tendencias GH"),
     ("Canales", "¿cómo van mis canales?"),
+    ("Suscripciones", "revisa mis suscripciones"),
     ("Plan de mañana", "plan de mañana"),
     ("Revisión semanal", "revisión semanal"),
     ("Limpieza bóveda", "limpieza de bóveda"),

@@ -8,5 +8,6 @@ Mapa de la bóveda de JARVIS.
 
 - [[perfil]]: áreas, proyectos, carpetas, metas, temas y canales
 - [[tareas]]: lista de pendientes por área
-- Entregables en `outputs/`: correo, archivos, programación, búsquedas, planes, resúmenes, tendencias, canales, diario
+- [[suscripciones]]: cobros recurrentes, totales y próximas renovaciones
+- Entregables en `outputs/`: correo, archivos, programación, búsquedas, planes, resúmenes, tendencias, canales, suscripciones, diario
 - Capturas sin procesar en `raw/`

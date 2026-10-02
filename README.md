@@ -83,6 +83,7 @@ No hay comandos fijos: le hablas normal. Ejemplos:
 - "Investiga las mejores librerías de detección facial en Python"
 - "¿Qué hay de nuevo en inversiones esta semana?"
 - "¿Cómo van mis canales?"
+- "Revisa mis suscripciones" → "¿cuánto pago al mes?" → "¿cómo cancelo Netflix?"
 - "Recuerda que la reunión con el cliente es el lunes" → "¿qué sé del cliente?"
 - "Cierra el día"
 
@@ -123,6 +124,7 @@ Para probar los canales: `python3 scripts/canales.py`.
 | `plan` | Las 3 prioridades de hoy y la revisión semanal | `outputs/planes/` |
 | `tendencias` | Lo que se mueve en tus temas | `outputs/tendencias/` |
 | `canales` | Números de tus redes y canales | `outputs/canales/` |
+| `suscripciones` | Cobros recurrentes desde los recibos de Gmail: total al mes, renovaciones próximas y cómo cancelar | `wiki/suscripciones.md`, `outputs/suscripciones/` |
 | `boveda` | Lee y escribe memoria; mantiene el grafo enlazado | `raw/`, `wiki/` |
 | `cierre-dia` | Reflexión del día y cola de mañana | `outputs/diario/` |
 
