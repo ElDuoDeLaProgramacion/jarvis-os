@@ -31,14 +31,16 @@ while true; do
   origen=$(sed -n 's/^origen: //p' "$en_curso")
 
   # Lo que llega de rutinas o del HUD corre sin conversación: JARVIS no puede esperar respuesta.
+  automatico=0
   if [ "$origen" != "manual" ]; then
+    automatico=1
     pedido="$pedido (Ejecución automática desde la cola ($origen): nadie puede responderte. No hagas preguntas; si te falta un dato, déjalo marcado como pendiente en la nota.)"
   fi
 
   echo "$(date -Iseconds) corredor > $nombre: $pedido" >> logs/corredor.log
   inicio=$(date +%s)
 
-  if respuesta=$(./scripts/jarvis.sh "$pedido" 2>&1); then
+  if respuesta=$(JARVIS_AUTOMATICO=$automatico ./scripts/jarvis.sh "$pedido" 2>&1); then
     destino="cola/hechas/$nombre"
     estado="hecha"
   else

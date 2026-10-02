@@ -15,7 +15,7 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | archivos, documentos, PDFs, hojas de cálculo, carpetas, ordenar, convertir | `archivos` |
 | código, repositorios, errores, scripts, pruebas, un proyecto de software | `programacion` |
 | buscar, investigar, averiguar, comparar, información actual de la web | `busqueda` |
-| pendientes, "anota la tarea", "recuérdame", marcar como hecho | `tareas` |
+| pendientes, "anota la tarea", "recuérdame", marcar como hecho, agendar o poner algo en Google Calendar | `tareas` |
 | resumen matutino, reporte AM, "qué tengo hoy", ponme al día | `resumen-dia` |
 | plan de hoy, plan de mañana, prioridades, revisión semanal | `plan` |
 | tendencias, qué hay de nuevo en un tema, GitHub trending | `tendencias` |

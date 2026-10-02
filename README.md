@@ -103,7 +103,7 @@ Instala una vez con `P:\jarvis-os\hud\instalar.bat` y luego abre `hud\abrir-hud.
 | Fuente | Cómo se conecta | Qué puede hacer JARVIS |
 |---|---|---|
 | Gmail | Conector **Gmail** en claude.ai (Configuración → Conectores). Claude Code lo recibe solo si iniciaste sesión con la misma cuenta | Leer, buscar y crear borradores. Nunca envía, reenvía ni borra sin tu "sí" |
-| Google Calendar | Conector **Google Calendar** en claude.ai | Ver la agenda del día para el resumen y el plan. No crea ni mueve eventos sin pedírselo |
+| Google Calendar | Conector **Google Calendar** en claude.ai | Ver la agenda del día para el resumen y el plan, y crear o cambiar eventos cuando se lo pides ("Jarvis, agéndame..."). Las rutinas solo leen; borrar eventos no puede |
 | GitHub | API pública, sin configurar nada | Seguidores, repos y estrellas |
 | YouTube | Clave gratis de YouTube Data API en `.env` (copia `.env.example`) | Suscriptores, vistas y videos |
 | TikTok / Instagram | Página pública del perfil | Seguidores (puede fallar si la plataforma lo bloquea; entonces dice "sin dato") |

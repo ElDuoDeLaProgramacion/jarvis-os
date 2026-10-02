@@ -20,8 +20,9 @@ echo "$(date -Iseconds) > $pedido" >> logs/jarvis.log
 # Claves locales (por ejemplo YOUTUBE_API_KEY) para scripts como canales.py.
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 
-# Herramientas que JARVIS puede usar sin preguntar. Las de Gmail y Calendar son solo de
-# lectura y borradores: enviar, reenviar, borrar o crear eventos queda fuera a propósito.
+# Herramientas que JARVIS puede usar sin preguntar. Gmail es solo lectura y borradores:
+# enviar, reenviar o borrar queda fuera a propósito. Calendar: leer siempre; crear y
+# cambiar eventos solo cuando David lo pide en directo (voz o terminal), nunca en rutinas.
 permitidas=(
   Read Write Edit Glob Grep WebSearch WebFetch
   "Bash(date:*)" "Bash(mkdir:*)" "Bash(ls:*)" "Bash(mv:*)"
@@ -30,7 +31,7 @@ permitidas=(
 )
 # Conectores de claude.ai: "claude.ai Gmail" → mcp__claude_ai_Gmail (se listan ambas grafías por si acaso).
 # Fuera a propósito: send_message, reply, forward, trash_*, *_spam, *label* y delete_draft (Gmail);
-# create_event, update_event, delete_event y respond_to_event (Calendar).
+# delete_event y respond_to_event (Calendar).
 for servidor in claude_ai_Gmail claude.ai_Gmail; do
   for h in search_threads get_thread get_message list_labels list_drafts get_draft create_draft update_draft; do
     permitidas+=("mcp__${servidor}__$h")
@@ -40,6 +41,12 @@ for servidor in claude_ai_Google_Calendar claude.ai_Google_Calendar; do
   for h in list_calendars list_events get_event search_events suggest_time; do
     permitidas+=("mcp__${servidor}__$h")
   done
+  # La cola marca JARVIS_AUTOMATICO=1 en rutinas y botones: ahí nadie pidió crear nada.
+  if [ "${JARVIS_AUTOMATICO:-0}" != "1" ]; then
+    for h in create_event update_event; do
+      permitidas+=("mcp__${servidor}__$h")
+    done
+  fi
 done
 
 respuesta=$(claude -p "$pedido" --allowedTools "$(IFS=,; echo "${permitidas[*]}")")
