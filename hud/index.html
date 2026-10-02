@@ -194,9 +194,10 @@ function aviso(texto) {
   setTimeout(() => $("aviso").classList.remove("visible"), 2200);
 }
 
-async function encolar(pedido) {
-  const r = await fetch("/api/encolar", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({pedido})});
-  aviso(r.ok ? "En cola: " + pedido : "No se pudo encolar");
+async function encolar(pedido, escrito = false) {
+  const r = await fetch("/api/encolar", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({pedido, escrito})});
+  const d = r.ok ? await r.json() : {};
+  aviso(!r.ok ? "No se pudo encolar" : d.via === "voz" ? "A JARVIS: " + pedido : "En cola: " + pedido);
   refrescar();
 }
 
@@ -280,7 +281,7 @@ document.addEventListener("click", e => {
 $("pedir").addEventListener("submit", e => {
   e.preventDefault();
   const t = $("pedido").value.trim();
-  if (t) { encolar(t); $("pedido").value = ""; }
+  if (t) { encolar(t, true); $("pedido").value = ""; }
 });
 
 setInterval(() => {

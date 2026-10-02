@@ -24,6 +24,8 @@ Doble clic en `jarvis.bat` (o se abre solo al iniciar sesión, ver [rutinas](../
 - "Jarvis" a secas → "¿Sí?" → dices la orden en los 8 segundos siguientes.
 - Lo que digas sin "Jarvis" al principio se ignora (aparece como "(oído)" en la ventana).
 - **Si JARVIS te pregunta algo** ("¿Lo agendo?"), contesta sin decir "Jarvis" en los 20 segundos siguientes: sigue la misma conversación.
+- **Abrir programas** (al instante): "Jarvis, abre Chrome / Word / Excel / Spotify / WhatsApp / la calculadora / VS Code...". La lista está en `ABRIBLES` en `jarvis_voz.py`.
+- **Escribir en el HUD**: mientras la voz está encendida, lo que escribes en la caja del HUD lo atiende la voz igual que si lo dijeras (comandos al instante, música y respuesta hablada). Si la voz está apagada, va a la cola como antes.
 - **Música** (al instante, sin pasar por Claude ni gastar uso): "Jarvis, abre Spotify", "pausa", "play", "siguiente canción", "canción anterior", "sube el volumen", "baja el volumen".
 - **"Jarvis, pon ..."** (una canción, un artista, "algo para concentrarme"): JARVIS lo busca con el conector de Spotify y lo abre en tu Spotify. Si es una lista o un álbum y no arranca solo, di "Jarvis, play".
 - **Enviar un correo**: JARVIS redacta, te lo resume y pregunta "¿Lo envío? Sí o no." Si contestas "sí" (o "dale", "envíalo") en esos 20 segundos, lo envía; con "no", "espera" o "mejor no" queda como borrador. Solo envía en esa respuesta tuya, nunca desde rutinas ni botones del HUD. Las cancelaciones de suscripciones por correo funcionan igual.

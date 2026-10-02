@@ -90,7 +90,8 @@ if [ -n "$reanudar" ]; then opciones+=(--resume "$reanudar"); fi
 # Por voz importa la rapidez: un modelo más ágil. Las rutinas y la terminal usan el de siempre.
 if [ "$voz" = "1" ]; then opciones+=(--model "${JARVIS_MODELO_VOZ:-sonnet}"); fi
 
-salida=$(claude "${opciones[@]}")
+# </dev/null: sin esto claude espera 3 s una entrada que nunca llega y avisa "no stdin data received".
+salida=$(claude "${opciones[@]}" </dev/null)
 # La salida JSON trae la respuesta ("result") y la conversación ("session_id").
 if datos=$(printf '%s' "$salida" | python3 -c 'import json, sys
 d = json.load(sys.stdin)
