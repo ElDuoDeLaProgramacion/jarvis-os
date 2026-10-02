@@ -26,7 +26,7 @@ boveda/           vault de Obsidian
 scripts/          jarvis.sh (petición directa), encolar.sh, corredor.sh, rutina.sh
 cola/             intenciones pendientes, en curso, hechas y fallidas
 rutinas/          horarios del día real para el Programador de tareas de Windows
-hud/              la pantalla de JARVIS (servidor local + página)
+hud/              la pantalla de JARVIS (programa de Windows + servidor local)
 ```
 
 ## Requisitos (Windows + WSL)
@@ -95,7 +95,7 @@ Detalles en [rutinas/README.md](rutinas/README.md).
 
 ## HUD
 
-Doble clic en `P:\jarvis-os\hud\abrir-hud.bat` y se abre la pantalla de JARVIS en el navegador: vitales, panel de comandos, agenda, pendientes, actividad de la cola y la bóveda en vivo. Detalles en [hud/README.md](hud/README.md).
+Instala una vez con `P:\jarvis-os\hud\instalar.bat` y luego abre `hud\abrir-hud.bat`: la pantalla de JARVIS sale en su propia ventana, sin navegador, con vitales, panel de comandos, agenda, pendientes, actividad de la cola y la bóveda en vivo. Detalles en [hud/README.md](hud/README.md).
 
 ## Fuentes reales
 

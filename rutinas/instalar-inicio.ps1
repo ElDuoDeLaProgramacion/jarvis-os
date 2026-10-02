@@ -1,9 +1,10 @@
-# Hace que el HUD y la voz de JARVIS arranquen solos al iniciar sesión en Windows.
+﻿# Hace que el HUD y la voz de JARVIS arranquen solos al iniciar sesión en Windows.
 # Crea dos tareas en el Programador de tareas, carpeta \JARVIS\Inicio\.
 # Uso (PowerShell):  powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\instalar-inicio.ps1
 param(
     [string]$Distro = "Ubuntu",
-    [switch]$SinVoz
+    [switch]$SinVoz,
+    [switch]$PantallaCompleta
 )
 
 $repo = Split-Path $PSScriptRoot -Parent
@@ -11,8 +12,8 @@ $carpeta = "\JARVIS\Inicio\"
 $usuario = "$env:USERDOMAIN\$env:USERNAME"
 $ajustes = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 
-function Registrar($nombre, $comando, $retraso) {
-    $accion = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c $comando"
+function Registrar($nombre, $programa, $argumentos, $retraso) {
+    $accion = New-ScheduledTaskAction -Execute $programa -Argument $argumentos -WorkingDirectory $repo
     $disparador = New-ScheduledTaskTrigger -AtLogOn -User $usuario
     $disparador.Delay = $retraso
     Register-ScheduledTask -TaskPath $carpeta -TaskName $nombre -Action $accion `
@@ -20,15 +21,20 @@ function Registrar($nombre, $comando, $retraso) {
     Write-Host "OK  al iniciar sesión  ->  $nombre"
 }
 
-# El HUD espera 20 s para que Windows termine de arrancar; luego abre el navegador solo.
-Registrar "HUD" "`"$repo\hud\abrir-hud.bat`" $Distro" "PT20S"
+# El HUD es su propio programa (sin navegador ni consola). Espera 20 s a que Windows termine de arrancar.
+if (-not (Test-Path "$repo\hud\.venv\Scripts\pythonw.exe")) {
+    Write-Host "Aviso: el HUD aún no está instalado. Ejecuta $repo\hud\instalar.bat antes de reiniciar."
+}
+$argsHud = "`"$repo\hud\jarvis_hud.py`" --distro $Distro"
+if ($PantallaCompleta) { $argsHud += " --pantalla-completa" }
+Registrar "HUD" "$repo\hud\.venv\Scripts\pythonw.exe" $argsHud "PT20S"
 
 if (-not $SinVoz) {
     if (-not (Test-Path "$repo\voz\.venv")) {
         Write-Host "Aviso: la voz aún no está instalada. Ejecuta $repo\voz\instalar.bat antes de reiniciar."
     }
     # La voz queda en una ventana minimizada escuchando F9.
-    Registrar "Voz" "start `"JARVIS voz`" /min `"$repo\voz\jarvis.bat`" --distro $Distro" "PT30S"
+    Registrar "Voz" "cmd.exe" "/c start `"JARVIS voz`" /min `"$repo\voz\jarvis.bat`" --distro $Distro" "PT30S"
 }
 
 Write-Host ""

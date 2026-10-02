@@ -39,12 +39,13 @@ powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\desinstalar-rutina
 
 ## Arranque automático del HUD y la voz
 
-Para que al iniciar sesión en Windows se abra el HUD en el navegador y la voz quede escuchando F9 (ventana minimizada):
+Para que al iniciar sesión en Windows se abra el programa del HUD (su propia ventana, sin navegador) y la voz quede escuchando F9 (ventana minimizada):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\instalar-inicio.ps1
 ```
 
-- Instala antes la voz (`voz\instalar.bat`). Si solo quieres el HUD, añade `-SinVoz`.
+- Instala antes el HUD (`hud\instalar.bat`) y la voz (`voz\instalar.bat`). Si solo quieres el HUD, añade `-SinVoz`.
+- Para que el HUD ocupe toda la pantalla, añade `-PantallaCompleta`.
 - Si tu distribución de WSL no se llama `Ubuntu`, añade `-Distro "NombreExacto"`.
 - Para quitarlo: `powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\desinstalar-inicio.ps1`

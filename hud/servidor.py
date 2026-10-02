@@ -13,6 +13,8 @@ import os
 import re
 import shutil
 import subprocess
+import sys
+import threading
 import time
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -287,10 +289,20 @@ class Manejador(BaseHTTPRequestHandler):
         pass  # silencio: el HUD consulta cada pocos segundos
 
 
+def esperar_cierre():
+    """El programa de Windows deja la entrada abierta; cuando se cierra, el servidor sale."""
+    sys.stdin.read()
+    os._exit(0)
+
+
 def main():
     p = argparse.ArgumentParser(description="HUD de JARVIS")
     p.add_argument("--puerto", type=int, default=7777)
+    p.add_argument("--con-programa", action="store_true",
+                   help="se apaga solo cuando se cierra el programa del HUD en Windows")
     args = p.parse_args()
+    if args.con_programa:
+        threading.Thread(target=esperar_cierre, daemon=True).start()
     uso_cpu()  # primera lectura para tener referencia
     servidor = ThreadingHTTPServer(("127.0.0.1", args.puerto), Manejador)
     print(f"HUD de JARVIS en http://localhost:{args.puerto}  (Ctrl+C para salir)")
