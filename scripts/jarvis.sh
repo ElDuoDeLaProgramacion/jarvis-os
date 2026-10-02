@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Punto de entrada por texto: ./scripts/jarvis.sh "plan de hoy"
-# La capa de voz (fase 4) llamará a este mismo script con el texto transcrito.
+# La voz (voz/jarvis_voz.py) llama a este mismo script con el texto transcrito.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+# La voz llama a este script sin cargar ~/.bashrc, así que aseguramos dónde está claude.
+export PATH="$HOME/.local/bin:$PATH"
 
 if [ $# -eq 0 ]; then
   echo "Uso: $0 \"tu petición\"" >&2

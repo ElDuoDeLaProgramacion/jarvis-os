@@ -8,7 +8,7 @@ Asistente de trabajo por voz. Tú hablas, JARVIS ejecuta el trabajo: correos, ar
 |---|---|---|
 | Claude Code | El motor: enruta cada petición a la habilidad adecuada | `CLAUDE.md`, `.claude/skills/` |
 | Obsidian | La memoria: todo aterriza como Markdown enlazado | `boveda/` |
-| Voz local | Oídos y boca: STT entra, TTS sale, 100% privado | `voz/` (fase 4) |
+| Voz local | Oídos y boca: STT entra, TTS sale, 100% privado | `voz/` |
 | HUD | La cara: una pantalla con vitales, agenda y comandos | `hud/` (fase 3) |
 
 Sin base de datos. Solo archivos Markdown que puedes leer y editar a mano.
@@ -60,6 +60,23 @@ cd /mnt/p/jarvis-os
 
 O abre `claude` en la carpeta y habla con él normalmente: las habilidades se cargan solas.
 
+## Hablar con JARVIS
+
+Instala la voz siguiendo [voz/README.md](voz/README.md). Luego abre `P:\jarvis-os\voz\jarvis.bat`, mantén **F9**, habla y suelta.
+
+No hay comandos fijos: le hablas normal. Ejemplos:
+
+- "Ponme al día" / "resumen matutino"
+- "Plan de hoy" / "¿qué tengo pendiente?"
+- "Anota la tarea: terminar el bot de WhatsApp para el viernes"
+- "Revisa el estado del proyecto Hands-Free Navigator"
+- "Busca en Descargas el PDF de la factura de septiembre"
+- "Investiga las mejores librerías de detección facial en Python"
+- "¿Qué hay de nuevo en inversiones esta semana?"
+- "¿Cómo van mis canales?"
+- "Recuerda que la reunión con el cliente es el lunes" → "¿qué sé del cliente?"
+- "Cierra el día"
+
 ## Habilidades
 
 | Habilidad | Qué hace | Escribe en |
@@ -93,5 +110,5 @@ Regla: habilidades pequeñas de un solo propósito superan a un prompt gigante.
 1. **Cerebro + memoria** (este repo hoy): habilidades, bóveda, enrutador.
 2. **Corredor y rutinas**: cola de intenciones y horarios automáticos.
 3. **HUD**: panel oscuro de una sola pantalla servido en local.
-4. **Voz**: push-to-talk, STT local (faster-whisper) y TTS local (Piper).
+4. **Voz** (hecha): push-to-talk en Windows, STT local (faster-whisper) y TTS local (voces de Windows o Piper).
 5. **Fuentes reales**: correo, calendario, almacenamiento en la nube, redes.
