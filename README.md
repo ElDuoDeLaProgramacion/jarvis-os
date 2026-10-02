@@ -29,7 +29,13 @@ scripts/jarvis.sh punto de entrada por texto (la voz lo usará después)
 ## Requisitos (Windows + WSL)
 
 1. WSL con Ubuntu: `wsl --install -d Ubuntu` en PowerShell si aún no lo tienes.
-2. Dentro de Ubuntu: Node 18+ y Claude Code (`npm install -g @anthropic-ai/claude-code`), luego `claude` una vez para iniciar sesión.
+2. Dentro de Ubuntu, instala Claude Code con el instalador nativo (no necesita Node ni sudo):
+   ```bash
+   curl -fsSL https://claude.ai/install.sh | bash
+   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+   claude
+   ```
+   El último comando abre Claude Code para iniciar sesión. No uses `sudo npm install -g`: la versión de npm pide Node 22+ y con sudo deja permisos rotos.
 3. Comprueba que WSL ve la unidad P: con `ls /mnt/p`. Si no aparece (pasa con unidades mapeadas o `subst`), móntala:
    ```bash
    sudo mkdir -p /mnt/p && sudo mount -t drvfs P: /mnt/p
