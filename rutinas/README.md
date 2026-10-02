@@ -39,7 +39,7 @@ powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\desinstalar-rutina
 
 ## Arranque automático del HUD y la voz
 
-Para que al iniciar sesión en Windows se abra el programa del HUD (su propia ventana, sin navegador) y la voz quede escuchando F9 (ventana minimizada):
+Para que al iniciar sesión en Windows se abra el programa del HUD (su propia ventana, sin navegador) y la voz quede escuchando "Jarvis" y tus gestos (ventana minimizada):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\instalar-inicio.ps1

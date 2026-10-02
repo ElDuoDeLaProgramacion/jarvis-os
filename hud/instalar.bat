@@ -1,7 +1,10 @@
 @echo off
 REM Instala el programa del HUD de JARVIS (ventana propia, sin navegador).
 cd /d "%~dp0"
-python -m venv .venv || goto :error
+REM Si ya existe (por ejemplo, con JARVIS abierto) no se recrea: solo se actualizan los paquetes.
+if not exist .venv\Scripts\python.exe (
+  python -m venv .venv || goto :error
+)
 call .venv\Scripts\activate.bat
 python -m pip install --upgrade pip
 pip install -r requirements.txt || goto :error

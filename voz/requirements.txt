@@ -2,5 +2,5 @@ faster-whisper>=1.0
 sounddevice>=0.4
 numpy>=1.24
 keyboard>=0.13
-pyttsx3>=2.90
+comtypes>=1.2; sys_platform == "win32"
 # Opcional, voz más natural: piper-tts>=1.3
