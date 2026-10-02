@@ -5,7 +5,8 @@ description: Tareas de programación en los proyectos de David. Explicar código
 # Programación
 
 ## Dónde
-- Los proyectos están en la carpeta "Proyectos" de `boveda/wiki/perfil.md`.
+- Los proyectos están en `P:\` (`/mnt/p` en WSL) y listados en "Proyectos" de `boveda/wiki/perfil.md`.
+- Cualquier proyecto nuevo se crea en `/mnt/p`.
 - Si David nombra un proyecto, trabaja dentro de esa carpeta y lee su README y CLAUDE.md primero.
 
 ## Cómo

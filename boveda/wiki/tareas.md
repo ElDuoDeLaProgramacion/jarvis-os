@@ -7,7 +7,7 @@ tags: [jarvis, tareas]
 ## Trabajo
 
 ## Programación
-- [ ] Probar JARVIS OS fase 1 en WSL #programacion
+- [ ] Clonar jarvis-os en P:\ y probarlo en WSL #programacion
 
 ## Correo
 

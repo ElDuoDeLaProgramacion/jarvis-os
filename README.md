@@ -30,13 +30,21 @@ scripts/jarvis.sh punto de entrada por texto (la voz lo usará después)
 
 1. WSL con Ubuntu: `wsl --install -d Ubuntu` en PowerShell si aún no lo tienes.
 2. Dentro de Ubuntu: Node 18+ y Claude Code (`npm install -g @anthropic-ai/claude-code`), luego `claude` una vez para iniciar sesión.
-3. Llena `boveda/wiki/perfil.md` con tus carpetas, proyectos y correo.
-4. Obsidian en Windows: "Open folder as vault" y elige `\\wsl$\Ubuntu\home\<tu-usuario>\jarvis-os\boveda`.
+3. Comprueba que WSL ve la unidad P: con `ls /mnt/p`. Si no aparece (pasa con unidades mapeadas o `subst`), móntala:
+   ```bash
+   sudo mkdir -p /mnt/p && sudo mount -t drvfs P: /mnt/p
+   ```
+4. Clona el repo en P: (ahí viven todos los proyectos):
+   ```bash
+   cd /mnt/p && git clone https://github.com/ElDuoDeLaProgramacion/jarvis-os
+   ```
+5. Revisa `boveda/wiki/perfil.md`: ahí están tus carpetas, proyectos y correo.
+6. Obsidian en Windows: "Open folder as vault" y elige `P:\jarvis-os\boveda`.
 
 ## Uso
 
 ```bash
-cd ~/jarvis-os
+cd /mnt/p/jarvis-os
 ./scripts/jarvis.sh "plan de hoy"
 ./scripts/jarvis.sh "resume mis correos de hoy"
 ./scripts/jarvis.sh "busca en Descargas el PDF de la factura de septiembre"

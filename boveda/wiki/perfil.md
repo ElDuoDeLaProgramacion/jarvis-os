@@ -4,7 +4,7 @@ tags: [jarvis, contexto]
 ---
 # Perfil
 
-> Edita esta nota: JARVIS la lee para saber dónde trabajar y qué te importa.
+> JARVIS lee esta nota para saber dónde trabajar y qué te importa. Edítala cuando algo cambie.
 
 ## Áreas de trabajo
 - Correo
@@ -17,28 +17,47 @@ tags: [jarvis, contexto]
 - Construir JARVIS OS (ver [[inicio]])
 
 ## Proyectos
-| Proyecto | Carpeta | Notas |
+Todos los proyectos de programación viven en `P:\` (en WSL: `/mnt/p`).
+
+| Proyecto | Carpeta | Qué es |
 |---|---|---|
-| jarvis-os | ~/jarvis-os | este asistente |
+| jarvis-os | /mnt/p/jarvis-os | Este asistente de trabajo por voz |
+| Hands-Free Navigator | /mnt/p/Hands-Free Navigator | Navegador que controla el mouse con gestos de la mano y otros comandos |
+| Deteccion_Facial | /mnt/p/Deteccion_Facial | Detección facial |
+| bot-whatsapp-excel | /mnt/p/bot-whatsapp-excel | Bot que se conecta por QR a WhatsApp y arma tablas de finanzas en Excel |
+
+> Si el nombre de alguna carpeta es distinto, corrígelo aquí.
 
 ## Carpetas
-Rutas donde JARVIS puede buscar y ordenar archivos (en WSL, Windows está en `/mnt/c/Users/<usuario>/`).
-- Proyectos: ~/proyectos
-- Documentos: /mnt/c/Users/(completar)/Documents
-- Descargas: /mnt/c/Users/(completar)/Downloads
+Rutas donde JARVIS puede buscar y ordenar archivos.
+
+| Carpeta | Windows | WSL |
+|---|---|---|
+| Proyectos (código) | `P:\` | `/mnt/p` |
+| Usuario | `C:\Users\Usuario` | `/mnt/c/Users/Usuario` |
+| Documentos | `C:\Users\Usuario\Documents` | `/mnt/c/Users/Usuario/Documents` |
+| Descargas | `C:\Users\Usuario\Downloads` | `/mnt/c/Users/Usuario/Downloads` |
+| Escritorio | `C:\Users\Usuario\Desktop` | `/mnt/c/Users/Usuario/Desktop` |
+
+Regla: cualquier proyecto de código nuevo se crea en `P:\`.
 
 ## Correo
-- Cuenta principal: (completar)
+- Cuenta principal: elduodelaprogramacion@gmail.com (Gmail)
 - Tono: directo y cordial
 
 ## Temas (tendencias y noticias)
-- IA y agentes
-- Programación
+- Crecimiento de inversiones
+- Nuevas tecnologías
+- Nuevas librerías (programación)
+- Avances tecnológicos
 
-## Canales (opcional)
+## Canales
 | Plataforma | Usuario | Métrica |
 |---|---|---|
-| GitHub | ElDuoDeLaProgramacion | estrellas |
+| YouTube | ProgramadorDuo | suscriptores |
+| TikTok | @sandler021 | seguidores |
+| Instagram | sandler_021 | seguidores |
+| GitHub | ElDuoDeLaProgramacion | estrellas y seguidores |
 
 ## Rutina
-- Zona horaria: (completar)
+- Zona horaria: Bogotá (UTC-5)
