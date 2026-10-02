@@ -17,6 +17,8 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import datetime
+from pathlib import Path
 
 import keyboard
 import numpy as np
@@ -24,6 +26,31 @@ import sounddevice as sd
 from faster_whisper import WhisperModel
 
 FRECUENCIA = 16000  # Whisper trabaja a 16 kHz mono
+
+# La carpeta voz/ vive dentro del repo (P:\jarvis-os\voz), así que la cola está al lado.
+COLA = Path(__file__).resolve().parent.parent / "cola"
+
+
+def estado_audio(estado):
+    """Deja el estado del audio donde el HUD lo lee (ESCUCHANDO, PENSANDO, HABLANDO, EN ESPERA)."""
+    try:
+        (COLA / "voz-estado.txt").write_text(estado, encoding="utf-8")
+    except OSError:
+        pass
+
+
+def registrar(pedido, respuesta):
+    """Guarda la conversación en cola/hechas para que aparezca en la actividad del HUD."""
+    try:
+        destino = COLA / "hechas" / f"{datetime.now():%Y%m%d-%H%M%S}-voz.md"
+        pedido_seguro = pedido.replace('"', '\\"')
+        destino.write_text(
+            f'---\npedido: "{pedido_seguro}"\norigen: voz\ncreado: {datetime.now().isoformat(timespec="seconds")}\n---\n'
+            f"\n## Resultado (hecha, voz)\n\n{respuesta}\n",
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
 
 
 def opciones():
@@ -129,9 +156,13 @@ class Voz:
 def atender(texto, args, voz):
     print(f"\nTú: {texto}")
     print("JARVIS: pensando...", flush=True)
+    estado_audio("PENSANDO")
     respuesta = preguntar_a_jarvis(texto, args.distro, args.repo)
     print(f"JARVIS: {respuesta}\n")
+    registrar(texto, respuesta)
+    estado_audio("HABLANDO")
     voz.decir(limpiar_para_voz(respuesta))
+    estado_audio("EN ESPERA")
 
 
 def main():
@@ -148,6 +179,7 @@ def main():
     print(f"Cargando el modelo de voz '{args.modelo}' (la primera vez se descarga)...")
     modelo = WhisperModel(args.modelo, device=args.dispositivo,
                           compute_type="int8" if args.dispositivo == "cpu" else "float16")
+    estado_audio("EN ESPERA")
     print(f"Listo. Mantén pulsada {args.tecla.upper()} para hablar. Ctrl+C para salir.")
 
     ocupado = threading.Lock()
@@ -157,12 +189,14 @@ def main():
             continue
         try:
             print("Escuchando...", flush=True)
+            estado_audio("ESCUCHANDO")
             audio = grabar_mientras_pulsada(args.tecla)
             texto = transcribir(modelo, audio)
             if texto:
                 atender(texto, args, voz)
             else:
                 print("No te entendí.")
+                estado_audio("EN ESPERA")
         finally:
             ocupado.release()
 

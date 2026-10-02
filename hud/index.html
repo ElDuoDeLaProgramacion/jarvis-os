@@ -125,6 +125,7 @@
 
   <h2>Actividad</h2>
   <div class="estado" id="estado">EN ESPERA</div>
+  <div class="nota">Audio E/S · <span id="audio">–</span></div>
   <div id="recientes"></div>
 </aside>
 
@@ -191,6 +192,8 @@ async function refrescar() {
   $("actividad").textContent = d.actividad;
   $("estado").textContent = d.actividad + (d.cola.pendientes ? ` · ${d.cola.pendientes} en cola` : "");
   $("estado").classList.toggle("activo", d.actividad !== "EN ESPERA");
+  $("audio").textContent = d.audio;
+  $("audio").style.color = ["ESCUCHANDO", "PENSANDO", "HABLANDO"].includes(d.audio) ? "var(--acento)" : "";
 
   $("rutinas").innerHTML = d.rutinas.map(r => `<li>${esc(r.hora)} ${esc(r.nombre)}</li>`).join("") || `<li class="vacio">Sin rutinas</li>`;
   $("informes").innerHTML = d.informes.map(i =>
@@ -261,7 +264,7 @@ function animar() {
   const w = lienzo.width = lienzo.clientWidth * devicePixelRatio;
   const h = lienzo.height = lienzo.clientHeight * devicePixelRatio;
   const radio = Math.min(w, h) * 0.4, cx = w / 2, cy = h * 0.46;
-  const activo = $("estado").classList.contains("activo");
+  const activo = $("estado").classList.contains("activo") || $("audio").style.color !== "";
   angulo += activo ? 0.006 : 0.0018;
   const s = Math.sin(angulo), c = Math.cos(angulo);
   const proy = puntos.map(p => {

@@ -185,6 +185,17 @@ def estado_cola():
     }
 
 
+def estado_audio():
+    """Lo escribe el cliente de voz de Windows; si lleva mucho sin cambiar, la voz no está abierta."""
+    archivo = COLA / "voz-estado.txt"
+    try:
+        if time.time() - archivo.stat().st_mtime > 6 * 3600:
+            return "VOZ APAGADA"
+        return archivo.read_text(encoding="utf-8").strip() or "EN ESPERA"
+    except OSError:
+        return "VOZ APAGADA"
+
+
 def encolar(pedido):
     pedido = pedido.strip()[:500]
     if not pedido:
@@ -224,6 +235,7 @@ def estado_completo():
         "informes": informes(),
         "cola": cola,
         "actividad": "EJECUTANDO" if cola["en_curso"] else ("EN COLA" if cola["pendientes"] else "EN ESPERA"),
+        "audio": estado_audio(),
         "rutinas": rutinas(),
         "comandos": [{"etiqueta": e, "pedido": p} for e, p in COMANDOS],
     }

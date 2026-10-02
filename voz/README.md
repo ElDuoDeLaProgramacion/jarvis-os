@@ -21,6 +21,7 @@ Doble clic en `jarvis.bat`. La primera vez descarga el modelo de voz (unos 500 M
 
 - Mantén **F9**, di "plan de hoy", suelta.
 - Verás la transcripción y la respuesta en la ventana, y la oirás.
+- Si tienes el HUD abierto, "Audio E/S" muestra ESCUCHANDO, PENSANDO o HABLANDO, y cada conversación aparece en "Actividad".
 
 Opciones (se añaden al final, por ejemplo `jarvis.bat --tecla f8`):
 
