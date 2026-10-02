@@ -24,10 +24,10 @@ La lista vive en `boveda/wiki/suscripciones.md`. La fuente son los correos de co
 "¿Cuánto pago al mes?", "¿qué se renueva esta semana?", "¿desde cuándo pago X?": responde desde `boveda/wiki/suscripciones.md`. Si la `ultima-revision` tiene más de 7 días, revisa antes.
 
 ## Cancelar
-No puedes cancelar ni pagar nada. Lo que sí:
+No puedes cancelar en la web ni pagar nada. Lo que sí:
 1. Busca en el último correo del servicio el enlace de "gestionar suscripción" o "cancelar". Si no hay, búscalo en la web (habilidad `busqueda`).
 2. Dale a David el enlace y los pasos en una frase.
-3. Si el servicio solo se cancela por correo, deja un borrador con la habilidad `correo`; nunca lo envíes sin su "sí, envíalo".
+3. Si el servicio se cancela por correo, deja el borrador con la habilidad `correo` y pregunta "¿Lo envío? Sí o no." Si David dice que sí, envíalo (ver "Enviar" en `correo`) y marca la suscripción como `cancelación pedida` con la fecha.
 4. Cuando David diga que ya la canceló, cambia el estado a `cancelada` con la fecha.
 
 ## Reglas

@@ -21,6 +21,11 @@ Busca por remitente, asunto o tema y responde con lo que dice el correo, citando
 1. Lee el hilo completo antes de escribir.
 2. Usa el tono de David: directo y cordial, en el idioma del hilo.
 3. Deja el texto como borrador (en el conector si lo permite, si no en `boveda/outputs/correo/AAAA-MM-DD-borrador-<tema>.md`).
-4. Lee el borrador en voz alta y pregunta si lo envía.
+4. Di en una frase a quién va y qué dice, y termina con: "¿Lo envío? Sí o no." David contesta sin decir "Jarvis".
 
-**Nunca envíes, borres ni archives correos sin un "sí, envíalo" explícito de David.**
+## Enviar
+- Solo puedes enviar en la respuesta a ese "¿Lo envío?", cuando David dijo que sí: en ese momento (y solo entonces) tienes las herramientas `send_message` y `reply` del conector. Si no las tienes, es que no hubo un "sí": deja el borrador y díselo.
+- Envía exactamente el borrador que le resumiste (mismo destinatario, asunto y texto; `reply` si era una respuesta a un hilo). No borres nada: el borrador enviado sale solo de Borradores.
+- Confirma en una frase: "Enviado a <quién>." Si dijo que no, deja el borrador y di que queda en Borradores.
+
+**Nunca envíes un correo que David no confirmó con un "sí", ni reenvíes, borres o archives correos.**

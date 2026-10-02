@@ -109,11 +109,13 @@ def separar_pedido(texto):
 
 # ---------- Cerebro: JARVIS en WSL ----------
 
-def preguntar_a_jarvis(texto, distro, repo, reanudar=None):
+def preguntar_a_jarvis(texto, distro, repo, reanudar=None, confirmado=False):
     """Devuelve (respuesta, id de conversación). Con reanudar, sigue esa conversación."""
     cmd = ["wsl.exe", "-d", distro, "--cd", repo, "--exec", "./scripts/jarvis.sh", "--sesion"]
     if reanudar:
         cmd += ["--reanudar", reanudar]
+        if confirmado:
+            cmd.append("--confirmado")  # David dijo "sí": se permite enviar el correo pendiente
     cmd += ["--", texto]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -126,6 +128,16 @@ def preguntar_a_jarvis(texto, distro, repo, reanudar=None):
         log("Error de JARVIS:", "\n".join(detalle[-5:]))
         return "Hubo un error al ejecutar la petición. Lo dejé anotado en el registro de la voz.", None
     return r.stdout.strip(), sesion
+
+
+SI = re.compile(r"^(si|sip|dale|claro|confirmo|confirmado|hazlo|envialo|enviala|envialos|mandalo|mandala|"
+                r"de una|ok|okay|listo|adelante|por favor)\b")
+
+
+def es_si(texto):
+    """'Sí', 'sí, envíalo', 'dale'... Nunca si hay un 'no' en la frase."""
+    plano = normalizar(texto).strip(" .,!¡¿?")
+    return bool(SI.match(plano)) and not re.search(r"\bno\b|\bespera\b|\bmejor\b", plano)
 
 
 def es_pregunta(respuesta):
@@ -349,6 +361,7 @@ class Jarvis:
         estado_audio("ESCUCHANDO")
 
     def atender(self, pedido, origen="voz", reanudar=None):
+        confirmado = bool(reanudar) and origen in ("voz", "texto") and es_si(pedido)
         navegacion = accion_navegacion(pedido) if origen in ("voz", "texto") and not reanudar else None
         if navegacion and navegacion[0] == "programa?":
             try:
@@ -381,7 +394,7 @@ class Jarvis:
                               "mira qué estoy haciendo y dime en pocas frases qué hacer.)")
                 except Exception as e:
                     log("No pude capturar la pantalla:", repr(e))
-            respuesta, sesion = preguntar_a_jarvis(texto, self.args.distro, self.args.repo, reanudar)
+            respuesta, sesion = preguntar_a_jarvis(texto, self.args.distro, self.args.repo, reanudar, confirmado)
             if not respuesta:
                 respuesta = "Listo, ya está hecho. Los detalles quedaron en la bóveda."
             log(f"JARVIS: {respuesta}\n")

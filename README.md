@@ -115,7 +115,7 @@ Para probar los canales: `python3 scripts/canales.py`.
 
 | Habilidad | Qué hace | Escribe en |
 |---|---|---|
-| `correo` | Resume la bandeja, busca correos, redacta respuestas (nunca envía sin confirmar) | `outputs/correo/` |
+| `correo` | Resume la bandeja, busca correos, redacta respuestas y solo envía cuando contestas "sí" a "¿Lo envío?" | `outputs/correo/` |
 | `archivos` | Busca, resume, ordena y convierte archivos en tus carpetas | `outputs/archivos/` |
 | `programacion` | Explica y arregla código, crea scripts, corre pruebas (en ramas, sin push sin confirmar) | `outputs/programacion/` |
 | `busqueda` | Investiga en la web y deja un informe con fuentes | `outputs/busquedas/` |
