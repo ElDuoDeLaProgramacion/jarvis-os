@@ -14,20 +14,22 @@ export PATH="$HOME/.local/bin:$PATH"
 #   --confirmado    David acaba de contestar "sí" en voz alta a un "¿lo envío?": se permite
 #                   enviar ese correo. Solo vale junto con --reanudar y solo la pone la voz.
 #   --voz           pedido hablado: usa el modelo rápido (JARVIS_MODELO_VOZ en .env, por defecto sonnet)
-reanudar=""; sesion=0; confirmado=0; voz=0
+#   --copiloto      recomendación que nadie pidió (voz/jarvis_voz.py, Copiloto): solo puede leer
+reanudar=""; sesion=0; confirmado=0; voz=0; copiloto=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --reanudar) reanudar="$2"; shift 2 ;;
     --sesion) sesion=1; shift ;;
     --confirmado) confirmado=1; shift ;;
     --voz) voz=1; shift ;;
+    --copiloto) copiloto=1; voz=1; shift ;;
     --) shift; break ;;
     *) break ;;
   esac
 done
 
 if [ $# -eq 0 ]; then
-  echo "Uso: $0 [--reanudar ID] [--sesion] [--confirmado] [--voz] \"tu petición\"" >&2
+  echo "Uso: $0 [--reanudar ID] [--sesion] [--confirmado] [--voz] [--copiloto] \"tu petición\"" >&2
   exit 1
 fi
 
@@ -79,6 +81,10 @@ for servidor in claude_ai_Google_Calendar claude.ai_Google_Calendar; do
     done
   fi
 done
+
+# El copiloto mira la pantalla por su cuenta: lo que haya en ella no puede hacerle escribir,
+# enviar ni agendar nada. Solo Read (la captura y la bóveda).
+if [ "$copiloto" = "1" ]; then permitidas=(Read); fi
 
 opciones=(-p "$pedido" --output-format json --allowedTools "$(IFS=,; echo "${permitidas[*]}")")
 # Además del repo, JARVIS puede trabajar en las carpetas de David (boveda/wiki/perfil.md):

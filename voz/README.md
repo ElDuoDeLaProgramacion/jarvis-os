@@ -24,6 +24,8 @@ Doble clic en `jarvis.bat` (o se abre solo al iniciar sesión, ver [rutinas](../
 - "Jarvis" a secas → "¿Sí?" → dices la orden en los 8 segundos siguientes.
 - Lo que digas sin "Jarvis" al principio se ignora (aparece como "(oído)" en la ventana).
 - **Si JARVIS te pregunta algo** ("¿Lo agendo?"), contesta sin decir "Jarvis" en los 20 segundos siguientes: sigue la misma conversación.
+- **Cerrar pestañas por nombre** (al instante): "Jarvis, cierra las pestañas de búsqueda de Google", "cierra las pestañas de YouTube". Recorre las pestañas del navegador que está al frente y cierra las que tienen eso en el título.
+- **Copiloto** (sin que lo pidas): si estás jugando ajedrez (chess.com, lichess) o programando (VS Code, Cursor, PyCharm...), JARVIS mira la pantalla de vez en cuando (ajedrez cada 45 s, código cada 3 min, y solo si cambió) y habla solo si ve algo útil. En partidas en vivo contra personas no sugiere jugadas: va contra las reglas de esas páginas; te da un consejo al terminar. Cada mirada usa tu cuenta de Claude. "Jarvis, apaga el copiloto" / "activa el copiloto"; para arrancar apagado usa `--sin-copiloto`.
 - **Abrir programas** (al instante): "Jarvis, abre Chrome / Word / Excel / Spotify / WhatsApp / la calculadora / VS Code...". La lista está en `ABRIBLES` en `jarvis_voz.py`.
 - **Escribir en el HUD**: mientras la voz está encendida, lo que escribes en la caja del HUD lo atiende la voz igual que si lo dijeras (comandos al instante, música y respuesta hablada). Si la voz está apagada, va a la cola como antes.
 - **Música** (al instante, sin pasar por Claude ni gastar uso): "Jarvis, abre Spotify", "pausa", "play", "siguiente canción", "canción anterior", "sube el volumen", "baja el volumen".

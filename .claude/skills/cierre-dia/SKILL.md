@@ -21,4 +21,8 @@ description: Cierra el día de David. Registra una reflexión y deja en cola lo 
    - ... (también se añade a `boveda/wiki/tareas.md`)
    Plan: [[AAAA-MM-DD]]
    ```
-4. Responde en voz: cuántas prioridades se cumplieron y la primera cosa en cola para mañana.
+4. **Evolución:**
+   - Revisa `logs/jarvis.log` de hoy y las líneas nuevas de `boveda/wiki/aprendizajes.md`.
+   - Une los aprendizajes repetidos en uno y quita los que ya no apliquen. Muévelos a `raw/archivo/`, no los borres.
+   - Si hoy algo salió mal o hiciste lo mismo varias veces a mano, añade una idea concreta a `boveda/wiki/ideas-jarvis.md`, como una habilidad nueva, un comando de voz o una rutina.
+5. Responde en voz: cuántas prioridades se cumplieron, la primera cosa en cola para mañana y, si la hay, la idea de mejora del día en una frase.

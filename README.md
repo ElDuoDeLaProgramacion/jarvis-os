@@ -125,6 +125,7 @@ Para probar los canales: `python3 scripts/canales.py`.
 | `tendencias` | Lo que se mueve en tus temas | `outputs/tendencias/` |
 | `canales` | Números de tus redes y canales | `outputs/canales/` |
 | `musica` | Pone música en Spotify, dice qué suena, crea listas y guarda canciones | (no guarda nada) |
+| `copiloto` | Recomendaciones sin que las pidas mientras juegas ajedrez o programas (solo lectura) | (no guarda nada) |
 | `analizar` | Analiza archivos, PDFs, enlaces, YouTube, audio, video y texto desde la ventana de análisis | `outputs/analisis/` |
 | `suscripciones` | Cobros recurrentes desde los recibos de Gmail: total al mes, renovaciones próximas y cómo cancelar | `wiki/suscripciones.md`, `outputs/suscripciones/` |
 | `boveda` | Lee y escribe memoria; mantiene el grafo enlazado | `raw/`, `wiki/` |
