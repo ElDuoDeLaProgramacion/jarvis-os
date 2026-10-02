@@ -36,9 +36,15 @@ scripts/jarvis.sh punto de entrada por texto (la voz lo usará después)
    claude
    ```
    El último comando abre Claude Code para iniciar sesión. No uses `sudo npm install -g`: la versión de npm pide Node 22+ y con sudo deja permisos rotos.
-3. Comprueba que WSL ve la unidad P: con `ls /mnt/p`. Si no aparece (pasa con unidades mapeadas o `subst`), móntala:
+3. Prepara la unidad P: en WSL para que git pueda trabajar ahí (sin esto `git clone` falla con `chmod ... Operation not permitted`):
    ```bash
-   sudo mkdir -p /mnt/p && sudo mount -t drvfs P: /mnt/p
+   cat /etc/wsl.conf   # si ya tiene una sección [automount], añade metadata a sus options en vez de duplicarla
+   printf '\n[automount]\noptions = "metadata,umask=22,fmask=11"\n' | sudo tee -a /etc/wsl.conf
+   ```
+   Luego en PowerShell: `wsl --shutdown`, y vuelve a abrir Ubuntu. Comprueba con `ls /mnt/p`.
+   Si `/mnt/p` no existe (unidad mapeada o `subst`), móntala a mano:
+   ```bash
+   sudo mkdir -p /mnt/p && sudo mount -t drvfs P: /mnt/p -o metadata,uid=$(id -u),gid=$(id -g)
    ```
 4. Clona el repo en P: (ahí viven todos los proyectos):
    ```bash
