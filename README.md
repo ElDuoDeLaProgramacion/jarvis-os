@@ -87,6 +87,9 @@ No hay comandos fijos: le hablas normal. Ejemplos:
 - "Recuerda que la reunión con el cliente es el lunes" → "¿qué sé del cliente?"
 - "Cierra el día"
 
+## WhatsApp
+JARVIS puede tener su propio número de WhatsApp (API oficial, con Kapso). Le escribes desde el celular y te contesta. Solo obedece a tu número. Instalación y límites en [whatsapp/README.md](whatsapp/README.md).
+
 ## Arranque automático
 
 - Las rutinas de 7, 9, 14 y 19 h: `rutinas\instalar-rutinas.ps1`.

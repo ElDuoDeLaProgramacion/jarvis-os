@@ -27,6 +27,9 @@ tags: [jarvis, ayuda]
 - **Memoria:** "recuerda que...", "¿qué decidí sobre...?", "limpieza de bóveda".
 - **Día a día:** "plan de hoy", "resumen matutino", "cierra el día", "revisa mis suscripciones", "tendencias".
 
+## Desde el celular (WhatsApp)
+- Escríbele al número de JARVIS lo mismo que le dirías por voz: "plan de hoy", "agéndame...", "resume mis correos". Te contesta por WhatsApp. Ver `whatsapp/README.md`.
+
 ## Sin que se lo pidas
 - **Copiloto:** cuando juegas ajedrez o programas, mira la pantalla de vez en cuando y habla solo si ve algo útil.
 - **Rutinas:** 7:00 resumen, 9:00 plan, 14:00 pendientes, 19:00 cierre.
