@@ -53,8 +53,8 @@ class SpotifyFalso:
     def saltar(self, n, atras=False):
         self.llamadas.append(("saltar", n, atras))
 
-    def reproducir(self, uri):
-        self.llamadas.append(("reproducir", uri))
+    def reproducir(self, uri, preferir=None):
+        self.llamadas.append(("reproducir", uri, preferir))
         return True
 
 
@@ -146,7 +146,7 @@ class PruebaApi(unittest.TestCase):
         self.pedir("/api/pedir", {"texto": "pon algo de queen"})
         m = self.esperar()
         self.assertEqual(m[-1]["abrir"], "spotify:playlist:37i9dQZF1DX")
-        self.assertEqual(self.spotify.llamadas, [("reproducir", "spotify:playlist:37i9dQZF1DX")])
+        self.assertEqual(self.spotify.llamadas, [("reproducir", "spotify:playlist:37i9dQZF1DX", "Smartphone")])
         self.assertFalse((self.dir / "reproducir.txt").exists())
 
     def voz(self, audio):
@@ -164,6 +164,16 @@ class PruebaApi(unittest.TestCase):
         # Lo que no se entiende no se pide.
         self.assertEqual(self.voz(b"ruido"), (200, {"texto": ""}))
         self.assertEqual(len(self.esperar()), 2)
+
+    def test_spotify_prefiere_el_celular(self):
+        real = api.cargar_modulo("spotify_real", api.RAIZ / "voz" / "spotify.py")
+        web = {"id": "web", "type": "Computer", "is_active": True}
+        cel = {"id": "cel", "type": "Smartphone", "is_active": False}
+        real._api = lambda *a, **k: {"devices": [web, cel]}
+        self.assertEqual(real._dispositivo("Smartphone")["id"], "cel")
+        self.assertEqual(real._dispositivo()["id"], "web")      # la voz del PC sigue con el que suena
+        real._api = lambda *a, **k: {"devices": [web]}
+        self.assertEqual(real._dispositivo("Smartphone")["id"], "web")   # celular cerrado: el que haya
 
     def test_es_si(self):
         self.assertTrue(api.es_si("Sí, envíalo"))
