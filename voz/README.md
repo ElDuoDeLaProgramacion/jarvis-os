@@ -28,8 +28,8 @@ Doble clic en `jarvis.bat` (o se abre solo al iniciar sesión, ver [rutinas](../
 - **Copiloto** (sin que lo pidas): si estás jugando ajedrez (chess.com, lichess) o programando (VS Code, Cursor, PyCharm...), JARVIS mira la pantalla de vez en cuando (ajedrez cada 45 s, código cada 3 min, y solo si cambió) y habla solo si ve algo útil. En partidas en vivo contra personas no sugiere jugadas: va contra las reglas de esas páginas; te da un consejo al terminar. Cada mirada usa tu cuenta de Claude. "Jarvis, apaga el copiloto" / "activa el copiloto"; para arrancar apagado usa `--sin-copiloto`.
 - **Abrir programas** (al instante): "Jarvis, abre Chrome / Word / Excel / Spotify / WhatsApp / la calculadora / VS Code...". La lista está en `ABRIBLES` en `jarvis_voz.py`.
 - **Escribir en el HUD**: mientras la voz está encendida, lo que escribes en la caja del HUD lo atiende la voz igual que si lo dijeras (comandos al instante, música y respuesta hablada). Si la voz está apagada, va a la cola como antes.
-- **Música** (al instante, sin pasar por Claude ni gastar uso): "Jarvis, abre Spotify", "pausa", "play", "siguiente canción", "canción anterior", "sube el volumen", "baja el volumen".
-- **"Jarvis, pon ..."** (una canción, un artista, "algo para concentrarme"): JARVIS lo busca con el conector de Spotify y lo abre en tu Spotify. Si es una lista o un álbum y no arranca solo, di "Jarvis, play".
+- **Música** (al instante, sin pasar por Claude ni gastar uso): "Jarvis, abre Spotify", "pausa", "play", "siguiente canción", "canción anterior", "pasa 3 canciones", "retrocede dos canciones", "sube el volumen", "baja el volumen".
+- **"Jarvis, pon ..."** (una canción, un artista, "algo para concentrarme"): JARVIS lo busca con el conector de Spotify y lo pone en tu Spotify. "Jarvis, cambia de playlist" pone otra lista parecida. Para que las listas y los álbumes empiecen a sonar solos, conecta la API de Spotify (abajo); sin ella solo se abre su página.
 - **Enviar un correo**: JARVIS redacta, te lo resume y pregunta "¿Lo envío? Sí o no." Si contestas "sí" (o "dale", "envíalo") en esos 20 segundos, lo envía; con "no", "espera" o "mejor no" queda como borrador. Solo envía en esa respuesta tuya, nunca desde rutinas ni botones del HUD. Las cancelaciones de suscripciones por correo funcionan igual.
 - **Cerrar al navegar** (lo hace al instante, sin pasar por Claude): "Jarvis, cierra esta pestaña" (Ctrl+W), "Jarvis, cierra la ventana" o "cierra esto" (Alt+F4 en la ventana activa) y "Jarvis, cierra Spotify / Chrome / Word..." (le pide al programa que se cierre, así que si hay algo sin guardar te pregunta). Nunca cierra el propio JARVIS, la consola ni el escritorio de Windows.
 - **"Jarvis, lee mi pantalla"** (o cualquier pedido con la palabra "pantalla"): hace una captura, JARVIS la mira y te dice qué hacer. Las últimas 10 capturas quedan en `cola\pantalla\` y no se suben a git.
@@ -70,6 +70,17 @@ Se añaden al final, por ejemplo `jarvis.bat --modelo base`:
 | `--distro Ubuntu-22.04` | Si tu distribución de WSL tiene otro nombre (míralo con `wsl -l`) |
 | `--piper ruta\voz.onnx` | Voz más natural con Piper (ver abajo) |
 | `--solo-texto` | Escribir en vez de hablar, para probar sin micrófono |
+
+## Spotify que obedece de verdad (opcional, requiere Premium)
+Sin esto, JARVIS abre la página de la lista y sigue sonando lo de antes. Con esto, la lista, el álbum o el artista empieza a sonar, y "pasa 3 canciones" va más rápido.
+1. Entra a https://developer.spotify.com/dashboard y pulsa **Create app**. Pon cualquier nombre. En **Redirect URI** escribe `http://127.0.0.1:8888/callback` y en **APIs** marca **Web API**.
+2. Copia el **Client ID** en `.env`: `SPOTIFY_CLIENT_ID=...`
+3. Con la app de Spotify abierta, ejecuta en PowerShell, dentro de `P:\jarvis-os`:
+   ```
+   voz\.venv\Scripts\python voz\spotify.py --login
+   ```
+   Acepta en el navegador con la misma cuenta de la app de Spotify. El permiso queda en `voz\.spotify-token.json`, que no se sube a git.
+4. Reinicia la voz.
 
 ## Voz más natural (opcional)
 

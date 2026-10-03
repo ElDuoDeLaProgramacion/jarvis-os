@@ -6,6 +6,7 @@ JARVIS se vincula a tu WhatsApp como un dispositivo más, igual que WhatsApp Web
 - **Tus chats:** los mensajes que te llegan quedan anotados en `boveda/raw/whatsapp/chats/AAAA-MM-DD.md`. Puedes preguntar "¿qué me escribieron hoy?" o "¿qué dijo Ana?".
 - **Responder:** "respóndele a Ana que llego a las 8". JARVIS te muestra el mensaje y solo lo envía si contestas "sí". Si contestas "no", no sale nada. Esto también funciona si lo pides por voz: el borrador te llega al chat contigo mismo.
 - **Avisos:** cada vez que alguien te escribe, JARVIS te avisa en tu chat contigo mismo ("Te escribió Ana: ...") y te propone 3 respuestas. Contestas 1, 2 o 3 ("sí" envía la 1), "no" para no responder, o le dices qué contestar ("dile que llego a las 8") y te muestra el mensaje antes de enviarlo. Si la persona manda varios mensajes seguidos, llega un solo aviso. Si le contestas tú desde el celular, el aviso se cancela. Cada aviso es una consulta a Claude. Para apagarlos, pon `WHATSAPP_AVISAR=0` en `.env`.
+- **Notas de voz:** puedes darle órdenes con notas de voz en tu chat contigo mismo. Las notas de voz que te mandan quedan escritas en el registro y en los avisos. Se transcriben en tu equipo con faster-whisper, el audio no se guarda y no gasta uso de Claude.
 - **Música:** "pon música de..." la abre en el Spotify del PC, y "play", "pausa", "siguiente" o "sube el volumen" funcionan al instante. Las dos cosas necesitan que la voz de JARVIS esté encendida en el PC.
 
 Nada de lo que escriben otras personas se ejecuta como orden: solo se anota.
@@ -42,7 +43,8 @@ Si el QR se ve mal en la terminal, usa un código: `./whatsapp/iniciar.sh --codi
 
 ## Límites y riesgos
 - **No es la API oficial.** WhatsApp puede cerrar la vinculación o bloquear el número si detecta abuso, como envíos masivos o spam. JARVIS solo envía mensajes uno por uno y con tu "sí". Si quieres cero riesgo para tu número principal, vincula un número secundario y usa `WHATSAPP_PERMITIDOS`.
-- Por ahora las órdenes solo pueden ser de texto, no notas de voz. Las fotos y los audios de tus chats se anotan como "(foto)" o "(nota de voz)", sin su contenido.
+- Las fotos, los videos y los documentos de tus chats se anotan como "(foto)" o "(documento: ...)", sin su contenido. Las notas de voz sí se transcriben.
+- Si `instalar.sh` no pudo instalar faster-whisper, las notas de voz se anotan como "(nota de voz)" sin texto. En ese caso corre `sudo apt install -y python3-venv` y vuelve a ejecutar `./whatsapp/instalar.sh`.
 - El PC tiene que estar encendido. JARVIS trabaja en tu PC y el celular solo es el control remoto.
 - Si el celular pasa unos 14 días sin conexión, WhatsApp desvincula los dispositivos. En ese caso vuelve a escanear el QR.
 - Tus chats quedan en `boveda/raw/whatsapp/`, que no se sube a git porque tu repositorio es público.

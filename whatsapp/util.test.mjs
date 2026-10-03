@@ -41,7 +41,7 @@ test('formato y trozos', () => {
 })
 
 test('teclas de música', () => {
-  for (const t of ['Jarvis, play', 'pausa', 'Siguiente canción', 'sube el volumen']) assert.ok(esTeclaMusica(t), t)
+  for (const t of ['Jarvis, play', 'pausa', 'Siguiente canción', 'sube el volumen', 'pasa 3 canciones', 'Retrocede dos canciones']) assert.ok(esTeclaMusica(t), t)
   for (const t of ['pon música', 'play de Bad Bunny', 'pausa la reunión de mañana']) assert.ok(!esTeclaMusica(t), t)
 })
 
