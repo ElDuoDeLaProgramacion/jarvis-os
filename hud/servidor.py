@@ -174,11 +174,40 @@ def leer_intencion(p):
     }
 
 
+def corredor_vivo():
+    """El corredor tiene tomado cola/.corredor.lock (flock) mientras trabaja."""
+    import fcntl
+    try:
+        with open(COLA / ".corredor.lock", "a") as f:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(f, fcntl.LOCK_UN)
+            return False
+    except OSError:
+        return True   # ante la duda, no lanzar otro
+
+
+_ultimo_rescate = 0.0
+
+
+def rescatar_cola(en_curso, pendientes):
+    """Si quedó algo "ejecutando" o pendiente sin corredor (JARVIS se cerró a mitad), lo retoma."""
+    global _ultimo_rescate
+    if not (en_curso or pendientes) or time.time() - _ultimo_rescate < 60 or corredor_vivo():
+        return
+    _ultimo_rescate = time.time()
+    subprocess.Popen([str(RAIZ / "scripts" / "corredor.sh")], cwd=RAIZ,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
 def estado_cola():
     def listar(nombre):
         return sorted((COLA / nombre).glob("*.md"), reverse=True)
 
     pendientes, en_curso = listar("pendientes"), listar("en-curso")
+    rescatar_cola(en_curso, pendientes)
     terminadas = sorted(listar("hechas") + listar("fallidas"),
                         key=lambda p: p.stat().st_mtime, reverse=True)
     return {

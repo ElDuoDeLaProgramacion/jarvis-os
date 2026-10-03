@@ -14,9 +14,21 @@ if ! flock -n 9; then
   exit 0
 fi
 
-# Si un corredor anterior murió a medias, devuelve sus intenciones a pendientes.
+# Si un corredor anterior murió a medias (se cerró JARVIS, se apagó el PC), sus intenciones quedaron
+# en en-curso/. Las recientes vuelven a pendientes; las de hace más de 3 h ya no tienen sentido
+# (un "resumen matutino" a la noche), así que pasan a fallidas con una nota.
 for f in cola/en-curso/*.md; do
-  [ -e "$f" ] && mv "$f" cola/pendientes/
+  [ -e "$f" ] || continue
+  creado=$(sed -n 's/^creado: //p' "$f" | head -n 1)
+  edad=$(( $(date +%s) - $(date -d "$creado" +%s 2>/dev/null || stat -c %Y "$f") ))
+  if [ "$edad" -gt 10800 ]; then
+    printf '\n## Resultado (fallida, %s)\n\nInterrumpida: JARVIS se cerró mientras la ejecutaba y ya pasó su hora.\n' \
+      "$(date -Iseconds)" >> "$f"
+    mv "$f" cola/fallidas/
+    echo "$(date -Iseconds) corredor: $(basename "$f") interrumpida hace más de 3 h, a fallidas" >> logs/corredor.log
+  else
+    mv "$f" cola/pendientes/
+  fi
 done
 
 while true; do
@@ -40,7 +52,8 @@ while true; do
   echo "$(date -Iseconds) corredor > $nombre: $pedido" >> logs/corredor.log
   inicio=$(date +%s)
 
-  if respuesta=$(JARVIS_AUTOMATICO=$automatico ./scripts/jarvis.sh "$pedido" 2>&1); then
+  # Tope de 20 min: si algo se cuelga (la red, un conector), la cola no se queda atascada para siempre.
+  if respuesta=$(JARVIS_AUTOMATICO=$automatico timeout 20m ./scripts/jarvis.sh "$pedido" 2>&1); then
     destino="cola/hechas/$nombre"
     estado="hecha"
   else
