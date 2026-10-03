@@ -15,5 +15,5 @@ with open("rutinas/rutinas.csv", encoding="utf-8") as f:
 print("# fin JARVIS rutinas")
 PY
 )
-{ crontab -l 2>/dev/null | sed '/^# JARVIS rutinas/,/^# fin JARVIS rutinas/d'; echo "$bloque"; } | crontab -
+{ { crontab -l 2>/dev/null || true; } | sed '/^# JARVIS rutinas/,/^# fin JARVIS rutinas/d'; echo "$bloque"; } | crontab -
 echo "$bloque"
