@@ -18,11 +18,12 @@
  * No es la API oficial: WhatsApp puede cerrar la vinculación si se abusa (spam, envíos masivos).
  */
 import makeWASocket, {
-  Browsers, DisconnectReason, fetchLatestBaileysVersion, isJidGroup, isJidNewsletter,
+  Browsers, DisconnectReason, downloadMediaMessage, fetchLatestBaileysVersion, isJidGroup, isJidNewsletter,
   isJidStatusBroadcast, jidNormalizedUser, normalizeMessageContent, useMultiFileAuthState,
 } from '@whiskeysockets/baileys'
 import { spawn } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { createInterface } from 'node:readline'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pino from 'pino'
@@ -161,6 +162,55 @@ function leerBorrador() {
   if (/^\+?\d[\d\s-]{6,}$/.test(para)) para = `${soloDigitos(para)}@s.whatsapp.net`
   if (!/@(s\.whatsapp\.net|lid)$/.test(para)) return null           // nada de grupos ni difusiones
   return { para: jidNormalizedUser(para), texto: b.texto.trim(), hasta: Date.now() + SEGUIR_MIN * 60000 }
+}
+
+// ---------- Notas de voz: se transcriben en local (whatsapp/transcribir.py, faster-whisper) ----------
+
+const AUDIOS = join(DATOS, 'audios')
+const PYTHON_AUDIO = join(RAIZ, 'whatsapp', '.venv', 'bin', 'python')
+let transcriptor = null          // { proc, esperando: Map(ruta -> resolve) }
+
+function iniciarTranscriptor() {
+  if (transcriptor) return transcriptor
+  if (!existsSync(PYTHON_AUDIO)) return null
+  const proc = spawn(PYTHON_AUDIO, [join(RAIZ, 'whatsapp', 'transcribir.py')], { cwd: RAIZ, stdio: ['pipe', 'pipe', 'ignore'] })
+  const t = { proc, esperando: new Map() }
+  createInterface({ input: proc.stdout }).on('line', (linea) => {
+    let r
+    try { r = JSON.parse(linea) } catch { return }
+    if (r.listo) return log('Transcriptor de notas de voz listo.')
+    t.esperando.get(r.ruta)?.(r.error ? null : r.texto)
+    t.esperando.delete(r.ruta)
+    if (r.error) log('No pude transcribir un audio:', r.error)
+  })
+  proc.on('exit', () => {
+    for (const fin of t.esperando.values()) fin(null)
+    transcriptor = null
+  })
+  transcriptor = t
+  return t
+}
+
+/** Descarga la nota de voz, la transcribe y la borra. null si no se pudo (o no está instalado). */
+async function transcribir(msg) {
+  const t = iniciarTranscriptor()
+  if (!t) return null
+  mkdirSync(AUDIOS, { recursive: true })
+  const ruta = join(AUDIOS, `${msg.key.id}.ogg`)
+  try {
+    writeFileSync(ruta, await downloadMediaMessage(msg, 'buffer', {}))
+    const texto = await new Promise((resolve) => {
+      t.esperando.set(ruta, resolve)
+      t.proc.stdin.write(ruta + '\n')
+      setTimeout(() => { if (t.esperando.delete(ruta)) resolve(null) }, 5 * 60000)
+    })
+    return texto
+  } catch (e) {
+    log('No pude bajar una nota de voz:', e.message)
+    return null
+  } finally {
+    rmSync(ruta, { force: true })   // el audio no se guarda: solo su texto
+  }
 }
 
 function vozViva() {
@@ -392,7 +442,7 @@ async function iniciar() {
         if (vistos.size > 5000) vistos.delete(vistos.values().next().value)
         if (isJidStatusBroadcast(chat) || isJidNewsletter(chat)) continue
         const contenido = normalizeMessageContent(msg.message)
-        const texto = textoDe(contenido)
+        let texto = textoDe(contenido)
         if (texto == null) continue
         const cuando = new Date(Number(msg.messageTimestamp || 0) * 1000 || Date.now())
         const reciente = Date.now() - cuando.getTime() < ORDEN_VIEJA_MIN * 60000 && cuando.getTime() > arranque - ORDEN_VIEJA_MIN * 60000
@@ -406,12 +456,22 @@ async function iniciar() {
 
         // Órdenes: chat contigo mismo, o un número permitido (si el puente usa un número aparte para JARVIS).
         const esOrden = conmigo || (!grupo && !k.fromMe && PERMITIDOS.has(remitente))
+        let dicho = null      // lo que dice una nota de voz, ya en texto
+        const seAnota = !esOrden && (!grupo || GUARDAR_GRUPOS) && !NO_GUARDAR.has(remitente) && !k.fromMe
+        if (contenido.audioMessage && (esOrden ? reciente && !enviados.has(k.id) : seAnota)) {
+          dicho = await transcribir(msg)
+          if (dicho) texto = `(nota de voz) ${dicho}`
+        }
         if (esOrden) {
           // Las respuestas de JARVIS también llegan a este chat: esas no son órdenes.
           if (enviados.has(k.id) || texto.startsWith(PREFIJO)) continue
           if (!reciente) { log(`Orden vieja ignorada (${hora(cuando)}): ${texto}`); continue }
-          if (!contenido.conversation && !contenido.extendedTextMessage?.text) { await responder(chat, `${PREFIJO}Por ahora solo entiendo mensajes de texto.`); continue }
-          cadena = cadena.then(() => atender(chat, texto)).catch((e) => log('Error atendiendo una orden:', e.message))
+          const orden = dicho || contenido.conversation || contenido.extendedTextMessage?.text
+          if (!orden) {
+            await responder(chat, `${PREFIJO}${contenido.audioMessage ? 'No pude entender la nota de voz. ¿Me la escribes?' : 'Por ahora solo entiendo texto y notas de voz.'}`)
+            continue
+          }
+          cadena = cadena.then(() => atender(chat, orden)).catch((e) => log('Error atendiendo una orden:', e.message))
           continue
         }
 
