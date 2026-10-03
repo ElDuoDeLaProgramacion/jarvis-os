@@ -48,6 +48,8 @@ jobs:
         run: |
           sudo apt-get install -y -qq espeak-ng ffmpeg >/dev/null
           python3 -m venv /tmp/vosk && /tmp/vosk/bin/pip install -q vosk
+          curl -sSfL -o es.zip https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip && unzip -q es.zip
+          /tmp/vosk/bin/python android/explorar_oido.py vosk-model-small-en-us-0.15 vosk-model-small-es-0.42 || true
           /tmp/vosk/bin/python android/probar_oido.py vosk-model-small-en-us-0.15
 
       - name: Meter el modelo en la app
