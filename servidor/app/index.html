@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05121c">
+<title>JARVIS</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icono.svg">
+<link rel="apple-touch-icon" href="icono-192.png">
+<style>
+  :root {
+    --fondo: #05121c; --panel: #0b2131; --borde: #17405a; --texto: #d8f3ff; --tenue: #7aa6bd;
+    --acento: #2ad4ff; --yo: #12405a; --error: #ff7a7a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--texto);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; height: 100dvh;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--borde); }
+  header h1 { font-size: 18px; letter-spacing: .2em; margin: 0; color: var(--acento); flex: 1; }
+  header button { background: none; border: 1px solid var(--borde); color: var(--tenue); border-radius: 8px;
+    padding: 6px 10px; font: inherit; font-size: 13px; }
+  header button.activo { color: var(--acento); border-color: var(--acento); }
+  #estado { font-size: 12px; color: var(--tenue); padding: 4px 16px; min-height: 22px; }
+  #chat { flex: 1; overflow-y: auto; padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .m { max-width: 86%; padding: 9px 12px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .m.jarvis { background: var(--panel); border: 1px solid var(--borde); align-self: flex-start; border-bottom-left-radius: 4px; }
+  .m.yo { background: var(--yo); align-self: flex-end; border-bottom-right-radius: 4px; }
+  .m small { display: block; color: var(--tenue); font-size: 11px; margin-top: 4px; }
+  .pensando { align-self: flex-start; color: var(--tenue); font-size: 14px; }
+  .pensando::after { content: "…"; animation: puntos 1.2s infinite; }
+  @keyframes puntos { 50% { opacity: .2; } }
+  #rapidos { display: flex; gap: 8px; overflow-x: auto; padding: 8px 16px; scrollbar-width: none; }
+  #rapidos button { flex: none; background: var(--panel); color: var(--texto); border: 1px solid var(--borde);
+    border-radius: 16px; padding: 6px 12px; font: inherit; font-size: 13px; }
+  form { display: flex; gap: 8px; padding: 8px 12px 12px; border-top: 1px solid var(--borde); }
+  textarea { flex: 1; resize: none; background: var(--panel); color: var(--texto); border: 1px solid var(--borde);
+    border-radius: 12px; padding: 10px 12px; font: inherit; max-height: 140px; }
+  form button { width: 48px; border-radius: 12px; border: 1px solid var(--borde); background: var(--panel);
+    color: var(--acento); font-size: 20px; }
+  #mic.escuchando { background: var(--acento); color: var(--fondo); }
+  #panel { display: none; padding: 8px 16px; border-bottom: 1px solid var(--borde); max-height: 45dvh; overflow-y: auto; font-size: 14px; }
+  #panel.abierto { display: block; }
+  #panel h2 { font-size: 13px; color: var(--acento); letter-spacing: .1em; margin: 10px 0 4px; }
+  #panel ul { margin: 0; padding-left: 18px; }
+  #panel .hecha { text-decoration: line-through; color: var(--tenue); }
+  #entrar { position: fixed; inset: 0; background: var(--fondo); display: none; flex-direction: column;
+    justify-content: center; gap: 12px; padding: 24px; }
+  #entrar.visible { display: flex; }
+  #entrar input { background: var(--panel); color: var(--texto); border: 1px solid var(--borde); border-radius: 10px;
+    padding: 12px; font: inherit; }
+  #entrar button { background: var(--acento); color: var(--fondo); border: 0; border-radius: 10px; padding: 12px; font: inherit; font-weight: 600; }
+  #entrar p { color: var(--tenue); margin: 0; font-size: 14px; }
+  .error { color: var(--error); }
+</style>
+</head>
+<body>
+<header>
+  <h1>JARVIS</h1>
+  <button id="btnPanel" type="button">Hoy</button>
+  <button id="btnVoz" type="button" title="Leer las respuestas en voz alta">Voz</button>
+</header>
+<div id="panel"></div>
+<div id="estado"></div>
+<main id="chat"></main>
+<nav id="rapidos"></nav>
+<form id="form">
+  <button id="mic" type="button" title="Hablar">🎙</button>
+  <textarea id="texto" rows="1" placeholder="Pídele algo a JARVIS" enterkeyhint="send"></textarea>
+  <button type="submit" title="Enviar">➤</button>
+</form>
+
+<div id="entrar">
+  <h1 style="color:var(--acento);letter-spacing:.2em;margin:0">JARVIS</h1>
+  <p>Pega la clave de la app (JARVIS_API_TOKEN en el .env del servidor). Se guarda solo en este celular.</p>
+  <input id="clave" type="password" autocomplete="off" placeholder="Clave">
+  <button id="guardarClave" type="button">Entrar</button>
+  <p id="errorClave" class="error"></p>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id)
+const leer = (k) => { try { return localStorage.getItem(k) } catch { return null } }
+const escribir = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch {} }
+
+let token = leer('jarvis-token') || ''
+let ultimo = 0
+let ocupado = false
+let vozActiva = leer('jarvis-voz') === '1'
+let primeraCarga = true
+
+async function api(ruta, opciones = {}) {
+  const r = await fetch(ruta, { ...opciones, headers: { ...(opciones.headers || {}), Authorization: 'Bearer ' + token } })
+  if (r.status === 401) { pedirClave('La clave no es correcta.'); throw new Error('token') }
+  if (!r.ok) throw new Error('HTTP ' + r.status)
+  return r.json()
+}
+
+function pedirClave(error = '') {
+  $('errorClave').textContent = error
+  $('entrar').classList.add('visible')
+}
+
+$('guardarClave').onclick = async () => {
+  token = $('clave').value.trim()
+  escribir('jarvis-token', token)
+  $('entrar').classList.remove('visible')
+  iniciar()
+}
+
+function burbuja(m) {
+  const div = document.createElement('div')
+  div.className = 'm ' + (m.de === 'yo' ? 'yo' : 'jarvis')
+  div.textContent = m.texto
+  const hora = document.createElement('small')
+  hora.textContent = m.hora
+  div.appendChild(hora)
+  return div
+}
+
+function pintarPensando() {
+  let p = document.querySelector('.pensando')
+  if (ocupado && !p) {
+    p = document.createElement('div')
+    p.className = 'pensando'
+    p.textContent = 'JARVIS está trabajando'
+    $('chat').appendChild(p)
+  } else if (!ocupado && p) p.remove()
+}
+
+function hablar(texto) {
+  if (!vozActiva || !('speechSynthesis' in window)) return
+  const u = new SpeechSynthesisUtterance(texto.replace(/[*_#`>]/g, ''))
+  u.lang = 'es-ES'
+  speechSynthesis.cancel()
+  speechSynthesis.speak(u)
+}
+
+async function actualizar() {
+  try {
+    const d = await api('/api/conversacion?desde=' + ultimo)
+    const chat = $('chat')
+    const abajo = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 80
+    document.querySelector('.pensando')?.remove()
+    for (const m of d.mensajes) {
+      chat.appendChild(burbuja(m))
+      ultimo = m.n
+      if (m.de === 'jarvis' && !primeraCarga) hablar(m.texto)
+    }
+    primeraCarga = false
+    ocupado = d.ocupado
+    pintarPensando()
+    if (abajo || d.mensajes.length) chat.scrollTop = chat.scrollHeight
+    $('estado').textContent = ''
+  } catch (e) {
+    if (e.message !== 'token') $('estado').textContent = 'Sin conexión con el servidor. ¿Tailscale está encendido?'
+  }
+}
+
+async function enviar(texto) {
+  texto = texto.trim()
+  if (!texto) return
+  $('texto').value = ''
+  ajustarAlto()
+  try {
+    await api('/api/pedir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }) })
+    ocupado = true
+    await actualizar()
+    programar()
+  } catch (e) {
+    if (e.message !== 'token') { $('estado').textContent = 'No se pudo enviar. Revisa la conexión.'; $('texto').value = texto }
+  }
+}
+
+$('form').onsubmit = (e) => { e.preventDefault(); enviar($('texto').value) }
+$('texto').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviar($('texto').value) }
+})
+function ajustarAlto() { const t = $('texto'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 140) + 'px' }
+$('texto').addEventListener('input', ajustarAlto)
+
+// Dictado con el reconocimiento de voz del propio celular (Chrome en Android, Safari en iPhone).
+const Reconocer = window.SpeechRecognition || window.webkitSpeechRecognition
+if (!Reconocer) $('mic').style.display = 'none'
+else {
+  let rec = null
+  $('mic').onclick = () => {
+    if (rec) { rec.stop(); return }
+    rec = new Reconocer()
+    rec.lang = 'es-CO'
+    rec.interimResults = true
+    let final = ''
+    rec.onresult = (e) => {
+      let parcial = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) final += e.results[i][0].transcript
+        else parcial += e.results[i][0].transcript
+      }
+      $('texto').value = final + parcial
+      ajustarAlto()
+    }
+    rec.onend = () => {
+      $('mic').classList.remove('escuchando')
+      rec = null
+      if (final.trim()) enviar(final)
+    }
+    rec.onerror = (e) => { $('estado').textContent = 'Micrófono: ' + e.error }
+    $('mic').classList.add('escuchando')
+    rec.start()
+  }
+}
+
+function pintarVoz() { $('btnVoz').classList.toggle('activo', vozActiva) }
+$('btnVoz').onclick = () => {
+  vozActiva = !vozActiva
+  escribir('jarvis-voz', vozActiva ? '1' : '0')
+  if (!vozActiva && 'speechSynthesis' in window) speechSynthesis.cancel()
+  pintarVoz()
+}
+
+async function cargarResumen() {
+  try {
+    const d = await api('/api/resumen')
+    const rapidos = $('rapidos')
+    rapidos.replaceChildren(...d.comandos.map((c) => {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = c.etiqueta
+      b.onclick = () => enviar(c.pedido)
+      return b
+    }))
+    const panel = $('panel')
+    const seccion = (titulo, items) => {
+      const h = document.createElement('h2'); h.textContent = titulo
+      const ul = document.createElement('ul')
+      for (const it of items) { const li = document.createElement('li'); li.textContent = it.texto; if (it.clase) li.className = it.clase; ul.appendChild(li) }
+      if (!items.length) { const li = document.createElement('li'); li.textContent = 'Nada por ahora'; ul.appendChild(li) }
+      return [h, ul]
+    }
+    panel.replaceChildren(
+      ...seccion('PRIORIDADES DE HOY', d.plan.prioridades.map((p) => ({ texto: p.texto, clase: p.hecha ? 'hecha' : '' }))),
+      ...seccion('AGENDA', d.plan.agenda.map((a) => ({ texto: a.hora + '  ' + a.texto }))),
+      ...seccion('TAREAS', d.tareas.map((t) => ({ texto: t.texto + (t.fecha ? '  (' + t.fecha + ')' : '') }))),
+    )
+  } catch {}
+}
+$('btnPanel').onclick = () => { $('panel').classList.toggle('abierto'); $('btnPanel').classList.toggle('activo'); cargarResumen() }
+
+let reloj = null
+function iniciar() {
+  if (!token) return pedirClave()
+  actualizar()
+  cargarResumen()
+  programar()
+}
+// Mientras JARVIS trabaja se mira cada 2 s; si no, cada 10 s.
+function programar() {
+  clearTimeout(reloj)
+  reloj = setTimeout(async () => { if (!document.hidden) await actualizar(); programar() }, ocupado ? 2000 : 10000)
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && token) actualizar() })
+
+pintarVoz()
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {})
+iniciar()
+</script>
+</body>
+</html>
