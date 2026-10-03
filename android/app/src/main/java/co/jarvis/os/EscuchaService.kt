@@ -1,8 +1,5 @@
 package co.jarvis.os
 
-import ai.picovoice.porcupine.Porcupine
-import ai.picovoice.porcupine.PorcupineException
-import ai.picovoice.porcupine.PorcupineManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -20,7 +17,12 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.widget.Toast
+import org.json.JSONObject
+import org.vosk.Model
+import org.vosk.Recognizer
+import org.vosk.android.RecognitionListener
+import org.vosk.android.SpeechService
+import org.vosk.android.StorageService
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -28,8 +30,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Escucha "Jarvis" todo el tiempo, también con la pantalla apagada (servicio en primer plano con
- * notificación fija). Al oírlo: pitido, graba la orden, la manda al servidor, lee la respuesta en voz
- * alta y, si JARVIS preguntó algo, escucha la contestación sin necesidad de decir "Jarvis" otra vez.
+ * notificación fija). La palabra se detecta en el celular con Vosk, sin cuenta ni internet: un
+ * reconocedor que solo conoce "jarvis" y "[unk]" (cualquier otra cosa), así gasta poco.
+ * Al oírlo: pitido, graba la orden, la manda al servidor, lee la respuesta en voz alta y, si JARVIS
+ * preguntó algo, escucha la contestación sin necesidad de decir "Jarvis" otra vez.
  */
 class EscuchaService : Service() {
 
@@ -44,7 +48,9 @@ class EscuchaService : Service() {
             private set
     }
 
-    private var porcupine: PorcupineManager? = null
+    private var modelo: Model? = null
+    private var oido: SpeechService? = null
+    private var reconocedor: Recognizer? = null
     private var servidor: Servidor? = null
     private var voz: TextToSpeech? = null
     private val vozLista = CountDownLatch(1)
@@ -81,31 +87,26 @@ class EscuchaService : Service() {
         }
         val ajustes = getSharedPreferences("jarvis", Context.MODE_PRIVATE)
         servidor = Servidor(ajustes.getString("servidor", "")!!, ajustes.getString("token", "")!!)
-        porcupine?.delete()
-        porcupine = try {
-            PorcupineManager.Builder()
-                .setAccessKey(ajustes.getString("picovoice", "")!!.trim())
-                .setKeyword(Porcupine.BuiltInKeyword.JARVIS)
-                .setSensitivity(ajustes.getFloat("sensibilidad", 0.6f))
-                .setErrorCallback { e -> mostrar("Error del micrófono: ${e.message}") }
-                .build(applicationContext) { detectado() }
-        } catch (e: PorcupineException) {
-            estado = "No pude activar la escucha. Revisa la clave de Picovoice y la conexión. (${e.message})"
-            Toast.makeText(this, estado, Toast.LENGTH_LONG).show()
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return START_NOT_STICKY
-        }
+        if (encendido) return START_STICKY
         encendido = true
-        escuchar()
+        mostrar("Preparando el oído…")
+        Thread {
+            try {
+                // El modelo viaja dentro del APK (assets/modelo); la primera vez se copia a la memoria.
+                modelo = modelo ?: Model(StorageService.sync(this, "modelo", "modelo"))
+                escuchar()
+            } catch (e: Exception) {
+                mostrar("No pude preparar el oído: ${e.message}")
+            }
+        }.start()
         return START_STICKY
     }
 
     override fun onDestroy() {
         if (encendido) estado = "Apagado"
         encendido = false
-        porcupine?.let { runCatching { it.stop() }; it.delete() }
-        porcupine = null
+        soltarMicrofono()
+        modelo?.close()
         voz?.shutdown()
         despierto?.let { if (it.isHeld) it.release() }
         super.onDestroy()
@@ -113,11 +114,33 @@ class EscuchaService : Service() {
 
     private fun escuchar() {
         try {
-            porcupine?.start()
+            val r = Recognizer(modelo, 16000f, "[\"jarvis\", \"[unk]\"]")
+            reconocedor = r
+            oido = SpeechService(r, 16000f).also {
+                it.startListening(object : RecognitionListener {
+                    override fun onPartialResult(json: String?) = revisar(json, "partial")
+                    override fun onResult(json: String?) = revisar(json, "text")
+                    override fun onFinalResult(json: String?) {}
+                    override fun onError(e: Exception?) = mostrar("Error del micrófono: ${e?.message}")
+                    override fun onTimeout() {}
+                })
+            }
             mostrar("Di \"Jarvis\" y, tras el pitido, tu pedido.")
-        } catch (e: PorcupineException) {
+        } catch (e: Exception) {
             mostrar("No pude abrir el micrófono: ${e.message}")
         }
+    }
+
+    private fun revisar(json: String?, campo: String) {
+        val texto = runCatching { JSONObject(json ?: "{}").optString(campo) }.getOrDefault("")
+        if (Regex("\\bjarvis\\b").containsMatchIn(texto)) detectado()
+    }
+
+    private fun soltarMicrofono() {
+        oido?.let { it.stop(); it.shutdown() }
+        oido = null
+        reconocedor?.close()
+        reconocedor = null
     }
 
     private fun detectado() {
@@ -127,7 +150,7 @@ class EscuchaService : Service() {
 
     private fun atender() {
         try {
-            runCatching { porcupine?.stop() }   // suelta el micrófono para grabar la orden
+            soltarMicrofono()   // para grabar la orden
             val s = servidor ?: return
             var seguir = true
             while (seguir && encendido) {

@@ -23,12 +23,11 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
-/** Ajustes (servidor, clave de la app, clave de Picovoice) y el interruptor de la escucha. */
+/** Ajustes (servidor y clave de la app) y el interruptor de la escucha. */
 class MainActivity : Activity() {
 
     private lateinit var servidor: EditText
     private lateinit var token: EditText
-    private lateinit var picovoice: EditText
     private lateinit var estado: TextView
     private lateinit var boton: Button
     private val reloj = Handler(Looper.getMainLooper())
@@ -72,8 +71,6 @@ class MainActivity : Activity() {
         servidor = campo("servidor", "https://servidor.tu-red.ts.net", false)
         etiqueta("Clave de la app (JARVIS_API_TOKEN)")
         token = campo("token", "La misma que pegaste en la app web", true)
-        etiqueta("Clave de Picovoice (AccessKey)")
-        picovoice = campo("picovoice", "console.picovoice.ai", true)
 
         boton = Button(this).apply { setOnClickListener { alternar() } }
         raiz.addView(boton, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = 48 })
@@ -98,13 +95,13 @@ class MainActivity : Activity() {
             startService(Intent(this, EscuchaService::class.java).setAction(EscuchaService.DETENER))
             return
         }
-        val valores = listOf(servidor, token, picovoice).map { it.text.toString().trim() }
+        val valores = listOf(servidor, token).map { it.text.toString().trim() }
         if (valores.any { it.isEmpty() }) {
-            Toast.makeText(this, "Llena los tres campos.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Llena los dos campos.", Toast.LENGTH_LONG).show()
             return
         }
         getSharedPreferences("jarvis", Context.MODE_PRIVATE).edit()
-            .putString("servidor", valores[0]).putString("token", valores[1]).putString("picovoice", valores[2])
+            .putString("servidor", valores[0]).putString("token", valores[1])
             .apply()
         val faltan = mutableListOf(Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= 33) faltan += Manifest.permission.POST_NOTIFICATIONS

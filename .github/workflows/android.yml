@@ -30,6 +30,19 @@ jobs:
         with:
           gradle-version: "8.7"
 
+      # El oído de la app: modelo pequeño de Vosk en inglés (trae "jarvis"; el de español no).
+      - name: Modelo de Vosk
+        run: |
+          curl -sSfL -o modelo.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+          unzip -q modelo.zip
+          ls vosk-model-small-en-us-0.15 vosk-model-small-en-us-0.15/graph
+          if [ -f vosk-model-small-en-us-0.15/graph/words.txt ]; then
+            grep -E "^jarvis " vosk-model-small-en-us-0.15/graph/words.txt || { echo "El modelo no conoce 'jarvis'"; exit 1; }
+          fi
+          mkdir -p android/app/src/main/assets
+          mv vosk-model-small-en-us-0.15 android/app/src/main/assets/modelo
+          echo "vosk-model-small-en-us-0.15" > android/app/src/main/assets/modelo/uuid
+
       - name: Armar el APK
         working-directory: android
         run: |
