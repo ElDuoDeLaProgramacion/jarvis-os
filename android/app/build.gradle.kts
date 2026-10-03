@@ -15,6 +15,13 @@ android {
         versionName = "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
+    // El workflow deja la misma clave en cada versión (caché de Actions) para que el APK nuevo
+    // se instale encima del anterior. Sin ella, se usa la clave de depuración de la máquina.
+    val clave = rootProject.file("debug.keystore")
+    if (clave.exists()) {
+        signingConfigs.getByName("debug").storeFile = clave
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

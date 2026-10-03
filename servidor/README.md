@@ -75,14 +75,13 @@ En la app:
 Si Spotify dice que no hay dispositivo, abre Spotify en el celular y dale play una vez.
 
 ### App de Android: "Jarvis" siempre escuchando
-La app web solo escucha con la pantalla encendida. La app de Android (`android/`) escucha "Jarvis" todo el tiempo, también con la pantalla apagada o usando otras apps, y contesta en voz alta. Detecta la palabra en el propio celular con Picovoice (no manda nada al servidor hasta que dices "Jarvis"); la orden se transcribe en el servidor con el mismo modelo de las notas de voz de WhatsApp.
+La app web solo escucha con la pantalla encendida. La app de Android (`android/`) escucha "Jarvis" todo el tiempo, también con la pantalla apagada o usando otras apps, y contesta en voz alta. Detecta la palabra en el propio celular con Vosk, sin cuentas ni claves extra (no manda nada al servidor hasta que dices "Jarvis"); la orden se transcribe en el servidor con el mismo modelo de las notas de voz de WhatsApp.
 
-1. Crea una cuenta gratis en [console.picovoice.ai](https://console.picovoice.ai) y copia tu **AccessKey**.
-2. En el celular abre [Releases](https://github.com/ElDuoDeLaProgramacion/jarvis-os/releases/latest), descarga `jarvis.apk` e instálalo (Android pide permitir "instalar apps de origen desconocido" para Chrome).
-3. Abre JARVIS y llena: la dirección del servidor (la misma de la app web, sin `/app/`), la clave de la app (`JARVIS_API_TOKEN`) y la AccessKey de Picovoice.
-4. **Activar la escucha**. Acepta el micrófono, las notificaciones y "sin restricciones de batería".
+1. En el celular abre [Releases](https://github.com/ElDuoDeLaProgramacion/jarvis-os/releases/latest), descarga `jarvis.apk` e instálalo (Android pide permitir "instalar apps de origen desconocido" para Chrome).
+2. Abre JARVIS y llena la dirección del servidor (la misma de la app web, sin `/app/`) y la clave de la app (`JARVIS_API_TOKEN`).
+3. **Activar la escucha**. Acepta el micrófono, las notificaciones y "sin restricciones de batería".
 
-Uso: di "Jarvis", espera el pitido y di tu pedido. Si JARVIS te pregunta algo ("¿Lo envío?"), suena otro pitido y contestas sin decir "Jarvis". Queda una notificación fija "JARVIS" mientras escucha; desde ella se apaga. Tailscale tiene que estar conectado en el celular. Tras reiniciar el celular, abre la app y actívala otra vez.
+Uso: di "Jarvis", espera el pitido y di tu pedido. Si JARVIS te pregunta algo ("¿Lo envío?"), suena otro pitido y contestas sin decir "Jarvis". Queda una notificación fija "JARVIS" mientras escucha; desde ella se apaga. Tailscale tiene que estar conectado en el celular. Tras reiniciar el celular, abre la app y actívala otra vez. La primera vez tarda unos segundos en "Preparando el oído". Pronuncia "Yarvis" con claridad: el detector es el de inglés porque el de español no trae esa palabra.
 
 Para actualizar, instala el `jarvis.apk` nuevo encima. Si Android dice que la firma no coincide, desinstala la app y vuelve a instalarla (los datos se llenan de nuevo).
 

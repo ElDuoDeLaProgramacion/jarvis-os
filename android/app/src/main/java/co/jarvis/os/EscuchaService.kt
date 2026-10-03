@@ -152,9 +152,7 @@ class EscuchaService : Service() {
         try {
             soltarMicrofono()   // para grabar la orden
             val s = servidor ?: return
-            var seguir = true
-            while (seguir && encendido) {
-                seguir = false
+            while (encendido) {
                 pitido()
                 mostrar("Te escucho…")
                 val wav = Grabadora.grabar { encendido } ?: break
@@ -170,7 +168,7 @@ class EscuchaService : Service() {
                 if (respuesta.isBlank()) break
                 mostrar(respuesta)
                 hablar(respuesta)
-                seguir = respuesta.trim().endsWith("?")   // JARVIS preguntó: la contestación va sin "Jarvis"
+                if (!respuesta.trim().endsWith("?")) break   // si JARVIS preguntó, la contestación va sin "Jarvis"
             }
         } catch (e: Exception) {
             val error = "No pude hablar con el servidor: ${e.message}"

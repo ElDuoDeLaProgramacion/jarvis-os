@@ -22,23 +22,36 @@ jobs:
 
       # La misma firma en cada versión, para que el APK nuevo se instale encima del anterior.
       - uses: actions/cache@v4
+        id: clave
         with:
-          path: ~/.android/debug.keystore
+          path: android/debug.keystore
           key: android-debug-keystore-v1
+
+      - name: Crear la clave de firma
+        if: steps.clave.outputs.cache-hit != 'true'
+        run: |
+          keytool -genkeypair -keystore android/debug.keystore -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
 
-      # El oído de la app: modelo pequeño de Vosk en inglés (trae "jarvis"; el de español no).
+      # El oído de la app: modelo pequeño de Vosk en inglés, donde "jarvis" es una palabra conocida.
       - name: Modelo de Vosk
         run: |
           curl -sSfL -o modelo.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
           unzip -q modelo.zip
-          ls vosk-model-small-en-us-0.15 vosk-model-small-en-us-0.15/graph
-          if [ -f vosk-model-small-en-us-0.15/graph/words.txt ]; then
-            grep -E "^jarvis " vosk-model-small-en-us-0.15/graph/words.txt || { echo "El modelo no conoce 'jarvis'"; exit 1; }
-          fi
+
+      # Prueba el oído con voces sintéticas: tiene que oír "Jarvis" y no confundirse con otras frases.
+      - name: Probar que el modelo oye "Jarvis"
+        run: |
+          sudo apt-get install -y -qq espeak-ng ffmpeg >/dev/null
+          python3 -m venv /tmp/vosk && /tmp/vosk/bin/pip install -q vosk
+          /tmp/vosk/bin/python android/probar_oido.py vosk-model-small-en-us-0.15
+
+      - name: Meter el modelo en la app
+        run: |
           mkdir -p android/app/src/main/assets
           mv vosk-model-small-en-us-0.15 android/app/src/main/assets/modelo
           echo "vosk-model-small-en-us-0.15" > android/app/src/main/assets/modelo/uuid
