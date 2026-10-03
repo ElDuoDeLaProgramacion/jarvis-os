@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { esNo, esSi, limpiar, lineaChat, numeroDe, partir, textoDe } from './util.mjs'
+import { eleccion, esNo, esSi, esTeclaMusica, opcionesDe, limpiar, lineaChat, numeroDe, partir, textoDe } from './util.mjs'
 
 test('sí y no', () => {
   for (const t of ['sí', 'Si.', 'dale', 'ok envíalo', '¡Sí!']) assert.ok(esSi(t), t)
@@ -38,4 +38,20 @@ test('formato y trozos', () => {
   assert.equal(trozos.join(''), 'a'.repeat(8000))
   assert.ok(trozos.every((t) => t.length <= 3500))
   assert.deepEqual(partir('uno\ndos', 5), ['uno', 'dos'])
+})
+
+test('teclas de música', () => {
+  for (const t of ['Jarvis, play', 'pausa', 'Siguiente canción', 'sube el volumen']) assert.ok(esTeclaMusica(t), t)
+  for (const t of ['pon música', 'play de Bad Bunny', 'pausa la reunión de mañana']) assert.ok(!esTeclaMusica(t), t)
+})
+
+test('opciones de respuesta', () => {
+  const salida = 'Aquí van:\n1) "¡Claro! ¿A qué hora?"\n2. Mañana no puedo, ¿el sábado?\n*3)* Te confirmo en un rato.\n4) sobra'
+  assert.deepEqual(opcionesDe(salida), ['¡Claro! ¿A qué hora?', 'Mañana no puedo, ¿el sábado?', 'Te confirmo en un rato.'])
+  assert.deepEqual(opcionesDe('NADA'), [])
+  assert.equal(eleccion('2', 3), 1)
+  assert.equal(eleccion('la 3', 3), 2)
+  assert.equal(eleccion('envía la 1.', 3), 0)
+  assert.equal(eleccion('4', 3), -1)
+  assert.equal(eleccion('dile que 2 horas', 3), -1)
 })

@@ -15,6 +15,8 @@ export PATH="$HOME/.local/bin:$PATH"
 #                   enviar ese correo. Solo vale junto con --reanudar y solo la pone la voz.
 #   --voz           pedido hablado: usa el modelo rápido (JARVIS_MODELO_VOZ en .env, por defecto sonnet)
 #   --copiloto      recomendación que nadie pidió (voz/jarvis_voz.py, Copiloto): solo puede leer
+#   --solo-leer     solo puede leer, con el modelo rápido (whatsapp/puente.mjs: opciones de respuesta
+#                   a un mensaje que escribió otra persona)
 reanudar=""; sesion=0; confirmado=0; voz=0; copiloto=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -23,6 +25,7 @@ while [ $# -gt 0 ]; do
     --confirmado) confirmado=1; shift ;;
     --voz) voz=1; shift ;;
     --copiloto) copiloto=1; voz=1; shift ;;
+    --solo-leer) copiloto=1; voz=1; shift ;;
     --) shift; break ;;
     *) break ;;
   esac
@@ -82,7 +85,8 @@ for servidor in claude_ai_Google_Calendar claude.ai_Google_Calendar; do
   fi
 done
 
-# El copiloto mira la pantalla por su cuenta: lo que haya en ella no puede hacerle escribir,
+# El copiloto mira la pantalla por su cuenta, y --solo-leer trabaja con mensajes de otras personas:
+# nada de eso puede hacerle escribir,
 # enviar ni agendar nada. Solo Read (la captura y la bóveda).
 if [ "$copiloto" = "1" ]; then permitidas=(Read); fi
 
