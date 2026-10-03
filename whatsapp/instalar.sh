@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 # Instala lo que necesita el WhatsApp de JARVIS (una sola vez, en Ubuntu/WSL):
-#   - cloudflared, para el túnel gratis de Cloudflare (sin cuenta ni dominio)
-#   - las variables que faltan en .env (el secreto del webhook se genera solo)
+#   - Node.js 20 o más nuevo (si no está, se descarga el oficial en ~/.local/node, sin sudo)
+#   - las librerías del puente (Baileys, la que usa WhatsApp Web)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p "$HOME/.local/bin" logs
+export PATH="$HOME/.local/bin:$PATH"
 
-if ! command -v cloudflared >/dev/null && [ ! -x "$HOME/.local/bin/cloudflared" ]; then
-  echo "Descargando cloudflared (Cloudflare, oficial)..."
-  arq=$(uname -m); case "$arq" in x86_64) arq=amd64 ;; aarch64) arq=arm64 ;; esac
-  curl -fsSL -o "$HOME/.local/bin/cloudflared" \
-    "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$arq"
-  chmod +x "$HOME/.local/bin/cloudflared"
+version_node() { node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
+if [ "$(version_node)" -lt 20 ]; then
+  echo "Descargando Node.js 22 (nodejs.org, oficial)..."
+  arq=$(uname -m); case "$arq" in x86_64) arq=x64 ;; aarch64) arq=arm64 ;; esac
+  nombre=$(curl -fsSL https://nodejs.org/dist/latest-v22.x/ | grep -o "node-v22[0-9.]*-linux-$arq.tar.xz" | head -n 1)
+  rm -rf "$HOME/.local/node" && mkdir -p "$HOME/.local/node"
+  curl -fsSL "https://nodejs.org/dist/latest-v22.x/$nombre" | tar -xJ -C "$HOME/.local/node" --strip-components=1
+  for b in node npm npx; do ln -sf "$HOME/.local/node/bin/$b" "$HOME/.local/bin/$b"; done
 fi
-"$HOME/.local/bin/cloudflared" --version 2>/dev/null || cloudflared --version
+echo "Node $(node --version)"
+
+(cd whatsapp && npm ci --no-audit --no-fund)
 
 touch .env
-agregar() { grep -q "^$1=" .env || echo "$1=$2" >> .env; }
-agregar KAPSO_API_KEY ""
-agregar KAPSO_PHONE_NUMBER_ID ""
-agregar WHATSAPP_PERMITIDOS ""
-agregar KAPSO_WEBHOOK_SECRET "$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+grep -q "^WHATSAPP_PERMITIDOS=" .env || echo "WHATSAPP_PERMITIDOS=" >> .env
 
 echo
-echo "Listo. Abre .env y completa KAPSO_API_KEY, KAPSO_PHONE_NUMBER_ID y WHATSAPP_PERMITIDOS"
-echo "(ver whatsapp/README.md). Luego prueba con:  ./whatsapp/iniciar.sh"
+echo "Listo. Ahora vincula tu WhatsApp:  ./whatsapp/iniciar.sh   (y escanea el QR)"

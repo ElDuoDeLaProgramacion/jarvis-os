@@ -28,7 +28,8 @@ tags: [jarvis, ayuda]
 - **Día a día:** "plan de hoy", "resumen matutino", "cierra el día", "revisa mis suscripciones", "tendencias".
 
 ## Desde el celular (WhatsApp)
-- Escríbele al número de JARVIS lo mismo que le dirías por voz: "plan de hoy", "agéndame...", "resume mis correos". Te contesta por WhatsApp. Ver `whatsapp/README.md`.
+- Escríbete a ti mismo (el chat "Tú") lo mismo que le dirías por voz: "plan de hoy", "agéndame...", "resume mis correos". JARVIS contesta en ese chat. Ver `whatsapp/README.md`.
+- **Tus chats:** "¿qué me escribieron hoy?", "¿qué dijo Ana?", "respóndele a Ana que llego a las 8" (te muestra el mensaje y lo envía solo si dices "sí").
 
 ## Sin que se lo pidas
 - **Copiloto:** cuando juegas ajedrez o programas, mira la pantalla de vez en cuando y habla solo si ve algo útil.

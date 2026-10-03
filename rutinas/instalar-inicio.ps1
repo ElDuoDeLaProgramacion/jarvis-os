@@ -38,12 +38,11 @@ if (-not $SinVoz) {
     Registrar "Voz" "cmd.exe" "/c start `"JARVIS voz`" /min `"$repo\voz\jarvis.bat`" --distro $Distro" "PT30S"
 }
 
-# WhatsApp de JARVIS (whatsapp/README.md): solo si ya pusiste la clave de Kapso en .env.
-$env_ = Get-Content "$repo\.env" -ErrorAction SilentlyContinue
-if (-not $SinWhatsApp -and ($env_ -match '^KAPSO_API_KEY=.+')) {
+# WhatsApp de JARVIS (whatsapp/README.md): solo si ya vinculaste el celular con el QR.
+if (-not $SinWhatsApp -and (Test-Path "$repo\whatsapp\sesion\creds.json")) {
     Registrar "WhatsApp" "cmd.exe" "/c start `"JARVIS WhatsApp`" /min wsl.exe -d $Distro --cd /mnt/p/jarvis-os --exec ./whatsapp/iniciar.sh" "PT40S"
 } elseif (-not $SinWhatsApp) {
-    Write-Host "WhatsApp: aún sin configurar (falta KAPSO_API_KEY en .env). Ver whatsapp\README.md."
+    Write-Host "WhatsApp: aún sin vincular. En Ubuntu ejecuta ./whatsapp/iniciar.sh y escanea el QR (whatsapp\README.md)."
 }
 
 Write-Host ""

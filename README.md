@@ -88,7 +88,7 @@ No hay comandos fijos: le hablas normal. Ejemplos:
 - "Cierra el día"
 
 ## WhatsApp
-JARVIS puede tener su propio número de WhatsApp (API oficial, con Kapso). Le escribes desde el celular y te contesta. Solo obedece a tu número. Instalación y límites en [whatsapp/README.md](whatsapp/README.md).
+JARVIS se vincula a tu WhatsApp con un QR, como WhatsApp Web. Le das órdenes en tu chat contigo mismo y te contesta ahí. También anota tus chats en la bóveda para leerlos y resumirlos, y te prepara respuestas que solo envía si dices "sí". Instalación y límites en [whatsapp/README.md](whatsapp/README.md).
 
 ## Arranque automático
 
@@ -128,6 +128,7 @@ Para probar los canales: `python3 scripts/canales.py`.
 | `tendencias` | Lo que se mueve en tus temas | `outputs/tendencias/` |
 | `canales` | Números de tus redes y canales | `outputs/canales/` |
 | `musica` | Pone música en Spotify, dice qué suena, crea listas y guarda canciones | (no guarda nada) |
+| `whatsapp` | Lee y resume tus chats de WhatsApp y prepara respuestas que confirmas con "sí" | (no guarda nada) |
 | `copiloto` | Recomendaciones sin que las pidas mientras juegas ajedrez o programas (solo lectura) | (no guarda nada) |
 | `analizar` | Analiza archivos, PDFs, enlaces, YouTube, audio, video y texto desde la ventana de análisis | `outputs/analisis/` |
 | `suscripciones` | Cobros recurrentes desde los recibos de Gmail: total al mes, renovaciones próximas y cómo cancelar | `wiki/suscripciones.md`, `outputs/suscripciones/` |
