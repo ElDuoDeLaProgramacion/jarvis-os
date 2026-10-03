@@ -865,6 +865,9 @@ def atender_escritos(jarvis):
                     seguir = jarvis.seguimiento[0] if vigente else None
                     jarvis.seguimiento = None
                     jarvis.atender(texto, "texto", reanudar=seguir)
+            # Música pedida por WhatsApp: nadie habló, así que nadie más abriría lo que JARVIS encontró.
+            if REPRODUCIR.exists() and not jarvis.ocupado.is_set():
+                abrir_lo_encontrado()
         except Exception as e:  # nunca tumbar la voz por un archivo raro
             log("Error con un pedido escrito:", repr(e))
         time.sleep(0.5)

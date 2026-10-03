@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { esNo, esSi, limpiar, lineaChat, numeroDe, partir, textoDe } from './util.mjs'
+import { esNo, esSi, esTeclaMusica, limpiar, lineaChat, numeroDe, partir, textoDe } from './util.mjs'
 
 test('sí y no', () => {
   for (const t of ['sí', 'Si.', 'dale', 'ok envíalo', '¡Sí!']) assert.ok(esSi(t), t)
@@ -38,4 +38,9 @@ test('formato y trozos', () => {
   assert.equal(trozos.join(''), 'a'.repeat(8000))
   assert.ok(trozos.every((t) => t.length <= 3500))
   assert.deepEqual(partir('uno\ndos', 5), ['uno', 'dos'])
+})
+
+test('teclas de música', () => {
+  for (const t of ['Jarvis, play', 'pausa', 'Siguiente canción', 'sube el volumen']) assert.ok(esTeclaMusica(t), t)
+  for (const t of ['pon música', 'play de Bad Bunny', 'pausa la reunión de mañana']) assert.ok(!esTeclaMusica(t), t)
 })

@@ -22,13 +22,13 @@ import makeWASocket, {
   isJidStatusBroadcast, jidNormalizedUser, normalizeMessageContent, useMultiFileAuthState,
 } from '@whiskeysockets/baileys'
 import { spawn } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import {
-  cargarEnv, esNo, esPregunta, esSi, limpiar, lineaChat, numeroDe, partir, soloDigitos, textoDe,
+  cargarEnv, esNo, esPregunta, esSi, esTeclaMusica, limpiar, lineaChat, numeroDe, partir, soloDigitos, textoDe,
 } from './util.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -41,6 +41,8 @@ const LOG = join(RAIZ, 'logs', 'whatsapp.log')
 const SEGUIR_MIN = 30          // minutos en que un mensaje sigue la misma conversación con JARVIS
 const ORDEN_VIEJA_MIN = 10     // órdenes que llegan con el PC apagado más de esto no se ejecutan
 const PREFIJO = '*JARVIS:* '
+const ESCRITOS = join(RAIZ, 'cola', 'escritos')            // la voz del PC atiende lo que llegue aquí
+const VOZ_VIVA = join(RAIZ, 'cola', 'voz-viva')
 
 cargarEnv(join(RAIZ, '.env'))
 const PERMITIDOS = new Set((process.env.WHATSAPP_PERMITIDOS || '').split(',').map(soloDigitos).filter(Boolean))
@@ -88,6 +90,13 @@ function anotarContacto(jid, datos) {
 const nombreDe = (jid) => {
   const c = contactos[jidNormalizedUser(jid)] || {}
   return c.nombre || (c.numero ? `+${c.numero}` : numeroDe(jid) ? `+${numeroDe(jid)}` : 'desconocido')
+}
+
+/** Para el registro de chats: "David (+573228564494)", así JARVIS lo encuentra por nombre o por número. */
+const chatDe = (jid) => {
+  const c = contactos[jidNormalizedUser(jid)] || {}
+  const numero = c.numero || numeroDe(jid)
+  return c.nombre && numero ? `${c.nombre} (+${numero})` : nombreDe(jid)
 }
 
 // ---------- Registro de chats en la bóveda ----------
@@ -150,6 +159,10 @@ function leerBorrador() {
   if (/^\+?\d[\d\s-]{6,}$/.test(para)) para = `${soloDigitos(para)}@s.whatsapp.net`
   if (!/@(s\.whatsapp\.net|lid)$/.test(para)) return null           // nada de grupos ni difusiones
   return { para: jidNormalizedUser(para), texto: b.texto.trim(), hasta: Date.now() + SEGUIR_MIN * 60000 }
+}
+
+function vozViva() {
+  try { return Date.now() - statSync(VOZ_VIVA).mtimeMs < 15000 } catch { return false }
 }
 
 // ---------- Socket ----------
@@ -256,6 +269,13 @@ async function iniciar() {
 
   async function atenderOrden(jid, texto) {
     log(`\nOrden por WhatsApp: ${texto}`)
+    // "play", "pausa", "siguiente"...: las teclas de música las aprieta la voz del PC, al instante.
+    if (esTeclaMusica(texto)) {
+      if (!vozViva()) return responder(jid, `${PREFIJO}La voz del PC no está encendida, así que no puedo tocar la música desde aquí.`)
+      mkdirSync(ESCRITOS, { recursive: true })
+      writeFileSync(join(ESCRITOS, `${Date.now()}-whatsapp.txt`), texto.replace(/^\s*jarvis[\s,]*/i, ''))
+      return responder(jid, `${PREFIJO}Hecho.`)
+    }
     // 1) ¿Es la respuesta a un borrador pendiente? Se decide aquí, sin pasar por el modelo.
     if (borrador && Date.now() < borrador.hasta) {
       const b = borrador
@@ -301,6 +321,11 @@ async function iniciar() {
       try {
         const k = msg.key
         const chat = k.remoteJid
+        if (chat && !msg.message && msg.messageStubType === 2) {
+          // CIPHERTEXT: WhatsApp aún no dio las llaves de ese chat; suele llegar de nuevo en segundos.
+          log(`Mensaje de ${chatDe(chat)} aún cifrado; espero a que WhatsApp lo reenvíe.`)
+          continue
+        }
         if (!chat || !msg.message || vistos.has(k.id)) continue
         vistos.add(k.id)
         if (vistos.size > 5000) vistos.delete(vistos.values().next().value)
@@ -337,8 +362,9 @@ async function iniciar() {
           const autor = k.fromMe ? 'yo' : msg.pushName || nombreDe(autorJid || '')
           anotarChat(lineaChat({ hora: hora(cuando), chat: await nombreGrupo(sock, chat), autor, texto, grupo: true }))
         } else {
-          anotarChat(lineaChat({ hora: hora(cuando), chat: nombreDe(chat), autor: k.fromMe ? 'yo' : nombreDe(chat), texto }))
+          anotarChat(lineaChat({ hora: hora(cuando), chat: chatDe(chat), autor: k.fromMe ? 'yo' : chatDe(chat), texto }))
         }
+        log(`Anotado: mensaje ${k.fromMe ? 'tuyo a' : 'de'} ${grupo ? 'un grupo' : chatDe(chat)}.`)
       } catch (e) {
         log('Error con un mensaje:', e.message)   // un mensaje raro nunca tumba el puente
       }
