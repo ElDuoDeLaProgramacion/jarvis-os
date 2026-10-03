@@ -21,9 +21,31 @@ echo "SESION=s1" >&2
 case "$pedido" in
   *correo*) echo "Listo el borrador para Ana. ¿Lo envío?" ;;
   *falla*) echo "se rompió" >&2; exit 1 ;;
+  *queen*) echo "spotify:playlist:37i9dQZF1DX" > "$REPRO"; echo "Pongo Queen." ;;
   *) echo "Hecho: $pedido" ;;
 esac
 """
+
+
+class SpotifyFalso:
+    def __init__(self):
+        self.llamadas = []
+
+    def disponible(self):
+        return True
+
+    def pausar(self):
+        self.llamadas.append("pausar")
+
+    def seguir(self):
+        self.llamadas.append("seguir")
+
+    def saltar(self, n, atras=False):
+        self.llamadas.append(("saltar", n, atras))
+
+    def reproducir(self, uri):
+        self.llamadas.append(("reproducir", uri))
+        return True
 
 
 class PruebaApi(unittest.TestCase):
@@ -33,7 +55,9 @@ class PruebaApi(unittest.TestCase):
         guion.write_text(FALSO)
         guion.chmod(0o755)
         self.registro = self.dir / "registro.txt"
-        os.environ.update(JARVIS_SCRIPT=str(guion), REGISTRO=str(self.registro))
+        os.environ.update(JARVIS_SCRIPT=str(guion), REGISTRO=str(self.registro), REPRO=str(self.dir / "reproducir.txt"))
+        api.REPRODUCIR = self.dir / "reproducir.txt"
+        api.spotify = self.spotify = SpotifyFalso()
         api.Manejador.token = "t" * 30
         api.Manejador.conversacion = api.Conversacion(self.dir / "conversacion.json")
         api.Manejador.modulo_hud = api.hud()
@@ -96,6 +120,20 @@ class PruebaApi(unittest.TestCase):
         _, d = self.pedir("/api/resumen")
         self.assertTrue(d["comandos"])
         self.assertIn("prioridades", d["plan"])
+
+    def test_musica_al_instante_sin_claude(self):
+        self.pedir("/api/pedir", {"texto": "Jarvis, pasa tres canciones"})
+        m = self.esperar()
+        self.assertEqual(m[-1]["texto"], "Paso 3 canciones.")
+        self.assertEqual(self.spotify.llamadas, [("saltar", 3, False)])
+        self.assertFalse(self.registro.exists())   # no pasó por jarvis.sh
+
+    def test_pon_musica_suena_y_deja_boton(self):
+        self.pedir("/api/pedir", {"texto": "pon algo de queen"})
+        m = self.esperar()
+        self.assertEqual(m[-1]["abrir"], "spotify:playlist:37i9dQZF1DX")
+        self.assertEqual(self.spotify.llamadas, [("reproducir", "spotify:playlist:37i9dQZF1DX")])
+        self.assertFalse((self.dir / "reproducir.txt").exists())
 
     def test_es_si(self):
         self.assertTrue(api.es_si("Sí, envíalo"))

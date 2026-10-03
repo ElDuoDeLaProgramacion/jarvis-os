@@ -59,10 +59,20 @@ Si usas la clave de YouTube u otras opciones, cópialas tú a mano en el `.env` 
 
 En la app:
 - Escribes o tocas 🎙 y hablas. El dictado usa el reconocimiento de voz del propio celular.
-- **Voz** hace que JARVIS lea en voz alta cada respuesta.
+- **Jarvis** (manos libres): mientras la app está abierta, escucha todo el tiempo. Di "Jarvis, qué tengo hoy" y lo envía solo; si dices solo "Jarvis", lo siguiente que digas es la orden. La pantalla se queda encendida mientras está activo, porque el navegador no deja escuchar con la pantalla apagada o con la app en segundo plano. En Android puede sonar un pitido cada vez que el micrófono se vuelve a abrir.
+- **Voz** hace que JARVIS lea en voz alta cada respuesta. Se enciende sola con "Jarvis".
 - **Hoy** muestra las prioridades, la agenda y las tareas.
 - Los botones de abajo son los mismos del HUD.
 - Los pedidos seguidos (en 30 minutos) son una sola conversación. Si JARVIS pregunta "¿Lo envío?" por un correo y contestas "sí", lo envía, igual que por voz.
+
+### Música desde el celular (Spotify Premium)
+"Pon algo de Queen" suena en el Spotify que tengas activo (normalmente el del celular), y "pausa", "play", "siguiente" o "pasa 3 canciones" funcionan al instante, sin pasar por Claude. Debajo de la respuesta sale **▶ Abrir en Spotify** por si el celular no tenía Spotify activo. Una vez:
+1. En el `.env` del servidor pon el mismo `SPOTIFY_CLIENT_ID` que en el PC (`nano .env`).
+2. Desde PowerShell entra al servidor con un túnel para el permiso: `ssh -L 8888:127.0.0.1:8888 david@IP_DEL_SERVIDOR`
+3. Ya dentro: `cd ~/jarvis-os && python3 voz/spotify.py --login`. Copia el enlace que aparece, ábrelo en el navegador del PC y acepta.
+4. `sudo systemctl restart jarvis-app`
+
+Si Spotify dice que no hay dispositivo, abre Spotify en el celular y dale play una vez.
 
 ## 5. La bóveda sincronizada (Syncthing)
 La bóveda vive en el servidor y en el PC a la vez. Syncthing copia los cambios en los dos sentidos.
@@ -102,7 +112,7 @@ Para volver atrás, cambia `Disable` por `Enable`. Si cambias `rutinas/rutinas.c
 - **Registros:** `logs/jarvis.log`, `logs/whatsapp.log`, `logs/rutinas.log` y `journalctl -u jarvis-app`
 
 ## Lo que no se puede con el PC apagado
-- Música: "pon...", "pasa la canción" y el volumen controlan el Spotify del PC.
+- El volumen y "abre Spotify" por voz del PC. Desde la app, la música funciona si conectaste Spotify en el servidor (arriba).
 - El copiloto, las capturas de pantalla, el lienzo 3D y los gestos, que miran tu pantalla o tu cámara.
 - Los archivos y proyectos de `P:\` y `C:\Users\Usuario`, que solo están en el PC.
 

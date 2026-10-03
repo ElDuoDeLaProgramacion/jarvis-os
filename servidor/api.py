@@ -21,12 +21,14 @@ import subprocess
 import sys
 import threading
 import time
+import unicodedata
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 RAIZ = Path(__file__).resolve().parent.parent
+REPRODUCIR = RAIZ / "cola" / "reproducir.txt"   # la habilidad musica deja aquí el spotify:... que eligió
 APP = Path(__file__).resolve().parent / "app"
 DATOS = RAIZ / "cola" / "app"
 CONVERSACION = DATOS / "conversacion.json"
@@ -59,6 +61,57 @@ def cargar_env(archivo=RAIZ / ".env"):
         m = re.match(r"^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$", linea)
         if m and m.group(1) not in os.environ:
             os.environ[m.group(1)] = m.group(2).strip("\"'")
+
+
+def cargar_modulo(nombre, ruta):
+    spec = importlib.util.spec_from_file_location(nombre, ruta)
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
+spotify = cargar_modulo("spotify", RAIZ / "voz" / "spotify.py")
+
+NUMEROS = {"una": 1, "un": 1, "uno": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6,
+           "siete": 7, "ocho": 8, "nueve": 9, "diez": 10}
+
+
+def orden_musica(texto):
+    """Órdenes de música que no necesitan a Claude: ("pausar",) ("seguir",) ("saltar", n, atras). None si no es."""
+    plano = unicodedata.normalize("NFD", texto.lower())
+    plano = re.sub(r"[\u0300-\u036f.,!¡¿?]", "", plano).strip()
+    plano = re.sub(r"^jarvis\s+", "", plano)
+    if re.fullmatch(r"(pausa|pon pausa|para la musica|deten la musica|pausa la musica)", plano):
+        return ("pausar",)
+    if re.fullmatch(r"(play|dale play|ponle play|sigue|reanuda|continua|sigue la musica)", plano):
+        return ("seguir",)
+    if re.fullmatch(r"(siguiente|siguiente cancion|pasa la cancion|salta la cancion)", plano):
+        return ("saltar", 1, False)
+    if re.fullmatch(r"(anterior|cancion anterior|la anterior)", plano):
+        return ("saltar", 1, True)
+    m = re.fullmatch(r"(pasa|salta|adelanta|retrocede|devuelve|regresa)\s+(\d+|\w+)\s+canciones?", plano)
+    if m:
+        n = int(m.group(2)) if m.group(2).isdigit() else NUMEROS.get(m.group(2))
+        if n and 0 < n <= 20:
+            return ("saltar", n, m.group(1) in ("retrocede", "devuelve", "regresa"))
+    return None
+
+
+def musica_al_instante(orden):
+    if not spotify.disponible():
+        return ("Para controlar Spotify desde aquí, conecta Spotify en el servidor "
+                "(servidor/README.md, Música desde el celular).")
+    try:
+        if orden[0] == "pausar":
+            spotify.pausar()
+            return "Pausado."
+        if orden[0] == "seguir":
+            spotify.seguir()
+            return "Sigue la música."
+        spotify.saltar(orden[1], orden[2])
+        return ("Vuelvo " if orden[2] else "Paso ") + (f"{orden[1]} canciones." if orden[1] > 1 else "una canción.")
+    except Exception as e:  # sin dispositivo activo, Spotify responde 404
+        return f"Spotify no respondió ({e}). Abre Spotify en el celular y dale play una vez."
 
 
 def hud():
@@ -94,10 +147,10 @@ class Conversacion:
                        encoding="utf-8")
         tmp.replace(self.archivo)
 
-    def anotar(self, de, texto):
+    def anotar(self, de, texto, **extra):
         with self.cerrojo:
             n = (self.mensajes[-1]["n"] + 1) if self.mensajes else 1
-            self.mensajes.append({"n": n, "de": de, "texto": texto, "hora": datetime.now().strftime("%H:%M")})
+            self.mensajes.append({"n": n, "de": de, "texto": texto, "hora": datetime.now().strftime("%H:%M"), **extra})
             self.mensajes = self.mensajes[-MAX_MENSAJES:]
             self._guardar()
             return n
@@ -116,10 +169,40 @@ class Conversacion:
     def _atender(self, texto):
         try:
             with self.turno:
-                self.anotar("jarvis", self._jarvis(texto))
+                orden = orden_musica(texto)
+                if orden:
+                    self.anotar("jarvis", musica_al_instante(orden))
+                    return
+                inicio = time.time()
+                respuesta = self._jarvis(texto)
+                uri = self._musica_pedida(inicio)
+                if uri:
+                    self.anotar("jarvis", respuesta, abrir=uri)
+                else:
+                    self.anotar("jarvis", respuesta)
         finally:
             with self.cerrojo:
                 self.ocupado -= 1
+
+    @staticmethod
+    def _musica_pedida(desde):
+        """Si JARVIS eligió música en este pedido (cola/reproducir.txt), la pone en el Spotify activo
+        (normalmente el del celular) y devuelve la dirección para el botón "Abrir en Spotify"."""
+        try:
+            if REPRODUCIR.stat().st_mtime < desde - 1:
+                return None
+            uri = REPRODUCIR.read_text(encoding="utf-8").strip()
+            REPRODUCIR.unlink(missing_ok=True)
+        except OSError:
+            return None
+        if not re.fullmatch(r"spotify:[a-z]+:[A-Za-z0-9]+", uri):
+            return None
+        if spotify.disponible():
+            try:
+                spotify.reproducir(uri)
+            except Exception:
+                pass   # sin dispositivo activo: queda el botón para abrir Spotify en el celular
+        return uri
 
     def _jarvis(self, texto):
         args = ["--sesion", "--voz"]

@@ -99,6 +99,14 @@ def reproducir(uri):
     return True
 
 
+def pausar():
+    _api("PUT", "/me/player/pause")
+
+
+def seguir():
+    _api("PUT", "/me/player/play")
+
+
 def saltar(n, atras=False):
     for _ in range(n):
         _api("POST", "/me/player/previous" if atras else "/me/player/next")
@@ -129,13 +137,15 @@ def login():
 
     import webbrowser
     webbrowser.open(url)
-    print("Acepta en el navegador que se abrió...")
+    # En el servidor no hay navegador: se abre este enlace en el PC, con el túnel
+    # ssh -L 8888:127.0.0.1:8888 abierto (servidor/README.md, "Música desde el celular").
+    print("Acepta en el navegador. Si no se abrió solo, abre este enlace:\n\n" + url + "\n")
     HTTPServer(("127.0.0.1", 8888), Vuelta).handle_request()
     if recibido.get("state", [""])[0] != estado or "code" not in recibido:
         sys.exit(f"No se completó el permiso: {recibido.get('error', ['desconocido'])[0]}")
     _cuenta({"grant_type": "authorization_code", "code": recibido["code"][0], "redirect_uri": REDIRECT,
              "client_id": client_id(), "code_verifier": verificador})
-    print("Spotify conectado. Reinicia la voz de JARVIS.")
+    print("Spotify conectado. Reinicia la voz de JARVIS (o la app en el servidor: sudo systemctl restart jarvis-app).")
 
 
 if __name__ == "__main__":
