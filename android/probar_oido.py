@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
 Prueba el detector de "Jarvis" de la app con voces sintéticas (espeak-ng), igual que lo usa la app:
-un reconocedor de Vosk con la gramática ["jarvis", "[unk]"]. Lo corre el workflow antes de armar el APK.
+el modelo pequeño de Vosk en español con la gramática de app/src/main/res/raw/gramatica.json ("jarvis"
+más palabras señuelo, para que lo demás no se fuerce a "jarvis"), mirando también los resultados parciales.
+Lo corre el workflow antes de armar el APK.
 
     python3 android/probar_oido.py <carpeta-del-modelo>
 
-Falla si no oye "Jarvis" en ninguna frase que lo dice, o si lo oye en más de una que no lo dice.
+Falla si se le escapa más de una frase con "Jarvis" o si lo oye en más de una que no lo dice.
 """
 import json
 import re
@@ -15,26 +17,35 @@ import tempfile
 import wave
 from pathlib import Path
 
-from vosk import KaldiRecognizer, Model
+from vosk import KaldiRecognizer, Model, SetLogLevel
 
-CON = [("en-us", "Jarvis"), ("en-us", "Jarvis, what is on my calendar today"),
-       ("es-419", "Jarvis"), ("es-419", "Jarvis, qué tengo hoy"), ("es-419", "Yarvis, pon música"),
-       ("es", "Jarvis, pasa la canción")]
+SetLogLevel(-1)
+
+FRASES = ["Jarvis", "Jarvis, qué tengo hoy", "Jarvis, pasa la canción", "Jarvis, apaga la música",
+          "Jarvis, cuántos correos tengo", "Oye Jarvis, pon algo de Queen"]
+VOCES = ["es-419", "es", "es-419 -s 140", "es-419 -s 200 -p 30", "es-419+m3", "es-419+f2"]
+CON = [(v, f) for v in VOCES for f in FRASES]
 SIN = [("es-419", "Buenos días, cómo estás"), ("es-419", "Mañana tengo una reunión con Ana"),
        ("es-419", "Pásame la sal por favor"), ("es-419", "Hoy hace mucho calor en Bogotá"),
-       ("es-419", "Voy a revisar el correo después")]
+       ("es-419", "Voy a revisar el correo después"), ("es-419", "Vamos a la casa de Javier"),
+       ("es-419", "Hay muchos carros en la vía"), ("es-419", "Ya vi esa película"),
+       ("es-419", "Garbanzos con arroz"), ("es", "Las variables del sistema"),
+       ("es-419+m3", "Harvey es mi amigo"), ("es-419+f2", "La jarra está en el jardín"),
+       ("es", "Qué hora es"), ("es-419", "Ponme un vaso de agua")]
+GRAMATICA = (Path(__file__).parent / "app/src/main/res/raw/gramatica.json").read_text(encoding="utf-8")
 
 
 def audio(voz, texto, carpeta):
     crudo, listo = carpeta / "crudo.wav", carpeta / "listo.wav"
-    subprocess.run(["espeak-ng", "-v", voz, "-w", str(crudo), texto], check=True)
+    voz, _, extra = voz.partition(" ")
+    subprocess.run(["espeak-ng", "-v", voz, *extra.split(), "-w", str(crudo), texto], check=True)
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(crudo), "-ar", "16000", "-ac", "1",
                     "-sample_fmt", "s16", str(listo)], check=True)
     return listo
 
 
 def oye_jarvis(modelo, ruta):
-    r = KaldiRecognizer(modelo, 16000, json.dumps(["jarvis", "[unk]"]))
+    r = KaldiRecognizer(modelo, 16000, GRAMATICA)
     oido = []
     with wave.open(str(ruta)) as w:
         # Un poco de silencio antes y después, como en la vida real.
@@ -66,7 +77,7 @@ def main():
             else:
                 print(f"  bien    [{v}] {t}")
     print(f"Oyó Jarvis en {aciertos}/{len(CON)} y se confundió en {falsos}/{len(SIN)}.")
-    if aciertos == 0 or falsos > 1:
+    if aciertos < len(CON) - 1 or falsos > 1:
         sys.exit(1)
 
 

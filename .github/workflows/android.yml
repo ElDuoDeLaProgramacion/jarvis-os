@@ -37,10 +37,10 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      # El oído de la app: modelo pequeño de Vosk en inglés, donde "jarvis" es una palabra conocida.
+      # El oído de la app: modelo pequeño de Vosk en español, que ya trae la palabra "jarvis".
       - name: Modelo de Vosk
         run: |
-          curl -sSfL -o modelo.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+          curl -sSfL -o modelo.zip https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip
           unzip -q modelo.zip
 
       # Prueba el oído con voces sintéticas: tiene que oír "Jarvis" y no confundirse con otras frases.
@@ -48,15 +48,13 @@ jobs:
         run: |
           sudo apt-get install -y -qq espeak-ng ffmpeg >/dev/null
           python3 -m venv /tmp/vosk && /tmp/vosk/bin/pip install -q vosk
-          curl -sSfL -o es.zip https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip && unzip -q es.zip
-          /tmp/vosk/bin/python android/explorar_oido.py vosk-model-small-en-us-0.15 vosk-model-small-es-0.42 || true
-          /tmp/vosk/bin/python android/probar_oido.py vosk-model-small-en-us-0.15
+          /tmp/vosk/bin/python android/probar_oido.py vosk-model-small-es-0.42
 
       - name: Meter el modelo en la app
         run: |
           mkdir -p android/app/src/main/assets
-          mv vosk-model-small-en-us-0.15 android/app/src/main/assets/modelo
-          echo "vosk-model-small-en-us-0.15" > android/app/src/main/assets/modelo/uuid
+          mv vosk-model-small-es-0.42 android/app/src/main/assets/modelo
+          echo "vosk-model-small-es-0.42" > android/app/src/main/assets/modelo/uuid
 
       - name: Armar el APK
         working-directory: android

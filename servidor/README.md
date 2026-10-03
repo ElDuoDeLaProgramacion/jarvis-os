@@ -81,7 +81,7 @@ La app web solo escucha con la pantalla encendida. La app de Android (`android/`
 2. Abre JARVIS y llena la dirección del servidor (la misma de la app web, sin `/app/`) y la clave de la app (`JARVIS_API_TOKEN`).
 3. **Activar la escucha**. Acepta el micrófono, las notificaciones y "sin restricciones de batería".
 
-Uso: di "Jarvis", espera el pitido y di tu pedido. Si JARVIS te pregunta algo ("¿Lo envío?"), suena otro pitido y contestas sin decir "Jarvis". Queda una notificación fija "JARVIS" mientras escucha; desde ella se apaga. Tailscale tiene que estar conectado en el celular. Tras reiniciar el celular, abre la app y actívala otra vez. La primera vez tarda unos segundos en "Preparando el oído". Pronuncia "Yarvis" con claridad: el detector es el de inglés porque el de español no trae esa palabra.
+Uso: di "Jarvis", espera el pitido y di tu pedido. Si JARVIS te pregunta algo ("¿Lo envío?"), suena otro pitido y contestas sin decir "Jarvis". Queda una notificación fija "JARVIS" mientras escucha; desde ella se apaga. Tailscale tiene que estar conectado en el celular. Tras reiniciar el celular, abre la app y actívala otra vez. La primera vez tarda unos segundos en "Preparando el oído".
 
 Para actualizar, instala el `jarvis.apk` nuevo encima. Si Android dice que la firma no coincide, desinstala la app y vuelve a instalarla (los datos se llenan de nuevo).
 

@@ -30,8 +30,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Escucha "Jarvis" todo el tiempo, también con la pantalla apagada (servicio en primer plano con
- * notificación fija). La palabra se detecta en el celular con Vosk, sin cuenta ni internet: un
- * reconocedor que solo conoce "jarvis" y "[unk]" (cualquier otra cosa), así gasta poco.
+ * notificación fija). La palabra se detecta en el celular con Vosk (modelo pequeño en español), sin
+ * cuenta ni internet: un reconocedor que solo conoce "jarvis" y unas palabras señuelo
+ * (res/raw/gramatica.json), así gasta poco y lo demás no se confunde con "jarvis".
  * Al oírlo: pitido, graba la orden, la manda al servidor, lee la respuesta en voz alta y, si JARVIS
  * preguntó algo, escucha la contestación sin necesidad de decir "Jarvis" otra vez.
  */
@@ -114,7 +115,8 @@ class EscuchaService : Service() {
 
     private fun escuchar() {
         try {
-            val r = Recognizer(modelo, 16000f, "[\"jarvis\", \"[unk]\"]")
+            val gramatica = resources.openRawResource(R.raw.gramatica).bufferedReader().readText()
+            val r = Recognizer(modelo, 16000f, gramatica)
             reconocedor = r
             oido = SpeechService(r, 16000f).also {
                 it.startListening(object : RecognitionListener {
