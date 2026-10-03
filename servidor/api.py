@@ -204,7 +204,7 @@ class Conversacion:
             return None
         if spotify.disponible():
             try:
-                spotify.reproducir(uri)
+                spotify.reproducir(uri, preferir="Smartphone")   # el pedido viene del celular
             except Exception:
                 pass   # sin dispositivo activo: queda el botón para abrir Spotify en el celular
         return uri

@@ -81,17 +81,19 @@ def _api(metodo, ruta, cuerpo=None):
         return json.loads(texto) if texto.strip() else {}
 
 
-def _dispositivo():
-    """El que esté sonando; si ninguno, el Spotify de este PC (tiene que estar abierto)."""
+def _dispositivo(preferir=None):
+    """El tipo preferido si está abierto (la app del celular pide "Smartphone"); si no, el que esté
+    sonando; si ninguno, el Spotify de este PC (tiene que estar abierto)."""
     lista = _api("GET", "/me/player/devices").get("devices", [])
+    preferido = next((d for d in lista if preferir and d.get("type") == preferir), None)
     activo = next((d for d in lista if d.get("is_active")), None)
-    return (activo or next((d for d in lista if d.get("type") == "Computer"), None) or
+    return (preferido or activo or next((d for d in lista if d.get("type") == "Computer"), None) or
             (lista[0] if lista else None))
 
 
-def reproducir(uri):
+def reproducir(uri, preferir=None):
     """Pone a sonar una canción, lista, álbum o artista (spotify:...). True si lo logró."""
-    dispositivo = _dispositivo()
+    dispositivo = _dispositivo(preferir)
     if not dispositivo:
         return False
     cuerpo = {"uris": [uri]} if uri.startswith(("spotify:track:", "spotify:episode:")) else {"context_uri": uri}
