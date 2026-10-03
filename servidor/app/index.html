@@ -41,6 +41,8 @@
   form button { width: 48px; border-radius: 12px; border: 1px solid var(--borde); background: var(--panel);
     color: var(--acento); font-size: 20px; }
   #mic.escuchando { background: var(--acento); color: var(--fondo); }
+  .m a.abrir { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 16px; background: #1db954;
+    color: #04130a; font-weight: 600; text-decoration: none; font-size: 14px; }
   #panel { display: none; padding: 8px 16px; border-bottom: 1px solid var(--borde); max-height: 45dvh; overflow-y: auto; font-size: 14px; }
   #panel.abierto { display: block; }
   #panel h2 { font-size: 13px; color: var(--acento); letter-spacing: .1em; margin: 10px 0 4px; }
@@ -60,6 +62,7 @@
 <header>
   <h1>JARVIS</h1>
   <button id="btnPanel" type="button">Hoy</button>
+  <button id="btnEscucha" type="button" title="Escuchar siempre: di &quot;Jarvis&quot; y lo que quieras">Jarvis</button>
   <button id="btnVoz" type="button" title="Leer las respuestas en voz alta">Voz</button>
 </header>
 <div id="panel"></div>
@@ -90,6 +93,9 @@ let ultimo = 0
 let ocupado = false
 let vozActiva = leer('jarvis-voz') === '1'
 let primeraCarga = true
+let hablando = false
+// "Manos libres" (botón Jarvis): se define más abajo; hasta entonces no hace nada.
+let escucha = { pausar() {}, reanudar() {} }
 
 async function api(ruta, opciones = {}) {
   const r = await fetch(ruta, { ...opciones, headers: { ...(opciones.headers || {}), Authorization: 'Bearer ' + token } })
@@ -114,6 +120,17 @@ function burbuja(m) {
   const div = document.createElement('div')
   div.className = 'm ' + (m.de === 'yo' ? 'yo' : 'jarvis')
   div.textContent = m.texto
+  if (m.abrir) {
+    // spotify:playlist:ID -> https://open.spotify.com/playlist/ID (Android lo abre en la app de Spotify)
+    const a = document.createElement('a')
+    a.className = 'abrir'
+    a.href = 'https://open.spotify.com/' + m.abrir.replace(/^spotify:/, '').replace(/:/g, '/')
+    a.target = '_blank'
+    a.rel = 'noopener'
+    a.textContent = '▶ Abrir en Spotify'
+    div.appendChild(document.createElement('br'))
+    div.appendChild(a)
+  }
   const hora = document.createElement('small')
   hora.textContent = m.hora
   div.appendChild(hora)
@@ -134,6 +151,10 @@ function hablar(texto) {
   if (!vozActiva || !('speechSynthesis' in window)) return
   const u = new SpeechSynthesisUtterance(texto.replace(/[*_#`>]/g, ''))
   u.lang = 'es-ES'
+  // Mientras JARVIS habla no escuchamos, para que no se oiga a sí mismo.
+  u.onend = u.onerror = () => { hablando = false; escucha.reanudar() }
+  hablando = true
+  escucha.pausar()
   speechSynthesis.cancel()
   speechSynthesis.speak(u)
 }
@@ -188,6 +209,7 @@ else {
   let rec = null
   $('mic').onclick = () => {
     if (rec) { rec.stop(); return }
+    escucha.pausar()
     rec = new Reconocer()
     rec.lang = 'es-CO'
     rec.interimResults = true
@@ -204,12 +226,88 @@ else {
     rec.onend = () => {
       $('mic').classList.remove('escuchando')
       rec = null
+      escucha.reanudar()
       if (final.trim()) enviar(final)
     }
     rec.onerror = (e) => { $('estado').textContent = 'Micrófono: ' + e.error }
     $('mic').classList.add('escuchando')
     rec.start()
   }
+}
+
+// Manos libres: con la app abierta, escucha todo el tiempo y atiende lo que digas después de "Jarvis".
+// "Jarvis, pon música" va directo; si solo dices "Jarvis", lo siguiente que digas es la orden.
+// La pantalla se mantiene encendida mientras está activo (el navegador no deja escuchar con ella apagada).
+if (Reconocer) {
+  const PALABRA = /\b(jarvis|jarvi|yarvis|harvis|jervis|yervis)\b[\s,.:]*/i
+  let activo = false, pausado = false, rec = null, esperaOrden = 0, bloqueo = null
+  const estado = (t) => { $('estado').textContent = t }
+  const pedirPantalla = async () => {
+    try { if (activo && 'wakeLock' in navigator && !bloqueo) bloqueo = await navigator.wakeLock.request('screen'); bloqueo?.addEventListener('release', () => { bloqueo = null }) } catch {}
+  }
+  const arrancar = () => {
+    if (!activo || pausado || rec) return
+    rec = new Reconocer()
+    rec.lang = 'es-CO'
+    rec.continuous = true
+    rec.interimResults = false
+    rec.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (!e.results[i].isFinal) continue
+        const dicho = e.results[i][0].transcript.trim()
+        const m = dicho.match(PALABRA)
+        if (m) {
+          const orden = dicho.slice(m.index + m[0].length).trim()
+          if (orden) { esperaOrden = 0; enviar(orden) } else { esperaOrden = Date.now() + 8000; estado('Te escucho…') }
+        } else if (esperaOrden > Date.now() && dicho) {
+          esperaOrden = 0
+          enviar(dicho)
+        }
+      }
+    }
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        activo = false
+        pintar()
+        estado('Dale permiso de micrófono a la página para usar "Jarvis".')
+      }
+    }
+    // Chrome corta la escucha tras unos segundos de silencio: la volvemos a abrir.
+    rec.onend = () => { rec = null; if (activo && !pausado) setTimeout(arrancar, 250) }
+    try { rec.start() } catch { rec = null }
+  }
+  const pintar = () => {
+    $('btnEscucha').classList.toggle('activo', activo)
+    if (!activo && $('estado').textContent === 'Te escucho…') estado('')
+  }
+  escucha = {
+    pausar() { pausado = true; try { rec?.abort() } catch {} rec = null },
+    reanudar() { if (hablando) return; pausado = false; setTimeout(arrancar, 300) },
+  }
+  $('btnEscucha').onclick = () => {
+    activo = !activo
+    escribir('jarvis-escucha', activo ? '1' : '0')
+    if (activo) {
+      vozActiva = true                     // con manos libres, las respuestas se leen en voz alta
+      escribir('jarvis-voz', '1')
+      pintarVoz()
+      pausado = false
+      pedirPantalla()
+      arrancar()
+      estado('Di "Jarvis" y lo que necesites.')
+    } else {
+      escucha.pausar()
+      bloqueo?.release().catch(() => {})
+      bloqueo = null
+    }
+    pintar()
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { try { rec?.abort() } catch {} rec = null }
+    else if (activo) { pedirPantalla(); arrancar() }
+  })
+} else {
+  $('btnEscucha').style.display = 'none'
 }
 
 function pintarVoz() { $('btnVoz').classList.toggle('activo', vozActiva) }

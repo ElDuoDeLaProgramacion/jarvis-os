@@ -21,9 +21,41 @@ echo "SESION=s1" >&2
 case "$pedido" in
   *correo*) echo "Listo el borrador para Ana. ¿Lo envío?" ;;
   *falla*) echo "se rompió" >&2; exit 1 ;;
+  *queen*) echo "spotify:playlist:37i9dQZF1DX" > "$REPRO"; echo "Pongo Queen." ;;
   *) echo "Hecho: $pedido" ;;
 esac
 """
+
+
+# Transcriptor falso: el "audio" es texto plano; "ruido" no se entiende.
+TRANSCRIPTOR_FALSO = """import json, sys
+print(json.dumps({"listo": True}), flush=True)
+for linea in sys.stdin:
+    ruta = linea.strip()
+    texto = open(ruta, encoding="utf-8").read()
+    print(json.dumps({"ruta": ruta, "texto": "" if texto == "ruido" else texto}), flush=True)
+"""
+
+
+class SpotifyFalso:
+    def __init__(self):
+        self.llamadas = []
+
+    def disponible(self):
+        return True
+
+    def pausar(self):
+        self.llamadas.append("pausar")
+
+    def seguir(self):
+        self.llamadas.append("seguir")
+
+    def saltar(self, n, atras=False):
+        self.llamadas.append(("saltar", n, atras))
+
+    def reproducir(self, uri):
+        self.llamadas.append(("reproducir", uri))
+        return True
 
 
 class PruebaApi(unittest.TestCase):
@@ -33,10 +65,16 @@ class PruebaApi(unittest.TestCase):
         guion.write_text(FALSO)
         guion.chmod(0o755)
         self.registro = self.dir / "registro.txt"
-        os.environ.update(JARVIS_SCRIPT=str(guion), REGISTRO=str(self.registro))
+        os.environ.update(JARVIS_SCRIPT=str(guion), REGISTRO=str(self.registro), REPRO=str(self.dir / "reproducir.txt"))
+        api.REPRODUCIR = self.dir / "reproducir.txt"
+        api.spotify = self.spotify = SpotifyFalso()
         api.Manejador.token = "t" * 30
         api.Manejador.conversacion = api.Conversacion(self.dir / "conversacion.json")
         api.Manejador.modulo_hud = api.hud()
+        api.DATOS = self.dir
+        falso = self.dir / "transcribir.py"
+        falso.write_text(TRANSCRIPTOR_FALSO)
+        api.Manejador.transcriptor = api.Transcriptor([sys.executable, str(falso)])
         self.srv = ThreadingHTTPServer(("127.0.0.1", 0), api.Manejador)
         threading.Thread(target=self.srv.serve_forever, daemon=True).start()
         self.base = f"http://127.0.0.1:{self.srv.server_address[1]}"
@@ -96,6 +134,36 @@ class PruebaApi(unittest.TestCase):
         _, d = self.pedir("/api/resumen")
         self.assertTrue(d["comandos"])
         self.assertIn("prioridades", d["plan"])
+
+    def test_musica_al_instante_sin_claude(self):
+        self.pedir("/api/pedir", {"texto": "Jarvis, pasa tres canciones"})
+        m = self.esperar()
+        self.assertEqual(m[-1]["texto"], "Paso 3 canciones.")
+        self.assertEqual(self.spotify.llamadas, [("saltar", 3, False)])
+        self.assertFalse(self.registro.exists())   # no pasó por jarvis.sh
+
+    def test_pon_musica_suena_y_deja_boton(self):
+        self.pedir("/api/pedir", {"texto": "pon algo de queen"})
+        m = self.esperar()
+        self.assertEqual(m[-1]["abrir"], "spotify:playlist:37i9dQZF1DX")
+        self.assertEqual(self.spotify.llamadas, [("reproducir", "spotify:playlist:37i9dQZF1DX")])
+        self.assertFalse((self.dir / "reproducir.txt").exists())
+
+    def voz(self, audio):
+        req = urllib.request.Request(self.base + "/api/voz", data=audio,
+                                     headers={"Authorization": "Bearer " + "t" * 30, "Content-Type": "audio/wav"})
+        with urllib.request.urlopen(req) as r:
+            return r.status, json.loads(r.read())
+
+    def test_voz_transcribe_y_pide(self):
+        self.assertEqual(self.voz("qué tengo hoy".encode()), (202, {"texto": "qué tengo hoy"}))
+        m = self.esperar()
+        self.assertEqual(m[0]["texto"], "qué tengo hoy")
+        self.assertEqual(m[1]["texto"], "Hecho: qué tengo hoy")
+        self.assertEqual(list((self.dir / "voz").iterdir()), [])   # el audio no se queda guardado
+        # Lo que no se entiende no se pide.
+        self.assertEqual(self.voz(b"ruido"), (200, {"texto": ""}))
+        self.assertEqual(len(self.esperar()), 2)
 
     def test_es_si(self):
         self.assertTrue(api.es_si("Sí, envíalo"))

@@ -19,3 +19,13 @@ cola/whatsapp/
 boveda/raw/whatsapp/
 voz/.spotify-token.json
 cola/app/
+
+# App de Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/debug.keystore
+
+# Modelo de Vosk: lo descarga el workflow al armar el APK
+android/app/src/main/assets/

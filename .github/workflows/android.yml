@@ -1,0 +1,77 @@
+# Arma la app de Android (android/) y, en main, la publica como release para instalarla en el celular.
+name: App Android
+
+on:
+  push:
+    paths: ["android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # La misma firma en cada versión, para que el APK nuevo se instale encima del anterior.
+      - uses: actions/cache@v4
+        id: clave
+        with:
+          path: android/debug.keystore
+          key: android-debug-keystore-v1
+
+      - name: Crear la clave de firma
+        if: steps.clave.outputs.cache-hit != 'true'
+        run: |
+          keytool -genkeypair -keystore android/debug.keystore -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      # El oído de la app: modelo pequeño de Vosk en español, que ya trae la palabra "jarvis".
+      - name: Modelo de Vosk
+        run: |
+          curl -sSfL -o modelo.zip https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip
+          unzip -q modelo.zip
+
+      # Prueba el oído con voces sintéticas: tiene que oír "Jarvis" y no confundirse con otras frases.
+      - name: Probar que el modelo oye "Jarvis"
+        run: |
+          sudo apt-get install -y -qq espeak-ng ffmpeg >/dev/null
+          python3 -m venv /tmp/vosk && /tmp/vosk/bin/pip install -q vosk
+          /tmp/vosk/bin/python android/probar_oido.py vosk-model-small-es-0.42
+
+      - name: Meter el modelo en la app
+        run: |
+          mkdir -p android/app/src/main/assets
+          mv vosk-model-small-es-0.42 android/app/src/main/assets/modelo
+          echo "vosk-model-small-es-0.42" > android/app/src/main/assets/modelo/uuid
+
+      - name: Armar el APK
+        working-directory: android
+        run: |
+          gradle --no-daemon assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk jarvis.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-apk
+          path: android/jarvis.apk
+
+      - name: Publicar en Releases
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "android-${{ github.run_number }}" android/jarvis.apk \
+            --title "App Android ${{ github.run_number }}" --latest \
+            --notes "Descarga jarvis.apk desde el celular e instálala. Guía: servidor/README.md"
