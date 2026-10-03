@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS · Lienzo 3D</title>
+<style>
+  :root { --fondo: #05080d; --acento: #3fd0ff; --texto: #cfe8f5; --tenue: #5b7686; }
+  html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--texto);
+    font: 14px/1.4 "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+  #escena { position: fixed; inset: 0; }
+  #barra { position: fixed; top: 12px; left: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    background: #0b141cdd; border: 1px solid #16323f; border-radius: 10px; padding: 8px 10px; }
+  button { background: #0f2230; color: var(--texto); border: 1px solid #1d4457; border-radius: 6px;
+    padding: 5px 10px; cursor: pointer; font: inherit; }
+  button.activo { border-color: var(--acento); color: var(--acento); }
+  .color { width: 22px; height: 22px; border-radius: 50%; padding: 0; border: 2px solid transparent; }
+  .color.activo { border-color: #fff; }
+  #estado { color: var(--tenue); min-width: 220px; }
+  #camara { position: fixed; right: 12px; bottom: 12px; width: 240px; border: 1px solid #16323f;
+    border-radius: 8px; overflow: hidden; background: #000; }
+  #camara video, #camara canvas { width: 100%; display: block; transform: scaleX(-1); }
+  #camara canvas { position: absolute; inset: 0; height: 100%; }
+  #ayuda { position: fixed; left: 12px; bottom: 12px; color: var(--tenue); font-size: 12px; max-width: 520px;
+    background: #0b141cbb; border-radius: 8px; padding: 8px 10px; }
+  #ayuda b { color: var(--texto); }
+</style>
+</head>
+<body>
+<div id="escena"></div>
+<div id="barra">
+  <button id="modo-dibujar" class="activo" title="D">✏️ Dibujar</button>
+  <button id="modo-bloques" title="B">🧱 Construir</button>
+  <span id="colores"></span>
+  <button id="deshacer" title="Z">↶ Deshacer</button>
+  <button id="limpiar" title="C">Limpiar</button>
+  <button id="guardar" title="G">💾 Guardar</button>
+  <span id="estado">Encendiendo la cámara…</span>
+</div>
+<div id="camara"><video id="video" autoplay playsinline muted></video><canvas id="marcas"></canvas></div>
+<div id="ayuda">
+  <b>Mano derecha:</b> junta pulgar e índice (pellizco) para dibujar o poner/quitar un bloque. Acerca o aleja la mano para mover el punto en profundidad.
+  <b>Mano izquierda:</b> pellizca y mueve para girar la escena. <b>✌️ un segundo:</b> cambia entre dibujar y construir.
+  Teclas: D, B, Z, C, G, 1-6 colores. También puedes girar con el ratón.
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { FilesetResolver, HandLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs'
+
+// ---------- Escena ----------
+const contenedor = document.getElementById('escena')
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
+renderer.setPixelRatio(devicePixelRatio)
+contenedor.appendChild(renderer.domElement)
+const escena = new THREE.Scene()
+escena.background = new THREE.Color(0x05080d)
+const camara = new THREE.PerspectiveCamera(55, 1, 0.1, 200)
+camara.position.set(0, 4, 16)
+const orbita = new OrbitControls(camara, renderer.domElement)
+orbita.target.set(0, 2, 0)
+escena.add(new THREE.HemisphereLight(0xbfe9ff, 0x0b1a22, 1.1))
+const sol = new THREE.DirectionalLight(0xffffff, 1.2); sol.position.set(6, 12, 8); escena.add(sol)
+const rejilla = new THREE.GridHelper(20, 20, 0x1d4457, 0x0f2230); escena.add(rejilla)
+
+const mundo = new THREE.Group(); escena.add(mundo)   // lo que construyes; la mano izquierda lo gira
+const cursor = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), new THREE.MeshBasicMaterial({ color: 0x3fd0ff }))
+escena.add(cursor)
+const fantasma = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshBasicMaterial({ color: 0x3fd0ff, wireframe: true, transparent: true, opacity: 0.6 }))
+fantasma.visible = false; escena.add(fantasma)
+
+function ajustar() {
+  renderer.setSize(innerWidth, innerHeight)
+  camara.aspect = innerWidth / innerHeight; camara.updateProjectionMatrix()
+}
+addEventListener('resize', ajustar); ajustar()
+
+// ---------- Estado ----------
+const COLORES = ['#3fd0ff', '#ff4f7b', '#ffd23f', '#4fff9a', '#b07cff', '#ffffff']
+let color = COLORES[0]
+let modo = 'dibujar'
+const historial = []          // objetos en el orden en que se crearon (para deshacer)
+const bloques = new Map()     // "x,y,z" -> mesh
+let trazo = null              // { puntos, mesh, color }
+const estado = document.getElementById('estado')
+let avisoHasta = 0            // un mensaje ("Guardado...") se queda unos segundos en pantalla
+
+const paleta = document.getElementById('colores')
+COLORES.forEach((c, i) => {
+  const b = document.createElement('button')
+  b.className = 'color' + (i === 0 ? ' activo' : ''); b.style.background = c; b.title = String(i + 1)
+  b.onclick = () => elegirColor(i); paleta.appendChild(b)
+})
+function elegirColor(i) {
+  color = COLORES[i]
+  paleta.querySelectorAll('.color').forEach((b, j) => b.classList.toggle('activo', i === j))
+  cursor.material.color.set(color); fantasma.material.color.set(color)
+}
+function elegirModo(m) {
+  modo = m
+  document.getElementById('modo-dibujar').classList.toggle('activo', m === 'dibujar')
+  document.getElementById('modo-bloques').classList.toggle('activo', m === 'bloques')
+  fantasma.visible = false
+  terminarTrazo()
+}
+document.getElementById('modo-dibujar').onclick = () => elegirModo('dibujar')
+document.getElementById('modo-bloques').onclick = () => elegirModo('bloques')
+document.getElementById('deshacer').onclick = deshacer
+document.getElementById('limpiar').onclick = limpiar
+document.getElementById('guardar').onclick = guardar
+addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase()
+  if (k === 'd') elegirModo('dibujar')
+  else if (k === 'b') elegirModo('bloques')
+  else if (k === 'z') deshacer()
+  else if (k === 'c') limpiar()
+  else if (k === 'g') guardar()
+  else if (/^[1-6]$/.test(k)) elegirColor(Number(k) - 1)
+})
+
+// ---------- Dibujar y construir ----------
+function aLocal(p) { return mundo.worldToLocal(p.clone()) }
+
+function seguirTrazo(p) {
+  const local = aLocal(p)
+  if (!trazo) {
+    trazo = { puntos: [local], mesh: null, color }
+    return
+  }
+  if (trazo.puntos.at(-1).distanceTo(local) < 0.08) return
+  trazo.puntos.push(local)
+  if (trazo.puntos.length < 2) return
+  const curva = new THREE.CatmullRomCurve3(trazo.puntos)
+  const geo = new THREE.TubeGeometry(curva, Math.max(4, trazo.puntos.length * 3), 0.07, 8, false)
+  if (trazo.mesh) { trazo.mesh.geometry.dispose(); trazo.mesh.geometry = geo }
+  else {
+    trazo.mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: trazo.color, emissive: trazo.color, emissiveIntensity: 0.35 }))
+    mundo.add(trazo.mesh); historial.push({ tipo: 'trazo', mesh: trazo.mesh, puntos: trazo.puntos })
+  }
+}
+function terminarTrazo() { trazo = null }
+
+function celda(p) {
+  const l = aLocal(p)
+  return [Math.round(l.x), Math.max(0, Math.round(l.y - 0.5)), Math.round(l.z)]
+}
+function alternarBloque(p) {
+  const [x, y, z] = celda(p)
+  const clave = `${x},${y},${z}`
+  if (bloques.has(clave)) {
+    const mesh = bloques.get(clave); mundo.remove(mesh); bloques.delete(clave)
+    const i = historial.findIndex((h) => h.mesh === mesh); if (i >= 0) historial.splice(i, 1)
+    return
+  }
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.98, 0.98), new THREE.MeshStandardMaterial({ color }))
+  mesh.position.set(x, y + 0.5, z); mundo.add(mesh); bloques.set(clave, mesh)
+  historial.push({ tipo: 'bloque', mesh, clave })
+}
+
+function deshacer() {
+  const h = historial.pop(); if (!h) return
+  mundo.remove(h.mesh); if (h.clave) bloques.delete(h.clave)
+  if (trazo && trazo.mesh === h.mesh) trazo = null
+}
+function limpiar() {
+  if (historial.length && !confirm('¿Borrar todo lo que hay en el lienzo?')) return
+  while (historial.length) deshacer()
+}
+
+async function guardar() {
+  renderer.render(escena, camara)
+  const datos = {
+    imagen: renderer.domElement.toDataURL('image/png'),
+    escena: historial.map((h) => h.tipo === 'bloque'
+      ? { tipo: 'bloque', posicion: h.mesh.position.toArray(), color: '#' + h.mesh.material.color.getHexString() }
+      : { tipo: 'trazo', puntos: h.puntos.map((p) => p.toArray().map((n) => +n.toFixed(3))), color: '#' + h.mesh.material.color.getHexString() }),
+  }
+  try {
+    const r = await fetch('/api/lienzo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) })
+    const j = await r.json()
+    estado.textContent = j.ok ? `Guardado en la bóveda: ${j.nota}` : 'No pude guardar.'
+    avisoHasta = performance.now() + 4000
+  } catch { estado.textContent = 'No pude guardar (¿está abierto el HUD?).' }
+}
+
+// ---------- Manos ----------
+const video = document.getElementById('video')
+const marcas = document.getElementById('marcas')
+const ctx = marcas.getContext('2d')
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0))
+let escalaBase = null          // tamaño de la palma "normal": acercar la mano = hacia ti
+const manos = { derecha: { pellizco: false }, izquierda: { pellizco: false, ultimo: null } }
+let paz = 0                    // desde cuándo se ve el gesto ✌️
+
+function dedosArriba(lm) {
+  // índice, medio, anular, meñique: la punta más lejos de la muñeca que la articulación media
+  return [8, 12, 16, 20].map((t) => dist(lm[t], lm[0]) > dist(lm[t - 2], lm[0]) * 1.1)
+}
+
+function punto3D(lm) {
+  const palma = dist(lm[0], lm[9])
+  escalaBase = escalaBase == null ? palma : escalaBase * 0.995 + palma * 0.005
+  const x = (0.5 - lm[8].x) * 16          // la cámara se ve en espejo
+  const y = (1 - lm[8].y) * 9
+  const z = THREE.MathUtils.clamp((palma / escalaBase - 1) * 14, -6, 6)
+  return new THREE.Vector3(x, y, z)
+}
+
+function pellizca(lm, antes) {
+  const r = dist(lm[4], lm[8]) / dist(lm[0], lm[9])
+  return antes ? r < 0.45 : r < 0.3        // histéresis: no parpadea
+}
+
+function procesar(resultado) {
+  ctx.clearRect(0, 0, marcas.width, marcas.height)
+  let hayDerecha = false
+  resultado.landmarks.forEach((lm, i) => {
+    // MediaPipe mira la imagen sin espejo: su "Left" es tu mano derecha.
+    const lado = resultado.handednesses[i][0].categoryName === 'Left' ? 'derecha' : 'izquierda'
+    ctx.fillStyle = lado === 'derecha' ? '#3fd0ff' : '#ff4f7b'
+    lm.forEach((p) => ctx.fillRect(p.x * marcas.width - 2, p.y * marcas.height - 2, 4, 4))
+    const m = manos[lado]
+    const ahora = pellizca(lm, m.pellizco)
+
+    if (lado === 'derecha') {
+      hayDerecha = true
+      const p = punto3D(lm)
+      cursor.position.lerp(p, 0.5)
+      const arriba = dedosArriba(lm)
+      if (arriba[0] && arriba[1] && !arriba[2] && !arriba[3] && !ahora) {
+        if (!paz) paz = performance.now()
+        else if (performance.now() - paz > 1000) { elegirModo(modo === 'dibujar' ? 'bloques' : 'dibujar'); paz = Infinity }
+      } else paz = 0
+      if (modo === 'dibujar') {
+        if (ahora) seguirTrazo(cursor.position); else if (m.pellizco) terminarTrazo()
+      } else {
+        const [x, y, z] = celda(cursor.position)
+        fantasma.visible = true
+        fantasma.position.copy(mundo.localToWorld(new THREE.Vector3(x, y + 0.5, z)))
+        fantasma.quaternion.copy(mundo.quaternion)
+        if (ahora && !m.pellizco) alternarBloque(cursor.position)
+      }
+    } else {
+      // Mano izquierda: pellizcar y mover gira lo construido.
+      if (ahora && m.ultimo) {
+        mundo.rotation.y += (lm[8].x - m.ultimo.x) * -6
+        mundo.rotation.x = THREE.MathUtils.clamp(mundo.rotation.x + (lm[8].y - m.ultimo.y) * 4, -1.2, 1.2)
+      }
+      m.ultimo = ahora ? { x: lm[8].x, y: lm[8].y } : null
+    }
+    m.pellizco = ahora
+  })
+  if (!hayDerecha && manos.derecha.pellizco) { manos.derecha.pellizco = false; terminarTrazo() }
+  cursor.visible = hayDerecha
+  if (!hayDerecha) fantasma.visible = false
+  if (performance.now() > avisoHasta) estado.textContent = resultado.landmarks.length
+    ? `${modo === 'dibujar' ? 'Dibujando' : 'Construyendo'} · ${manos.derecha.pellizco ? 'pellizco' : 'mano abierta'}`
+    : 'Pon la mano frente a la cámara'
+}
+
+async function iniciarManos() {
+  try {
+    video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+    await video.play()
+    marcas.width = video.videoWidth; marcas.height = video.videoHeight
+  } catch (e) {
+    estado.textContent = 'No pude abrir la cámara: ' + e.message + '. Puedes dibujar con el ratón girando la escena.'
+    return
+  }
+  estado.textContent = 'Cargando el detector de manos…'
+  let detector
+  try {
+    const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm')
+    detector = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+        delegate: 'GPU',
+      },
+      runningMode: 'VIDEO', numHands: 2,
+    })
+  } catch (e) {
+    estado.textContent = 'No pude cargar el detector de manos (¿hay internet?): ' + (e.message || e)
+    return
+  }
+  estado.textContent = 'Listo. Pon la mano frente a la cámara.'
+  let ultimoTiempo = -1
+  const bucle = () => {
+    if (video.currentTime !== ultimoTiempo) {
+      ultimoTiempo = video.currentTime
+      procesar(detector.detectForVideo(video, performance.now()))
+    }
+    requestAnimationFrame(bucle)
+  }
+  bucle()
+}
+
+renderer.setAnimationLoop(() => { orbita.update(); renderer.render(escena, camara) })
+iniciarManos()
+</script>
+</body>
+</html>

@@ -376,8 +376,8 @@ class Manejador(BaseHTTPRequestHandler):
 
     def do_GET(self):
         url = urlparse(self.path)
-        if url.path in ("/", "/index.html"):
-            cuerpo = (HUD / "index.html").read_bytes()
+        if url.path in ("/", "/index.html", "/lienzo"):
+            cuerpo = (HUD / ("lienzo.html" if url.path == "/lienzo" else "index.html")).read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(cuerpo)))
@@ -401,6 +401,8 @@ class Manejador(BaseHTTPRequestHandler):
         ruta = urlparse(self.path).path
         if ruta == "/api/analizar":
             return self._analizar()
+        if ruta == "/api/lienzo":
+            return self._lienzo()
         if ruta != "/api/encolar":
             return self._json({"error": "no existe"}, 404)
         largo = int(self.headers.get("Content-Length", 0))
@@ -414,6 +416,32 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"ok": True, "via": "voz"})
         ok = encolar(pedido)
         self._json({"ok": ok, "via": "cola"}, 200 if ok else 400)
+
+    def _lienzo(self):
+        """Guarda lo hecho en el lienzo 3D: imagen, escena (JSON) y una nota en boveda/outputs/lienzo/."""
+        largo = int(self.headers.get("Content-Length", 0))
+        if largo > 20_000_000:
+            return self._json({"error": "demasiado grande"}, 413)
+        try:
+            datos = json.loads(self.rfile.read(largo) or b"{}")
+            png = base64.b64decode(str(datos.get("imagen", "")).split(",", 1)[-1], validate=True)
+        except (json.JSONDecodeError, binascii.Error, ValueError):
+            return self._json({"error": "datos inválidos"}, 400)
+        if not png.startswith(b"\x89PNG"):
+            return self._json({"error": "la imagen no es PNG"}, 400)
+        carpeta = BOVEDA / "outputs" / "lienzo"
+        carpeta.mkdir(parents=True, exist_ok=True)
+        nombre = f"{datetime.now():%Y-%m-%d-%H%M%S}-lienzo"
+        (carpeta / f"{nombre}.png").write_bytes(png)
+        (carpeta / f"{nombre}.json").write_text(json.dumps(datos.get("escena", []), ensure_ascii=False), encoding="utf-8")
+        piezas = datos.get("escena", [])
+        (carpeta / f"{nombre}.md").write_text(
+            f"---\nfecha: {date.today()}\ntipo: output\ntags: [lienzo, 3d]\n---\n"
+            f"# Lienzo 3D del {datetime.now():%Y-%m-%d %H:%M}\n\n![[{nombre}.png]]\n\n"
+            f"{sum(1 for x in piezas if x.get('tipo') == 'trazo')} trazos y "
+            f"{sum(1 for x in piezas if x.get('tipo') == 'bloque')} bloques. La escena está en `{nombre}.json`.\n",
+            encoding="utf-8")
+        self._json({"ok": True, "nota": f"outputs/lienzo/{nombre}.md"})
 
     def _analizar(self):
         largo = int(self.headers.get("Content-Length", 0))

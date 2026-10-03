@@ -14,6 +14,7 @@ tags: [jarvis, ayuda]
   - "cierra Spotify"
   - "cierra las pestañas de búsqueda de Google"
   - "cierra las pestañas de YouTube"
+- **Lienzo 3D:** "abre el lienzo 3D" para dibujar y construir en 3D con las manos frente a la cámara.
 - **Música:** "pausa", "play", "siguiente canción", "canción anterior", "sube el volumen", "baja el volumen".
 - **Copiloto:** "activa el copiloto", "apaga el copiloto".
 

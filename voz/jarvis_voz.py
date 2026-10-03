@@ -286,6 +286,7 @@ REPRODUCIR = COLA / "reproducir.txt"   # la habilidad musica deja aquí el spoti
 URI_SPOTIFY = re.compile(r"^spotify:(track|album|playlist|artist|show|episode):[A-Za-z0-9]{10,40}$")
 MUSICA = "(la )?(musica|cancion|tema|spotify|rola)"
 # "Jarvis, abre ...": nombre dicho -> lo que Windows sabe abrir (programa registrado o enlace de la app).
+LIENZO = "http://localhost:7777/lienzo"
 ABRIBLES = {
     "spotify": "spotify:", "chrome": "chrome.exe", "google chrome": "chrome.exe", "edge": "msedge.exe",
     "firefox": "firefox.exe", "brave": "brave.exe", "word": "winword.exe", "excel": "excel.exe",
@@ -294,12 +295,26 @@ ABRIBLES = {
     "notepad": "notepad.exe", "calculadora": "calc.exe", "visual studio code": "code", "vs code": "code",
     "code": "code", "explorador": "explorer.exe", "explorador de archivos": "explorer.exe",
     "configuracion": "ms-settings:",
+    # Lienzo 3D del HUD (hud/lienzo.html): cámara + manos para dibujar y construir en 3D.
+    "lienzo": LIENZO, "lienzo 3d": LIENZO, "el lienzo 3d": LIENZO, "camara 3d": LIENZO, "la camara 3d": LIENZO,
+    "la camara para dibujar": LIENZO, "modo 3d": LIENZO,
 }
+
+
+NUMEROS = {"una": 1, "un": 1, "uno": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6,
+           "siete": 7, "ocho": 8, "nueve": 9, "diez": 10}
 
 
 def accion_musica(pedido):
     """'abre Spotify', 'pausa la música', 'siguiente canción', 'sube el volumen' -> (tipo, objetivo, veces)."""
     plano = normalizar(pedido).strip(" .,!¡¿?")
+    # "pasa 3 canciones", "salta dos temas", "retrocede 2 canciones", "devuélvete una canción"
+    m = re.fullmatch(r"(pasa|pasale|salta|saltate|adelanta|retrocede|regresa|devuelvete|devuelve|vuelve) "
+                     r"(\d{1,2}|" + "|".join(NUMEROS) + r") (canciones|cancion|temas|tema|rolas|rola)( atras)?", plano)
+    if m:
+        n = int(m.group(2)) if m.group(2).isdigit() else NUMEROS[m.group(2)]
+        atras = m.group(1).startswith(("retro", "regres", "devuel", "vuelve")) or bool(m.group(4))
+        return ("saltar", "atras" if atras else "adelante", max(1, min(n, 50)))
     m = re.fullmatch(r"(abre|abreme|abrir|inicia|abri) (el |la |el programa |la app )?(.+)", plano)
     if m and m.group(3) in ABRIBLES:
         return ("abrir", ABRIBLES[m.group(3)], 1)
@@ -319,9 +334,45 @@ def accion_musica(pedido):
     return None
 
 
+def navegador_app():
+    """Ruta de Chrome o, si no está, de Edge (los dos abren páginas como ventana de programa)."""
+    import winreg
+    for exe in ("chrome.exe", "msedge.exe"):
+        for raiz in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+            try:
+                with winreg.OpenKey(raiz, rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{exe}") as k:
+                    return winreg.QueryValue(k, None)
+            except OSError:
+                continue
+    return None
+
+
 def ejecutar_musica(tipo, objetivo, veces):
+    if tipo == "saltar":
+        atras = objetivo == "atras"
+        try:
+            import spotify
+            if spotify.disponible():
+                spotify.saltar(veces, atras)
+                return ""
+        except Exception as e:
+            log("Spotify API no respondió; uso las teclas:", repr(e))
+        import keyboard
+        # Con las teclas, el primer "anterior" solo vuelve al inicio de la canción que suena.
+        for _ in range(veces + 1 if atras else veces):
+            keyboard.send("previous track" if atras else "next track")
+            time.sleep(0.4)
+        return ""
     if tipo == "abrir":
         import os
+        if objetivo == LIENZO:
+            # Ventana propia de Chrome o Edge (sin pestañas ni barra); si no, el navegador de siempre.
+            programa = navegador_app()
+            if programa:
+                subprocess.Popen([programa, f"--app={LIENZO}"])
+            else:
+                os.startfile(LIENZO)
+            return "Abro el lienzo 3D. Pellizca con la mano derecha para dibujar."
         try:
             os.startfile(objetivo)
         except OSError:
@@ -341,6 +392,14 @@ def abrir_lo_encontrado():
     uri = REPRODUCIR.read_text(encoding="utf-8").strip()
     REPRODUCIR.unlink(missing_ok=True)
     if URI_SPOTIFY.match(uri):
+        # Con la API de Spotify (voz/spotify.py) la lista o el álbum empieza a sonar de verdad;
+        # abrir la dirección solo muestra la página y "play" seguiría con lo de antes.
+        try:
+            import spotify
+            if spotify.disponible() and spotify.reproducir(uri):
+                return
+        except Exception as e:
+            log("Spotify API no respondió; abro la dirección:", repr(e))
         import os
         os.startfile(uri)
     else:
@@ -529,6 +588,14 @@ class Jarvis:
         musica = accion_musica(pedido) if origen in ("voz", "texto") and not reanudar else None
         if musica:
             log(f"\nTú ({origen}): {pedido}")
+            if musica[1] == LIENZO and not hud_responde():
+                # El lienzo lo sirve el HUD: si está cerrado, lo abrimos primero.
+                subprocess.Popen(["cmd", "/c", str(RAIZ / "hud" / "abrir-hud.bat"), "--distro", self.args.distro],
+                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                for _ in range(20):
+                    time.sleep(1)
+                    if hud_responde():
+                        break
             try:
                 respuesta = ejecutar_musica(*musica)
             except Exception as e:
