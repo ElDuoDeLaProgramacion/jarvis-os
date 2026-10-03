@@ -35,7 +35,8 @@ export function esNo(texto) {
 export function esTeclaMusica(texto) {
   const plano = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[.,!¡¿?]/g, '').replace(/^jarvis\s+/, '').trim()
-  return /^(play|dale play|ponle play|pausa|pon pausa|para la musica|sigue|reanuda|continua|siguiente|siguiente cancion|pasa la cancion|anterior|cancion anterior|(sube|baja)( el)? volumen( un poco)?)$/.test(plano)
+  return /^(play|dale play|ponle play|pausa|pon pausa|para la musica|sigue|reanuda|continua|siguiente|siguiente cancion|pasa la cancion|anterior|cancion anterior|(sube|baja)( el)? volumen( un poco)?)$/.test(plano) ||
+    /^(pasa|pasale|salta|saltate|adelanta|retrocede|regresa|devuelvete|devuelve|vuelve) (\d{1,2}|una?|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez) (canciones|cancion|temas|tema|rolas|rola)( atras)?$/.test(plano)
 }
 
 /** De la salida de JARVIS saca las opciones "1) ...", "2) ...", "3) ...". */

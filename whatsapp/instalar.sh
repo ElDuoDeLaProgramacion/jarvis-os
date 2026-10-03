@@ -2,6 +2,7 @@
 # Instala lo que necesita el WhatsApp de JARVIS (una sola vez, en Ubuntu/WSL):
 #   - Node.js 20 o más nuevo (si no está, se descarga el oficial en ~/.local/node, sin sudo)
 #   - las librerías del puente (Baileys, la que usa WhatsApp Web)
+#   - faster-whisper, para entender las notas de voz
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p "$HOME/.local/bin" logs
@@ -19,6 +20,17 @@ fi
 echo "Node $(node --version)"
 
 (cd whatsapp && npm ci --no-audit --no-fund)
+
+# Notas de voz: faster-whisper en su propio entorno de Python (whatsapp/.venv). Si falla, el resto sigue.
+if [ ! -x whatsapp/.venv/bin/python ]; then
+  echo "Instalando el transcriptor de notas de voz (faster-whisper)..."
+  if python3 -m venv whatsapp/.venv 2>/dev/null; then
+    whatsapp/.venv/bin/pip install -q --upgrade pip faster-whisper || echo "Aviso: no pude instalar faster-whisper; las notas de voz no se transcribirán."
+  else
+    rm -rf whatsapp/.venv
+    echo "Aviso: falta python3-venv. Instálalo con:  sudo apt install -y python3-venv  y vuelve a ejecutar este script."
+  fi
+fi
 
 touch .env
 grep -q "^WHATSAPP_PERMITIDOS=" .env || echo "WHATSAPP_PERMITIDOS=" >> .env

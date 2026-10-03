@@ -297,9 +297,20 @@ ABRIBLES = {
 }
 
 
+NUMEROS = {"una": 1, "un": 1, "uno": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6,
+           "siete": 7, "ocho": 8, "nueve": 9, "diez": 10}
+
+
 def accion_musica(pedido):
     """'abre Spotify', 'pausa la música', 'siguiente canción', 'sube el volumen' -> (tipo, objetivo, veces)."""
     plano = normalizar(pedido).strip(" .,!¡¿?")
+    # "pasa 3 canciones", "salta dos temas", "retrocede 2 canciones", "devuélvete una canción"
+    m = re.fullmatch(r"(pasa|pasale|salta|saltate|adelanta|retrocede|regresa|devuelvete|devuelve|vuelve) "
+                     r"(\d{1,2}|" + "|".join(NUMEROS) + r") (canciones|cancion|temas|tema|rolas|rola)( atras)?", plano)
+    if m:
+        n = int(m.group(2)) if m.group(2).isdigit() else NUMEROS[m.group(2)]
+        atras = m.group(1).startswith(("retro", "regres", "devuel", "vuelve")) or bool(m.group(4))
+        return ("saltar", "atras" if atras else "adelante", max(1, min(n, 50)))
     m = re.fullmatch(r"(abre|abreme|abrir|inicia|abri) (el |la |el programa |la app )?(.+)", plano)
     if m and m.group(3) in ABRIBLES:
         return ("abrir", ABRIBLES[m.group(3)], 1)
@@ -320,6 +331,21 @@ def accion_musica(pedido):
 
 
 def ejecutar_musica(tipo, objetivo, veces):
+    if tipo == "saltar":
+        atras = objetivo == "atras"
+        try:
+            import spotify
+            if spotify.disponible():
+                spotify.saltar(veces, atras)
+                return ""
+        except Exception as e:
+            log("Spotify API no respondió; uso las teclas:", repr(e))
+        import keyboard
+        # Con las teclas, el primer "anterior" solo vuelve al inicio de la canción que suena.
+        for _ in range(veces + 1 if atras else veces):
+            keyboard.send("previous track" if atras else "next track")
+            time.sleep(0.4)
+        return ""
     if tipo == "abrir":
         import os
         try:
@@ -341,6 +367,14 @@ def abrir_lo_encontrado():
     uri = REPRODUCIR.read_text(encoding="utf-8").strip()
     REPRODUCIR.unlink(missing_ok=True)
     if URI_SPOTIFY.match(uri):
+        # Con la API de Spotify (voz/spotify.py) la lista o el álbum empieza a sonar de verdad;
+        # abrir la dirección solo muestra la página y "play" seguiría con lo de antes.
+        try:
+            import spotify
+            if spotify.disponible() and spotify.reproducir(uri):
+                return
+        except Exception as e:
+            log("Spotify API no respondió; abro la dirección:", repr(e))
         import os
         os.startfile(uri)
     else:
