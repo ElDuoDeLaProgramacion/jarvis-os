@@ -196,6 +196,11 @@ async function iniciar() {
     if (connection === 'open') {
       const yo = numeroDe(jidNormalizedUser(sock.user.id))
       log(`WhatsApp de JARVIS en línea (vinculado a +${yo}). Escríbele en tu chat contigo mismo.`)
+      const otros = [...PERMITIDOS].filter((n) => n !== yo)
+      if (otros.length) {
+        log(`Ojo: también obedezco a ${otros.map((n) => '+' + n).join(', ')} (WHATSAPP_PERMITIDOS en .env). ` +
+          'Si vinculaste tu número personal, deja esa línea vacía.')
+      }
       // Borradores pedidos por voz o desde el HUD: se confirman igual, aquí en el chat contigo mismo.
       clearInterval(vigilante)
       vigilante = setInterval(() => {
@@ -342,5 +347,4 @@ async function iniciar() {
 }
 
 setInterval(() => {}, 1 << 30)   // mantiene vivo el proceso mientras el socket reconecta
-if (!PERMITIDOS.size) log('Aviso: WHATSAPP_PERMITIDOS está vacío. Solo obedeceré a tu chat contigo mismo.')
 iniciar().catch((e) => { log('No pude arrancar:', e.message); process.exit(1) })
