@@ -286,6 +286,7 @@ REPRODUCIR = COLA / "reproducir.txt"   # la habilidad musica deja aquí el spoti
 URI_SPOTIFY = re.compile(r"^spotify:(track|album|playlist|artist|show|episode):[A-Za-z0-9]{10,40}$")
 MUSICA = "(la )?(musica|cancion|tema|spotify|rola)"
 # "Jarvis, abre ...": nombre dicho -> lo que Windows sabe abrir (programa registrado o enlace de la app).
+LIENZO = "http://localhost:7777/lienzo"
 ABRIBLES = {
     "spotify": "spotify:", "chrome": "chrome.exe", "google chrome": "chrome.exe", "edge": "msedge.exe",
     "firefox": "firefox.exe", "brave": "brave.exe", "word": "winword.exe", "excel": "excel.exe",
@@ -294,6 +295,9 @@ ABRIBLES = {
     "notepad": "notepad.exe", "calculadora": "calc.exe", "visual studio code": "code", "vs code": "code",
     "code": "code", "explorador": "explorer.exe", "explorador de archivos": "explorer.exe",
     "configuracion": "ms-settings:",
+    # Lienzo 3D del HUD (hud/lienzo.html): cámara + manos para dibujar y construir en 3D.
+    "lienzo": LIENZO, "lienzo 3d": LIENZO, "el lienzo 3d": LIENZO, "camara 3d": LIENZO, "la camara 3d": LIENZO,
+    "la camara para dibujar": LIENZO, "modo 3d": LIENZO,
 }
 
 
@@ -319,9 +323,30 @@ def accion_musica(pedido):
     return None
 
 
+def navegador_app():
+    """Ruta de Chrome o, si no está, de Edge (los dos abren páginas como ventana de programa)."""
+    import winreg
+    for exe in ("chrome.exe", "msedge.exe"):
+        for raiz in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+            try:
+                with winreg.OpenKey(raiz, rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{exe}") as k:
+                    return winreg.QueryValue(k, None)
+            except OSError:
+                continue
+    return None
+
+
 def ejecutar_musica(tipo, objetivo, veces):
     if tipo == "abrir":
         import os
+        if objetivo == LIENZO:
+            # Ventana propia de Chrome o Edge (sin pestañas ni barra); si no, el navegador de siempre.
+            programa = navegador_app()
+            if programa:
+                subprocess.Popen([programa, f"--app={LIENZO}"])
+            else:
+                os.startfile(LIENZO)
+            return "Abro el lienzo 3D. Pellizca con la mano derecha para dibujar."
         try:
             os.startfile(objetivo)
         except OSError:
@@ -529,6 +554,14 @@ class Jarvis:
         musica = accion_musica(pedido) if origen in ("voz", "texto") and not reanudar else None
         if musica:
             log(f"\nTú ({origen}): {pedido}")
+            if musica[1] == LIENZO and not hud_responde():
+                # El lienzo lo sirve el HUD: si está cerrado, lo abrimos primero.
+                subprocess.Popen(["cmd", "/c", str(RAIZ / "hud" / "abrir-hud.bat"), "--distro", self.args.distro],
+                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                for _ in range(20):
+                    time.sleep(1)
+                    if hud_responde():
+                        break
             try:
                 respuesta = ejecutar_musica(*musica)
             except Exception as e:
