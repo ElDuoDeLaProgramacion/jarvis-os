@@ -22,7 +22,8 @@ description: Lee, busca y resume los chats de WhatsApp de David y le prepara res
 
 ## Responder a alguien
 Tú no envías nada. Dejas un borrador y el puente se lo muestra a David, que lo envía solo si contesta "sí".
-1. Busca al contacto en `cola/whatsapp/contactos.json` por su nombre. Si hay varios con ese nombre o ninguno, pregunta a quién se refiere y no escribas el borrador.
+1. Si el pedido trae "(Contexto: hace poco le avisé a David que X (jid ...) le escribió...)" y David dice "dile que..." sin nombrar a nadie, el destinatario es ese jid.
+   Si no, busca al contacto en `cola/whatsapp/contactos.json` por su nombre. Si hay varios con ese nombre o ninguno, pregunta a quién se refiere y no escribas el borrador.
 2. Escribe con Write `cola/whatsapp/borrador.json` con exactamente esto:
    `{"para": "<jid del contacto>", "texto": "<el mensaje tal como se enviará>"}`
    Escribe el mensaje en el tono de David con esa persona (mira `wiki/personas.md` y cómo le escribe en los chats).

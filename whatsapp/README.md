@@ -5,6 +5,7 @@ JARVIS se vincula a tu WhatsApp como un dispositivo más, igual que WhatsApp Web
 - **Órdenes:** escríbete a ti mismo (el chat "Tú" o "Mensaje a ti mismo") lo mismo que le dirías por voz: "plan de hoy", "agéndame dentista el viernes a las 3", "resume mis correos". JARVIS contesta en ese chat con mensajes que empiezan por *JARVIS:*.
 - **Tus chats:** los mensajes que te llegan quedan anotados en `boveda/raw/whatsapp/chats/AAAA-MM-DD.md`. Puedes preguntar "¿qué me escribieron hoy?" o "¿qué dijo Ana?".
 - **Responder:** "respóndele a Ana que llego a las 8". JARVIS te muestra el mensaje y solo lo envía si contestas "sí". Si contestas "no", no sale nada. Esto también funciona si lo pides por voz: el borrador te llega al chat contigo mismo.
+- **Avisos:** cada vez que alguien te escribe, JARVIS te avisa en tu chat contigo mismo ("Te escribió Ana: ...") y te propone 3 respuestas. Contestas 1, 2 o 3 ("sí" envía la 1), "no" para no responder, o le dices qué contestar ("dile que llego a las 8") y te muestra el mensaje antes de enviarlo. Si la persona manda varios mensajes seguidos, llega un solo aviso. Si le contestas tú desde el celular, el aviso se cancela. Cada aviso es una consulta a Claude. Para apagarlos, pon `WHATSAPP_AVISAR=0` en `.env`.
 - **Música:** "pon música de..." la abre en el Spotify del PC, y "play", "pausa", "siguiente" o "sube el volumen" funcionan al instante. Las dos cosas necesitan que la voz de JARVIS esté encendida en el PC.
 
 Nada de lo que escriben otras personas se ejecuta como orden: solo se anota.

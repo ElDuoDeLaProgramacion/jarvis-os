@@ -38,6 +38,24 @@ export function esTeclaMusica(texto) {
   return /^(play|dale play|ponle play|pausa|pon pausa|para la musica|sigue|reanuda|continua|siguiente|siguiente cancion|pasa la cancion|anterior|cancion anterior|(sube|baja)( el)? volumen( un poco)?)$/.test(plano)
 }
 
+/** De la salida de JARVIS saca las opciones "1) ...", "2) ...", "3) ...". */
+export function opcionesDe(salida) {
+  const opciones = []
+  for (const linea of salida.split('\n')) {
+    const m = linea.match(/^\s*\*?([1-3])[).:\-]\*?\s+(.+?)\s*$/)
+    if (m && Number(m[1]) === opciones.length + 1) opciones.push(m[2].replace(/^["“](.*)["”]$/, '$1'))
+  }
+  return opciones
+}
+
+/** "1", "la 2", "opción 3", "envía la 2" -> índice (0, 1, 2). -1 si no elige ninguna. */
+export function eleccion(texto, cuantas) {
+  const plano = texto.toLowerCase().trim().replace(/[.,!¡¿?]/g, '')
+  const m = plano.match(/^(?:(?:envia|envía|manda|mándale|mandale|la|opcion|opción|numero|número)\s+)*([1-9])$/)
+  const n = m ? Number(m[1]) : 0
+  return n >= 1 && n <= cuantas ? n - 1 : -1
+}
+
 export const esPregunta = (r) => r.trim().endsWith('?') || /\?\s*s[ií] o no/i.test(r.slice(-160))
 
 /** WhatsApp no entiende Markdown completo: dejamos *negrita* simple y quitamos lo demás. */
