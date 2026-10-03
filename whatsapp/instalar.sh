@@ -25,12 +25,14 @@ echo "Node $(node --version)"
 if [ ! -x whatsapp/.venv/bin/python ]; then
   echo "Instalando el transcriptor de notas de voz (faster-whisper)..."
   if python3 -m venv whatsapp/.venv 2>/dev/null; then
-    whatsapp/.venv/bin/pip install -q --upgrade pip faster-whisper || echo "Aviso: no pude instalar faster-whisper; las notas de voz no se transcribirán."
+    whatsapp/.venv/bin/pip install -q --upgrade pip faster-whisper "av<19" || echo "Aviso: no pude instalar faster-whisper; las notas de voz no se transcribirán."
   else
     rm -rf whatsapp/.venv
     echo "Aviso: falta python3-venv. Instálalo con:  sudo apt install -y python3-venv  y vuelve a ejecutar este script."
   fi
 fi
+# PyAV 19 quitó un parámetro que faster-whisper usa al leer las notas de voz: se queda en la 18.
+if [ -x whatsapp/.venv/bin/pip ]; then whatsapp/.venv/bin/pip install -q "av<19" || true; fi
 
 touch .env
 grep -q "^WHATSAPP_PERMITIDOS=" .env || echo "WHATSAPP_PERMITIDOS=" >> .env
