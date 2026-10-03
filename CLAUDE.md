@@ -23,6 +23,7 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | tendencias, qué hay de nuevo en un tema, GitHub trending | `tendencias` |
 | canales, redes, seguidores, vistas, métricas | `canales` |
 | música, Spotify, "pon...", "reproduce...", qué está sonando | `musica` |
+| WhatsApp, chats, "qué me escribieron", "qué dijo X", "respóndele a X por WhatsApp" | `whatsapp` |
 | suscripciones, cobros recurrentes, renovaciones, pruebas gratis, "cuánto pago al mes", cancelar un servicio | `suscripciones` |
 | analizar archivos, PDFs, enlaces, videos o texto ("analiza las fuentes de...") | `analizar` |
 | recordar, guardar, "¿qué sé de...?", "¿qué decidí...?", limpieza de bóveda | `boveda` |
