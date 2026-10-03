@@ -27,6 +27,16 @@ esac
 """
 
 
+# Transcriptor falso: el "audio" es texto plano; "ruido" no se entiende.
+TRANSCRIPTOR_FALSO = """import json, sys
+print(json.dumps({"listo": True}), flush=True)
+for linea in sys.stdin:
+    ruta = linea.strip()
+    texto = open(ruta, encoding="utf-8").read()
+    print(json.dumps({"ruta": ruta, "texto": "" if texto == "ruido" else texto}), flush=True)
+"""
+
+
 class SpotifyFalso:
     def __init__(self):
         self.llamadas = []
@@ -61,6 +71,10 @@ class PruebaApi(unittest.TestCase):
         api.Manejador.token = "t" * 30
         api.Manejador.conversacion = api.Conversacion(self.dir / "conversacion.json")
         api.Manejador.modulo_hud = api.hud()
+        api.DATOS = self.dir
+        falso = self.dir / "transcribir.py"
+        falso.write_text(TRANSCRIPTOR_FALSO)
+        api.Manejador.transcriptor = api.Transcriptor([sys.executable, str(falso)])
         self.srv = ThreadingHTTPServer(("127.0.0.1", 0), api.Manejador)
         threading.Thread(target=self.srv.serve_forever, daemon=True).start()
         self.base = f"http://127.0.0.1:{self.srv.server_address[1]}"
@@ -134,6 +148,22 @@ class PruebaApi(unittest.TestCase):
         self.assertEqual(m[-1]["abrir"], "spotify:playlist:37i9dQZF1DX")
         self.assertEqual(self.spotify.llamadas, [("reproducir", "spotify:playlist:37i9dQZF1DX")])
         self.assertFalse((self.dir / "reproducir.txt").exists())
+
+    def voz(self, audio):
+        req = urllib.request.Request(self.base + "/api/voz", data=audio,
+                                     headers={"Authorization": "Bearer " + "t" * 30, "Content-Type": "audio/wav"})
+        with urllib.request.urlopen(req) as r:
+            return r.status, json.loads(r.read())
+
+    def test_voz_transcribe_y_pide(self):
+        self.assertEqual(self.voz("qué tengo hoy".encode()), (202, {"texto": "qué tengo hoy"}))
+        m = self.esperar()
+        self.assertEqual(m[0]["texto"], "qué tengo hoy")
+        self.assertEqual(m[1]["texto"], "Hecho: qué tengo hoy")
+        self.assertEqual(list((self.dir / "voz").iterdir()), [])   # el audio no se queda guardado
+        # Lo que no se entiende no se pide.
+        self.assertEqual(self.voz(b"ruido"), (200, {"texto": ""}))
+        self.assertEqual(len(self.esperar()), 2)
 
     def test_es_si(self):
         self.assertTrue(api.es_si("Sí, envíalo"))

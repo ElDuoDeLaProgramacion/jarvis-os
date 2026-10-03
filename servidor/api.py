@@ -3,6 +3,8 @@ API de JARVIS para la app del celular.
 
 Corre en el servidor (servidor/README.md) junto a la bóveda. Sirve la app en /app y recibe
 pedidos de texto en /api/pedir, que pasan por scripts/jarvis.sh igual que la voz o WhatsApp.
+La app de Android (android/) manda el audio a /api/voz: se transcribe aquí con faster-whisper
+(el mismo de las notas de voz de WhatsApp) y sigue como un pedido de texto.
 Solo usa la biblioteca estándar de Python.
 
     python3 servidor/api.py            ->  http://127.0.0.1:7788/app
@@ -17,6 +19,7 @@ import importlib.util
 import json
 import os
 import re
+import select
 import subprocess
 import sys
 import threading
@@ -35,6 +38,8 @@ CONVERSACION = DATOS / "conversacion.json"
 SEGUIR_MIN = 30           # minutos en que un pedido sigue la misma conversación (igual que WhatsApp)
 LIMITE_SEG = 20 * 60      # tope de un pedido, como en la cola
 MAX_MENSAJES = 200
+MAX_AUDIO = 5 * 1024 * 1024    # unos 2 minutos de WAV a 16 kHz; una orden dura segundos
+TRANSCRIBIR = [str(RAIZ / "whatsapp" / ".venv" / "bin" / "python"), str(RAIZ / "whatsapp" / "transcribir.py")]
 TIPOS = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".json": "application/manifest+json", ".svg": "image/svg+xml", ".png": "image/png"}
 
@@ -232,12 +237,54 @@ class Conversacion:
         return respuesta
 
 
+# ---------- Audio de la app de Android ----------
+
+class Transcriptor:
+    """Mantiene vivo whatsapp/transcribir.py (cargar el modelo tarda) y le pasa un audio a la vez."""
+
+    def __init__(self, comando=None):
+        self.comando = comando or (os.environ.get("JARVIS_TRANSCRIBIR", "").split() or TRANSCRIBIR)
+        self.cerrojo = threading.Lock()
+        self.proceso = None
+
+    def _linea(self, espera):
+        listo, _, _ = select.select([self.proceso.stdout], [], [], espera)
+        linea = self.proceso.stdout.readline() if listo else ""
+        if not linea:
+            raise RuntimeError("el transcriptor no respondió")
+        return json.loads(linea)
+
+    def _arrancar(self):
+        if self.proceso and self.proceso.poll() is None:
+            return
+        self.proceso = subprocess.Popen(self.comando, cwd=RAIZ, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                        stderr=subprocess.DEVNULL, text=True, bufsize=1)
+        self._linea(300)   # {"listo": true} cuando el modelo cargó
+
+    def texto(self, ruta):
+        with self.cerrojo:
+            try:
+                self._arrancar()
+                self.proceso.stdin.write(f"{ruta}\n")
+                self.proceso.stdin.flush()
+                r = self._linea(120)
+            except (OSError, ValueError, RuntimeError) as e:
+                if self.proceso:
+                    self.proceso.kill()
+                self.proceso = None
+                raise RuntimeError(f"no pude transcribir: {e}") from e
+        if "error" in r:
+            raise RuntimeError(f"no pude transcribir: {r['error']}")
+        return r.get("texto", "").strip()
+
+
 # ---------- HTTP ----------
 
 class Manejador(BaseHTTPRequestHandler):
     conversacion = None
     token = ""
     modulo_hud = None
+    transcriptor = None
 
     def _json(self, datos, codigo=200):
         cuerpo = json.dumps(datos, ensure_ascii=False).encode()
@@ -292,10 +339,13 @@ class Manejador(BaseHTTPRequestHandler):
             self._json({"error": "no existe"}, 404)
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/pedir":
+        ruta = urlparse(self.path).path
+        if ruta not in ("/api/pedir", "/api/voz"):
             return self._json({"error": "no existe"}, 404)
         if not self._autorizado():
             return
+        if ruta == "/api/voz":
+            return self._voz()
         try:
             largo = int(self.headers.get("Content-Length", 0))
             if largo > 20000:
@@ -307,6 +357,29 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"error": "vacío"}, 400)
         self.conversacion.pedir(texto)
         self._json({"ok": True}, 202)
+
+    def _voz(self):
+        """Audio WAV de la app de Android: lo transcribe y lo pide como texto. Devuelve lo que entendió."""
+        try:
+            largo = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            largo = 0
+        if not 0 < largo <= MAX_AUDIO:
+            return self._json({"error": "audio vacío o demasiado largo"}, 413)
+        datos = self.rfile.read(largo)
+        carpeta = DATOS / "voz"
+        carpeta.mkdir(parents=True, exist_ok=True)
+        archivo = carpeta / f"{time.time_ns()}.wav"
+        archivo.write_bytes(datos)
+        try:
+            texto = self.transcriptor.texto(str(archivo))
+        except RuntimeError as e:
+            return self._json({"error": str(e)}, 500)
+        finally:
+            archivo.unlink(missing_ok=True)
+        if texto:
+            self.conversacion.pedir(texto)
+        self._json({"texto": texto}, 202 if texto else 200)
 
     def log_message(self, formato, *args):
         pass
@@ -323,6 +396,7 @@ def main():
     Manejador.token = token
     Manejador.conversacion = Conversacion()
     Manejador.modulo_hud = hud()
+    Manejador.transcriptor = Transcriptor()
     servidor = ThreadingHTTPServer(("127.0.0.1", args.puerto), Manejador)
     print(f"App de JARVIS en http://127.0.0.1:{args.puerto}/app/", flush=True)
     try:

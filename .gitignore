@@ -19,3 +19,9 @@ cola/whatsapp/
 boveda/raw/whatsapp/
 voz/.spotify-token.json
 cola/app/
+
+# App de Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
