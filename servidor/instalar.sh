@@ -24,6 +24,8 @@ paso "WhatsApp: Node.js y librerías"
 paso "Claude Code"
 if ! command -v claude >/dev/null; then curl -fsSL https://claude.ai/install.sh | bash; fi
 claude --version || true
+# Para que "claude" y "node" funcionen en la terminal sin volver a entrar al servidor.
+grep -q '.local/bin' "$HOME/.bashrc" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
 
 paso "Clave de la app del celular"
 touch .env
@@ -87,4 +89,5 @@ echo
 echo "Listo."
 echo "  App del celular: https://$direccion/app/"
 command -v claude >/dev/null && [ -d "$HOME/.claude" ] || echo "  Falta entrar a Claude: ejecuta  claude  y elige tu cuenta (una vez)."
+echo "  Para usar claude en esta terminal: source ~/.bashrc"
 echo "  Siguiente: servidor/README.md, pasos 5 a 7 (bóveda, WhatsApp y apagar lo del PC)."
