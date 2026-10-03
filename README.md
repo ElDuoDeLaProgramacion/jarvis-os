@@ -90,6 +90,9 @@ No hay comandos fijos: le hablas normal. Ejemplos:
 ## WhatsApp
 JARVIS se vincula a tu WhatsApp con un QR, como WhatsApp Web. Le das órdenes en tu chat contigo mismo y te contesta ahí. También anota tus chats en la bóveda para leerlos y resumirlos, y te prepara respuestas que solo envía si dices "sí". Instalación y límites en [whatsapp/README.md](whatsapp/README.md).
 
+## Servidor y app del celular
+JARVIS puede vivir en un servidor gratis de Oracle Cloud, con la bóveda dentro. Así WhatsApp, las rutinas y una app de chat con micrófono para el celular siguen funcionando con el PC apagado. La bóveda se sincroniza con el PC. Guía paso a paso en [servidor/README.md](servidor/README.md).
+
 ## Arranque automático
 
 - Las rutinas de 7, 9, 14 y 19 h: `rutinas\instalar-rutinas.ps1`.
