@@ -82,7 +82,9 @@ if ! tailscale status >/dev/null 2>&1; then
   echo "Abre el enlace que sale abajo y entra con la misma cuenta que usarás en el celular."
   sudo tailscale up
 fi
-sudo tailscale serve --bg 7788 >/dev/null
+# La primera vez Tailscale puede pedir activar HTTPS en tu red con un enlace: ábrelo y espera aquí.
+echo "Si sale un enlace para activar HTTPS (Serve), ábrelo y actívalo."
+sudo tailscale serve --bg 7788
 direccion=$(tailscale status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')
 
 echo
