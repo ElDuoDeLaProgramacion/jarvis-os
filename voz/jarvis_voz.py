@@ -647,7 +647,7 @@ class Jarvis:
                 log("No pude abrir Spotify:", repr(e))
             if not respuesta:
                 respuesta = "Listo, ya está hecho. Los detalles quedaron en la bóveda."
-            log(f"JARVIS: {respuesta}\n")
+            log(f"JARVIS{' (servidor)' if sesion == SERVIDOR else ' (PC)'}: {respuesta}\n")
             registrar(pedido, respuesta, origen)
             # Si JARVIS pregunta algo, la respuesta no necesita "Jarvis" durante 20 segundos.
             self.seguimiento = (sesion, time.monotonic() + 20) if sesion and es_pregunta(respuesta) else None
