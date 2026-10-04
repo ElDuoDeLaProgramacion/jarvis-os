@@ -12,6 +12,9 @@ Script: `python3 scripts/ia_externa.py` (lee las claves de `.env`; las pone Davi
 | "pregúntale a GPT / Llama / DeepSeek..." | `python3 scripts/ia_externa.py --modelo <proveedor/modelo> "..."` (busca el nombre con `python3 scripts/ia_externa.py modelos openrouter`, por ejemplo `openai/...`, `meta-llama/...`, `deepseek/...`) |
 | "¿qué opinan otras IAs?", segunda opinión | `python3 scripts/ia_externa.py --todas "..."` |
 | sobre un documento o informe | añade `--archivo <ruta>` |
+| qué modelos gratis hay | `python3 scripts/ia_externa.py modelos gratis` |
+
+Sin `OPENROUTER_MODELO`, OpenRouter usa un modelo gratis (`:free`), que tiene límite diario. Si un modelo de pago falla por falta de saldo, prueba su versión `:free` o díselo a David.
 
 Si dice que no hay claves, dile a David en una frase qué clave falta y dónde se crea (el script lo imprime).
 

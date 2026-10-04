@@ -166,7 +166,7 @@ Regla: habilidades pequeñas de un solo propósito superan a un prompt gigante.
 
 En `.claude/agents/` hay seis agentes que JARVIS puede llamar (directamente o con la habilidad `equipo`): `programador`, `revisor-codigo`, `auditor-seguridad`, `disenador`, `juez-ideas` e `investigador`. Cada uno tiene sus propias instrucciones y herramientas, y trabajan en paralelo cuando el pedido lo permite ("audita todos mis servidores" lanza un auditor por servidor). Cada agente gasta uso de Claude como una petición entera, así que las rutinas automáticas no los usan.
 
-**IAs externas.** Para que JARVIS consulte otras IAs, pon en `.env` `GEMINI_API_KEY` (gratis en https://aistudio.google.com/apikey) y/o `OPENROUTER_API_KEY` (https://openrouter.ai/settings/keys: una clave para GPT, Llama, DeepSeek, Mistral, Grok y más, con saldo prepago). Ponlas en el `.env` del servidor y del PC. Prueba con `python3 scripts/ia_externa.py --todas "hola"`. JARVIS nunca les manda secretos, correos ni chats salvo que se lo pidas.
+**IAs externas.** Para que JARVIS consulte otras IAs, pon en `.env` `GEMINI_API_KEY` (gratis en https://aistudio.google.com/apikey) y/o `OPENROUTER_API_KEY` (https://openrouter.ai/settings/keys: una clave para GPT, Llama, DeepSeek, Mistral, Grok y más; sin saldo usa sus modelos gratis, con límite diario, y con saldo prepago cualquier modelo). Ponlas en el `.env` del servidor y del PC. Prueba con `python3 scripts/ia_externa.py --todas "hola"`. JARVIS nunca les manda secretos, correos ni chats salvo que se lo pidas.
 
 ## Día real (rutinas automáticas)
 

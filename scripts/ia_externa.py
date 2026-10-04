@@ -8,11 +8,11 @@ clave, los modelos de OpenRouter (GPT, Gemini, Llama, DeepSeek, Mistral, Grok...
     python3 scripts/ia_externa.py --modelo openai/gpt-5 "..."    un modelo de OpenRouter por su nombre
     python3 scripts/ia_externa.py --todas "pregunta"             todas las configuradas, una tras otra
     python3 scripts/ia_externa.py --archivo nota.md "pregunta"   añade el texto de un archivo a la pregunta
-    python3 scripts/ia_externa.py modelos [gemini|openrouter]    qué modelos hay disponibles con tu clave
+    python3 scripts/ia_externa.py modelos [gemini|openrouter|gratis]  modelos disponibles (gratis = los :free de OpenRouter)
 
 Claves en .env (las pone David a mano): GEMINI_API_KEY y OPENROUTER_API_KEY.
 Modelos opcionales: GEMINI_MODELO y OPENROUTER_MODELO (si no, Gemini usa el flash más nuevo
-y OpenRouter elige solo con "openrouter/auto").
+y OpenRouter un modelo gratis, de los que terminan en ":free"; así funciona sin saldo).
 Solo usa la biblioteca estándar.
 """
 
@@ -91,7 +91,15 @@ def modelo_por_defecto(proveedor):
     if elegido:
         return elegido
     if proveedor == "openrouter":
-        return "openrouter/auto"
+        # Sin saldo: un modelo gratis (":free"). Con saldo, David puede fijar OPENROUTER_MODELO=openrouter/auto.
+        gratis = [m for m in modelos("openrouter") if m.endswith(":free")]
+        for familia in ("deepseek", "qwen", "llama", "gemini", "mistral", "gpt"):
+            for m in gratis:
+                if familia in m:
+                    return m
+        if gratis:
+            return gratis[0]
+        raise RuntimeError("OpenRouter no ofrece modelos gratis ahora; pon OPENROUTER_MODELO en .env")
     # Gemini cambia de versión a menudo: el "flash" más nuevo que tenga la clave (rápido y con capa gratis).
     flash = [m for m in modelos("gemini") if "flash" in m and "gemini" in m
              and not any(x in m for x in ("lite", "image", "tts", "audio", "live", "embedding", "exp", "preview"))]
@@ -130,6 +138,9 @@ def main():
         return 2
 
     if args.pregunta[:1] == ["modelos"]:
+        if args.pregunta[1:2] == ["gratis"] and "openrouter" in listas:
+            print("\n".join(m for m in modelos("openrouter") if m.endswith(":free")))
+            return 0
         for n in (args.pregunta[1:2] or listas):
             if n not in listas:
                 print(f"{n}: sin clave en .env")
