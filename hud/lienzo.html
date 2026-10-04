@@ -266,13 +266,34 @@ function procesar(resultado) {
     : 'Pon la mano frente a la cámara'
 }
 
+// La voz de JARVIS usa la misma cámara para los gestos. Mientras el lienzo esté abierto le
+// avisamos cada 2 s para que la suelte, y si aún la tiene ocupada reintentamos unos segundos.
+const pedirCamara = () => fetch('/api/lienzo/camara', { method: 'POST' }).catch(() => {})
+pedirCamara()
+setInterval(pedirCamara, 2000)
+
+async function abrirCamara() {
+  for (let intento = 0; ; intento++) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+    } catch (e) {
+      if (e.name !== 'NotReadableError' || intento >= 8) throw e
+      estado.textContent = 'Esperando a que se libere la cámara…'
+      await new Promise(r => setTimeout(r, 1000))
+    }
+  }
+}
+
 async function iniciarManos() {
   try {
-    video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+    video.srcObject = await abrirCamara()
     await video.play()
     marcas.width = video.videoWidth; marcas.height = video.videoHeight
   } catch (e) {
-    estado.textContent = 'No pude abrir la cámara: ' + e.message + '. Puedes dibujar con el ratón girando la escena.'
+    const motivo = e.name === 'NotReadableError'
+      ? 'otro programa la está usando (ciérralo y recarga con F5)'
+      : e.message
+    estado.textContent = 'No pude abrir la cámara: ' + motivo + '. Puedes dibujar con el ratón girando la escena.'
     return
   }
   estado.textContent = 'Cargando el detector de manos…'

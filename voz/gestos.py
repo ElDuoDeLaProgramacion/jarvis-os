@@ -64,11 +64,31 @@ class Filtro:
 class Ojos(threading.Thread):
     """Lee la cámara en segundo plano y maneja ratón y teclado con los gestos básicos."""
 
-    def __init__(self, camara=0, ver=False, al_cambiar_pausa=None):
+    def __init__(self, camara=0, ver=False, al_cambiar_pausa=None, ceder=None):
         super().__init__(daemon=True)
         self.cfg = configuracion(camara)
         self.ver = ver
         self.filtro = Filtro(self.cfg, al_cambiar_pausa)
+        # ceder() es True mientras otra ventana (el lienzo 3D) necesita la cámara:
+        # Windows solo deja usarla a un programa a la vez.
+        self.ceder = ceder or (lambda: False)
+
+    def _abrir(self):
+        import cv2
+        cap = cv2.VideoCapture(self.cfg.camera_index)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.cfg.frame_width)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.cfg.frame_height)
+        return cap
+
+    def _soltar_mientras_la_usen(self, cap, acciones):
+        """Suelta la cámara mientras ceder() diga que sí y luego la vuelve a abrir."""
+        acciones.release_all()
+        cap.release()
+        print("Gestos: suelto la cámara para el lienzo 3D.", flush=True)
+        while self.ceder():
+            time.sleep(1)
+        print("Gestos: vuelvo a usar la cámara.", flush=True)
+        return self._abrir()
 
     def run(self):
         import cv2
@@ -76,9 +96,9 @@ class Ojos(threading.Thread):
         from manos.actions import ActionExecutor
 
         cfg = self.cfg
-        cap = cv2.VideoCapture(cfg.camera_index)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, cfg.frame_width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cfg.frame_height)
+        while self.ceder():
+            time.sleep(1)
+        cap = self._abrir()
         if not cap.isOpened():
             print("Gestos: no pude abrir la cámara. Sigo solo con voz.", flush=True)
             return
@@ -86,14 +106,22 @@ class Ojos(threading.Thread):
                                          min_detection_confidence=cfg.detection_confidence,
                                          min_tracking_confidence=cfg.tracking_confidence)
         detector, acciones = GestureDetector(cfg), ActionExecutor(cfg)
-        ultima, visto = None, -1e9
+        ultima, visto, revisado = None, -1e9, 0.0
         print("Gestos: cámara lista, en pausa. Haz los cuernos (índice y meñique) 1 s para activarlos.",
               flush=True)
         try:
             while True:
+                if time.monotonic() - revisado > 1:
+                    revisado = time.monotonic()
+                    if self.ceder():
+                        cap = self._soltar_mientras_la_usen(cap, acciones)
+                        ultima, visto = None, -1e9
+                        continue
                 ok, cuadro = cap.read()
                 if not ok:
                     time.sleep(0.5)
+                    if not cap.isOpened():  # p. ej. al volver del lienzo y seguir ocupada
+                        cap = self._abrir()
                     continue
                 if cfg.mirror:
                     cuadro = cv2.flip(cuadro, 1)

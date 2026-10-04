@@ -372,6 +372,9 @@ def ejecutar_musica(tipo, objetivo, veces):
     if tipo == "abrir":
         import os
         if objetivo == LIENZO:
+            # Que los gestos suelten la cámara ya, antes de que el lienzo la pida.
+            COLA.mkdir(exist_ok=True)
+            (COLA / "lienzo-camara").touch()
             # Ventana propia de Chrome o Edge (sin pestañas ni barra); si no, el navegador de siempre.
             programa = navegador_app()
             if programa:
@@ -962,6 +965,14 @@ def atender_escritos(jarvis):
         time.sleep(0.5)
 
 
+def lienzo_quiere_camara():
+    """El lienzo 3D toca cola/lienzo-camara cada 2 s mientras está abierto (hud/servidor.py)."""
+    try:
+        return time.time() - (COLA / "lienzo-camara").stat().st_mtime < 6
+    except OSError:
+        return False
+
+
 def arrancar_gestos(jarvis, args):
     """Ratón y teclado con la mano (gestos básicos de Hands-Free Navigator)."""
     try:
@@ -976,7 +987,7 @@ def arrancar_gestos(jarvis, args):
         if not jarvis.ocupado.is_set():
             jarvis.hablar("Gestos en pausa." if pausado else "Gestos activos.")
 
-    gestos.Ojos(args.camara, args.ver_camara, al_cambiar_pausa).start()
+    gestos.Ojos(args.camara, args.ver_camara, al_cambiar_pausa, lienzo_quiere_camara).start()
 
 
 def main():
