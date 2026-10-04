@@ -85,6 +85,19 @@ Uso: di "Jarvis", espera el pitido y di tu pedido. Si JARVIS te pregunta algo ("
 
 Para actualizar, instala el `jarvis.apk` nuevo encima. Si Android dice que la firma no coincide, desinstala la app y vuelve a instalarla (los datos se llenan de nuevo).
 
+### El PC conectado al servidor (un solo JARVIS)
+Con esto, lo que le dices a la voz del PC o escribes en el HUD lo atiende el JARVIS del servidor: la misma memoria, el mismo `.env` y la misma conversación que el celular (por ejemplo, "prueba la seguridad del servidor" se hace en el servidor). Lo que necesita el PC se sigue haciendo en el PC: tus archivos y carpetas, tus proyectos y código, la pantalla, el copiloto, abrir y cerrar programas y el volumen. Si dices "en el PC" o "en el servidor", JARVIS va donde le digas. Si el servidor no responde, lo hace el PC.
+
+1. Instala Tailscale en Windows ([tailscale.com/download](https://tailscale.com/download)) y entra con la misma cuenta.
+2. En el `.env` del PC (`P:\jarvis-os\.env`) agrega dos líneas, copiando tú la clave del `.env` del servidor:
+   ```
+   JARVIS_SERVIDOR=https://jarvis.<tu-red>.ts.net
+   JARVIS_API_TOKEN=<la misma clave del servidor>
+   ```
+3. Cierra la voz y ábrela otra vez (o reinicia sesión).
+
+En `logs/voz.log` queda anotado si algún pedido se hizo en el PC porque el servidor no respondió.
+
 ## 5. La bóveda sincronizada (Syncthing)
 La bóveda vive en el servidor y en el PC a la vez. Syncthing copia los cambios en los dos sentidos.
 
@@ -97,6 +110,8 @@ La bóveda vive en el servidor y en el PC a la vez. Syncthing copia los cambios 
 3. En el PC: *Agregar dispositivo remoto* con el ID del servidor (Acciones → Mostrar ID). Acepta en el servidor.
 4. En el PC: *Agregar carpeta* con la ruta `P:\jarvis-os\boveda` y compártela con el servidor.
 5. En el servidor, al aceptar la carpeta, pon la ruta `/home/ubuntu/jarvis-os/boveda` y, en *Avanzado*, el tipo **Solo recibir**. Cuando termine, pulsa **Revertir cambios locales**: así la bóveda del servidor queda igual a la del PC, que es la más nueva. Después cambia el tipo a **Enviar y recibir**.
+
+**Obsidian:** en el PC abre Obsidian → *Abrir carpeta como bóveda* → `P:\jarvis-os\boveda`. Es la copia que Syncthing mantiene igual a la del servidor, así que ves el cerebro completo de JARVIS, también lo que escribe desde el celular o WhatsApp. Obsidian no puede abrir una carpeta remota directamente, por eso se usa la copia sincronizada.
 
 Si JARVIS escribe el mismo archivo en los dos lados a la vez, Syncthing guarda las dos versiones (`*.sync-conflict-*.md`) en vez de perder una.
 

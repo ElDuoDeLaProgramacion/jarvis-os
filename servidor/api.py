@@ -164,14 +164,14 @@ class Conversacion:
         with self.cerrojo:
             return [m for m in self.mensajes if m["n"] > n], self.ocupado > 0
 
-    def pedir(self, texto):
-        """Anota el pedido y lo atiende en segundo plano."""
+    def pedir(self, texto, origen="app"):
+        """Anota el pedido y lo atiende en segundo plano. origen "pc": viene de la voz o el HUD del PC."""
         with self.cerrojo:
             self.ocupado += 1
-        self.anotar("yo", texto)
-        threading.Thread(target=self._atender, args=(texto,), daemon=True).start()
+        self.anotar("yo", texto, **({"origen": origen} if origen != "app" else {}))
+        threading.Thread(target=self._atender, args=(texto, origen), daemon=True).start()
 
-    def _atender(self, texto):
+    def _atender(self, texto, origen="app"):
         try:
             with self.turno:
                 orden = orden_musica(texto)
@@ -180,7 +180,7 @@ class Conversacion:
                     return
                 inicio = time.time()
                 respuesta = self._jarvis(texto)
-                uri = self._musica_pedida(inicio)
+                uri = self._musica_pedida(inicio, poner=origen != "pc")   # el PC la pone en su Spotify
                 if uri:
                     self.anotar("jarvis", respuesta, abrir=uri)
                 else:
@@ -190,7 +190,7 @@ class Conversacion:
                 self.ocupado -= 1
 
     @staticmethod
-    def _musica_pedida(desde):
+    def _musica_pedida(desde, poner=True):
         """Si JARVIS eligió música en este pedido (cola/reproducir.txt), la pone en el Spotify activo
         (normalmente el del celular) y devuelve la dirección para el botón "Abrir en Spotify"."""
         try:
@@ -202,7 +202,7 @@ class Conversacion:
             return None
         if not re.fullmatch(r"spotify:[a-z]+:[A-Za-z0-9]+", uri):
             return None
-        if spotify.disponible():
+        if poner and spotify.disponible():
             try:
                 spotify.reproducir(uri, preferir="Smartphone")   # el pedido viene del celular
             except Exception:
@@ -290,6 +290,7 @@ class Transcriptor:
 # ---------- HTTP ----------
 
 class Manejador(BaseHTTPRequestHandler):
+    timeout = 60          # una conexión que no manda nada no deja un hilo colgado para siempre
     conversacion = None
     token = ""
     modulo_hud = None
@@ -357,14 +358,16 @@ class Manejador(BaseHTTPRequestHandler):
             return self._voz()
         try:
             largo = int(self.headers.get("Content-Length", 0))
-            if largo > 20000:
-                return self._json({"error": "demasiado largo"}, 413)
-            texto = str(json.loads(self.rfile.read(largo) or b"{}").get("texto", "")).strip()
+            if not 0 <= largo <= 20000:   # negativo: read(-1) esperaría el fin de la conexión
+                return self._json({"error": "largo inválido"}, 413)
+            datos = json.loads(self.rfile.read(largo) or b"{}")
+            texto = str(datos.get("texto", "")).strip()
+            origen = "pc" if datos.get("origen") == "pc" else "app"
         except (ValueError, AttributeError):
             return self._json({"error": "json"}, 400)
         if not texto:
             return self._json({"error": "vacío"}, 400)
-        self.conversacion.pedir(texto)
+        self.conversacion.pedir(texto, origen)
         self._json({"ok": True}, 202)
 
     def _voz(self):
