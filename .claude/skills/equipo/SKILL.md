@@ -22,6 +22,7 @@ Los agentes están en `.claude/agents/`. Se llaman con la herramienta de agentes
    - "Audita mis servidores" → un `auditor-seguridad` por objetivo, en paralelo.
    - "¿Qué opinas de esta app?" → `disenador` y `juez-ideas` en paralelo.
 3. Lanza en paralelo lo que no dependa de otra cosa.
+   Si David quiere también la opinión de IAs externas ("con todas las IAs"), usa la habilidad `panel`, que combina estos agentes con varias IAs por especialidad.
 4. Junta los resultados en `boveda/outputs/equipo/AAAA-MM-DD-<tema>.md` (frontmatter `fecha`, `tipo: equipo`, `tags`), con una sección por agente y enlaces `[[...]]` a las notas que usaron.
 
 Las reglas de JARVIS valen para los agentes: nada de push, envíos, despliegues ni borrados sin el "sí" de David, y seguridad solo sobre sus sistemas.

@@ -9,6 +9,8 @@ clave, los modelos de OpenRouter (GPT, Gemini, Llama, DeepSeek, Mistral, Grok...
     python3 scripts/ia_externa.py --todas "pregunta"             todas las configuradas, una tras otra
     python3 scripts/ia_externa.py --archivo nota.md "pregunta"   añade el texto de un archivo a la pregunta
     python3 scripts/ia_externa.py modelos [gemini|openrouter|gratis]  modelos disponibles (gratis = los :free de OpenRouter)
+    python3 scripts/ia_externa.py panel --rol auditoria [--n 3] --archivo resumen.md "pregunta"
+        un panel de varias IAs a la vez, elegidas por especialidad (roles: ver ROLES), en paralelo
 
 Claves en .env (las pone David a mano): GEMINI_API_KEY y OPENROUTER_API_KEY.
 Modelos opcionales: GEMINI_MODELO y OPENROUTER_MODELO (si no, Gemini usa el flash más nuevo
@@ -17,6 +19,7 @@ Solo usa la biblioteca estándar.
 """
 
 import argparse
+import concurrent.futures
 import json
 import os
 import sys
@@ -114,13 +117,13 @@ def candidatos(proveedor):
     return (flash + lite)[:6]
 
 
-def preguntar(proveedor, pregunta, modelo=None):
+def preguntar(proveedor, pregunta, modelo=None, sistema=SISTEMA, lista=None):
     ultimo = None
-    for m in ([modelo] if modelo else candidatos(proveedor)):
+    for m in ([modelo] if modelo else (lista or candidatos(proveedor))):
         try:
             datos = llamar(proveedor, "/chat/completions", {
                 "model": m,
-                "messages": [{"role": "system", "content": SISTEMA}, {"role": "user", "content": pregunta}],
+                "messages": [{"role": "system", "content": sistema}, {"role": "user", "content": pregunta}],
             })
         except RuntimeError as e:
             if getattr(e, "codigo", None) in (404, 429):
@@ -132,6 +135,89 @@ def preguntar(proveedor, pregunta, modelo=None):
     raise RuntimeError(f"ningún modelo tiene cuota ahora (puede ser el límite diario gratis). Último error: {ultimo}")
 
 
+# Panel: para cada especialidad, qué pedirle a cada IA y qué modelos suelen ser mejores en eso
+# (palabras del nombre del modelo, de más a menos preferido). Los nombres cambian: lo que no
+# coincide queda al final, pero sigue pudiendo entrar.
+ROLES = {
+    "auditoria": ("Eres auditor de ciberseguridad sénior. Revisa lo que te pasan y lista vulnerabilidades y "
+                  "malas prácticas concretas, cada una con gravedad (Alta, Media, Baja), por qué importa y el arreglo. "
+                  "No inventes: si algo no se puede saber con lo que ves, dilo.",
+                  ["r1", "deepseek", "qwen3", "gpt-oss", "kimi", "glm", "nemotron", "llama", "mistral"]),
+    "programacion": ("Eres ingeniero de software sénior. Evalúa la calidad del código y la arquitectura: errores, "
+                     "deuda técnica, pruebas, mantenibilidad y rendimiento. Da una nota de 1 a 10 y las 5 mejoras "
+                     "más valiosas en orden.",
+                     ["coder", "devstral", "codestral", "qwen3", "deepseek", "gpt-oss", "kimi", "glm", "llama"]),
+    "planeacion": ("Eres jefe de producto y planeación. Evalúa el proyecto como producto: objetivo, alcance, "
+                   "prioridades, riesgos y qué falta. Propón los próximos 5 pasos en orden y qué dejarías de hacer.",
+                   ["kimi", "llama", "gemini", "mistral", "qwen", "deepseek", "gpt-oss", "glm"]),
+    "ideas": ("Eres un juez de ideas exigente. Puntúa de 1 a 10 problema real, diferencia, viabilidad, costo y "
+              "potencial; luego los 3 riesgos más serios y cómo probar la idea barato en una semana.",
+              ["r1", "deepseek", "kimi", "llama", "qwen", "gemini", "mistral", "gpt-oss"]),
+    "diseno": ("Eres diseñador de producto e interfaces. Critica la experiencia y la interfaz: claridad, jerarquía, "
+               "accesibilidad y flujo. Da las 5 mejoras de más impacto.",
+               ["gemini", "llama", "qwen", "mistral", "kimi", "gpt-oss"]),
+}
+
+
+def ranking(rol, ids):
+    preferidos = ROLES[rol][1]
+    def nota(m):
+        b = m.lower()
+        return next((i for i, k in enumerate(preferidos) if k in b), len(preferidos))
+    return sorted(ids, key=nota)
+
+
+def armar_panel(rol, n):
+    """Lista de (proveedor, [modelos a probar en orden]) con n miembros de familias distintas."""
+    miembros = []
+    if "gemini" in configuradas():
+        try:
+            miembros.append(("gemini", candidatos("gemini")))
+        except RuntimeError:
+            pass
+    if "openrouter" in configuradas():
+        fijo = os.environ.get("OPENROUTER_MODELO")
+        todos = modelos("openrouter")
+        # Con saldo (OPENROUTER_PANEL_DE_PAGO=1) entran todos; si no, solo los gratis.
+        pool = todos if os.environ.get("OPENROUTER_PANEL_DE_PAGO") == "1" else [m for m in todos if m.endswith(":free")]
+        pool = [m for m in pool if m != "openrouter/auto"]
+        usadas = set()
+        ordenados = ranking(rol, pool)
+        for m in ordenados:
+            familia = m.split("/")[0]
+            if familia in usadas:
+                continue
+            usadas.add(familia)
+            # Si este no tiene cuota, se prueba el siguiente de la misma especialidad que nadie usa.
+            reserva = [x for x in ordenados if x.split("/")[0] not in usadas][:3]
+            miembros.append(("openrouter", [m] + reserva))
+            if len(miembros) >= n:
+                break
+        if fijo and not any(fijo in l for _, l in miembros):
+            miembros.insert(0, ("openrouter", [fijo]))
+    return miembros[:n]
+
+
+def panel(rol, pregunta, n):
+    miembros = armar_panel(rol, n)
+    if not miembros:
+        print("No pude armar el panel: no hay IAs externas disponibles.")
+        return 1
+    sistema = ROLES[rol][0] + " Responde en español, directo y con argumentos."
+    print(f"# Panel de {rol}: {len(miembros)} IAs\n")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(miembros)) as ex:
+        futuros = [ex.submit(preguntar, prov, pregunta, None, sistema, lista) for prov, lista in miembros]
+        fallo = 0
+        for (prov, lista), f in zip(miembros, futuros):
+            try:
+                usado, texto = f.result()
+                print(f"## {usado}\n{texto}\n")
+            except Exception as e:
+                print(f"## {lista[0]}\nError: {e}\n")
+                fallo = 1
+    return fallo
+
+
 def main():
     cargar_env()
     a = argparse.ArgumentParser(description="IAs externas a Claude para JARVIS")
@@ -140,7 +226,9 @@ def main():
     a.add_argument("--modelo", help="modelo concreto (en OpenRouter: proveedor/modelo)")
     a.add_argument("--todas", action="store_true", help="preguntar a todas las configuradas")
     a.add_argument("--archivo", help="añadir el texto de este archivo a la pregunta")
-    args = a.parse_args()
+    a.add_argument("--rol", help="panel: " + ", ".join(ROLES))
+    a.add_argument("--n", type=int, default=3, help="panel: cuántas IAs (máximo 6)")
+    args = a.parse_intermixed_args()
 
     listas = configuradas()
     if not listas:
@@ -161,12 +249,20 @@ def main():
             print("\n".join(modelos(n)))
         return 0
 
+    es_panel = args.pregunta[:1] == ["panel"]
+    if es_panel:
+        args.pregunta = args.pregunta[1:]
     pregunta = " ".join(args.pregunta).strip()
     if args.archivo:
         texto = Path(args.archivo).read_text(encoding="utf-8", errors="replace")[:60000]
         pregunta = f"{pregunta}\n\n--- {Path(args.archivo).name} ---\n{texto}"
     if not pregunta:
         a.error("falta la pregunta")
+
+    if es_panel:
+        if args.rol not in ROLES:
+            a.error(f"--rol debe ser uno de: {', '.join(ROLES)}")
+        return panel(args.rol, pregunta, max(1, min(args.n, 6)))
 
     if args.todas:
         elegidas = listas

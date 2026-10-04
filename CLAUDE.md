@@ -34,6 +34,7 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | "recomiéndame...", "¿qué me sugieres...?", "¿qué debería aprender/usar?" | `recomendar` |
 | evaluar una idea, "¿vale la pena...?", abogado del diablo | `evaluar-idea` |
 | "pregúntale a Gemini/GPT/...", "¿qué opinan otras IAs?", segunda opinión | `segunda-opinion` |
+| "con todas las IAs", "que varias IAs opinen/auditen", panel o consejo de IAs, "qué tan bueno es el proyecto X" | `panel` |
 | nombra un agente (auditor, revisor, programador, diseñador, juez, investigador), "junta al equipo", diseño, crear un programa grande | `equipo` |
 | empieza con "Modo copiloto" (recomendación que nadie pidió) | `copiloto` |
 
