@@ -703,6 +703,11 @@ class Jarvis:
                     REPRODUCIR.write_text(abrir, encoding="utf-8")   # suena en el Spotify de este PC
                 return respuesta, SERVIDOR
             except ConnectionError as e:
+                if servidor_remoto.nombra_el_servidor(pedido):
+                    # Hacerlo en el PC respondería sobre otra máquina.
+                    log("Servidor:", e)
+                    return ("No llego al servidor. Revisa que Tailscale esté conectado en este PC "
+                            "y vuelve a pedírmelo."), None
                 log("Servidor:", e, "- lo hago en el PC.")
                 reanudar = confirmado = None
         return preguntar_a_jarvis(texto, self.args.distro, self.args.repo, reanudar, confirmado)
