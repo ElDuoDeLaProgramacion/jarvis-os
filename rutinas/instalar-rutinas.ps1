@@ -10,8 +10,9 @@ $carpeta = "\JARVIS\"
 $rutinas = Import-Csv (Join-Path $PSScriptRoot "rutinas.csv")
 
 foreach ($r in $rutinas) {
-    $argumentos = "-d $Distro --cd $Repo --exec ./scripts/rutina.sh `"$($r.pedido)`""
-    $accion = New-ScheduledTaskAction -Execute "wsl.exe" -Argument $argumentos
+    # oculto.vbs: la rutina corre sin abrir una ventana de terminal.
+    $argumentos = "`"$PSScriptRoot\oculto.vbs`" wsl.exe -d $Distro --cd $Repo --exec ./scripts/rutina.sh `"$($r.pedido)`""
+    $accion = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $argumentos
     $disparador = New-ScheduledTaskTrigger -Daily -At $r.hora
     # Si el PC estaba apagado a esa hora, la rutina corre en cuanto se encienda.
     $ajustes = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 1)

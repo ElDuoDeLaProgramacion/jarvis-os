@@ -47,10 +47,10 @@ if (-not $SinWhatsApp -and (Test-Path "$repo\whatsapp\sesion\creds.json")) {
 }
 
 # Actualización automática: al iniciar sesión y cada 2 horas trae lo nuevo de GitHub (sin git pull a mano).
-# conhost --headless evita que se abra una ventana negra cada vez.
+# oculto.vbs evita que se abra una ventana negra cada vez (conhost --headless no siempre lo lograba).
 if (-not $SinActualizar) {
-    $accion = New-ScheduledTaskAction -Execute "conhost.exe" `
-        -Argument "--headless wsl.exe -d $Distro --cd /mnt/p/jarvis-os --exec ./scripts/actualizar.sh"
+    $accion = New-ScheduledTaskAction -Execute "wscript.exe" `
+        -Argument "`"$repo\rutinas\oculto.vbs`" wsl.exe -d $Distro --cd /mnt/p/jarvis-os --exec ./scripts/actualizar.sh"
     $disparador = New-ScheduledTaskTrigger -AtLogOn -User $usuario
     $disparador.Delay = "PT1M"
     $disparador.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours 2)).Repetition
