@@ -45,7 +45,7 @@ if [ -f .env ]; then set -a; . ./.env; set +a; fi
 
 # Herramientas que JARVIS puede usar sin preguntar. Gmail: leer y borradores; enviar solo
 # tras un "sí" de David en voz (--confirmado); reenviar o borrar, nunca. Calendar: leer siempre; crear y
-# cambiar eventos solo cuando David lo pide en directo (voz o terminal), nunca en rutinas.
+# cambiar eventos solo cuando David lo pide en directo (voz o terminal), nunca en rutinas; borrar, tras su "sí".
 permitidas=(
   Read Write Edit Glob Grep WebSearch WebFetch
   "Bash(date:*)" "Bash(mkdir:*)" "Bash(ls:*)" "Bash(mv:*)"
@@ -53,10 +53,15 @@ permitidas=(
   "Bash(git add:*)" "Bash(git commit:*)" "Bash(npm test:*)" "Bash(python3:*)" "Bash(pdftotext:*)"
   # Pruebas de seguridad: el script solo revisa (no cambia nada) y solo los sistemas de David.
   "Bash(scripts/seguridad.sh:*)" "Bash(./scripts/seguridad.sh:*)"
+  # IAs externas (Gemini, OpenRouter) para una segunda opinión; ya entra en python3, se nombra por claridad.
+  "Bash(python3 scripts/ia_externa.py:*)"
 )
+# Agentes especializados (.claude/agents/: programador, revisor, auditor, diseñador, juez, investigador).
+# Heredan estas mismas herramientas; en la cola (rutinas y botones) no se usan, por el gasto.
+if [ "${JARVIS_AUTOMATICO:-0}" != "1" ]; then permitidas+=(Task Agent); fi
 # Conectores de claude.ai: "claude.ai Gmail" → mcp__claude_ai_Gmail (se listan ambas grafías por si acaso).
 # Fuera a propósito (send_message y reply solo con --confirmado): forward, trash_*, *_spam, *label* y delete_draft (Gmail);
-# delete_event y respond_to_event (Calendar).
+# respond_to_event (Calendar); delete_event solo con --confirmado (David dijo "sí" a "¿Lo borro?").
 for servidor in claude_ai_Gmail claude.ai_Gmail; do
   for h in search_threads get_thread get_message list_labels list_drafts get_draft create_draft update_draft; do
     permitidas+=("mcp__${servidor}__$h")
@@ -84,6 +89,9 @@ for servidor in claude_ai_Google_Calendar claude.ai_Google_Calendar; do
     for h in create_event update_event; do
       permitidas+=("mcp__${servidor}__$h")
     done
+  fi
+  if [ "$confirmado" = "1" ] && [ -n "$reanudar" ] && [ "${JARVIS_AUTOMATICO:-0}" != "1" ]; then
+    permitidas+=("mcp__${servidor}__delete_event")
   fi
 done
 

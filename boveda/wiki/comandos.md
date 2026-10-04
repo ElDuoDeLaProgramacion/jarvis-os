@@ -20,7 +20,11 @@ tags: [jarvis, ayuda]
 
 ## Con Claude
 - **Correo:** "resume mi bandeja", "responde a Ana que sí", "manda la captura de pantalla a Ana". Siempre pregunta "¿Lo envío?".
-- **Agenda:** "agéndame reunión el lunes a las 3".
+- **Agenda:** "agéndame reunión el lunes a las 3", "mueve la reunión al martes", "elimina la reunión del lunes" (pregunta "¿La borro?" y solo borra con tu "sí").
+- **Noticias:** "dame las noticias", "qué pasó hoy en ciberseguridad".
+- **Aprender:** "aprende de Rust", "ponte al día en agentes de IA". Lo guarda en `wiki/conocimiento/`. También aprende solo cada noche de las noticias y tendencias.
+- **Recomendar:** "recomiéndame una herramienta para...", "¿qué debería aprender?".
+- **Ideas:** "evalúa esta idea: ...", "hazle de abogado del diablo a...". Te da nota, riesgos y cómo probarla.
 - **Pantalla:** "lee mi pantalla".
 - **Analizar:** "analiza este archivo / PDF / enlace / video". Abre la ventana del HUD.
 - **Música:** "pon Bad Bunny", "ponme algo para concentrarme", "qué está sonando".
@@ -28,11 +32,18 @@ tags: [jarvis, ayuda]
 - **Memoria:** "recuerda que...", "¿qué decidí sobre...?", "limpieza de bóveda".
 - **Día a día:** "plan de hoy", "resumen matutino", "cierra el día", "revisa mis suscripciones", "tendencias".
 
+## Agentes especializados
+- "pídele al auditor que revise el servidor", "que el revisor mire mi proyecto X", "que el diseñador proponga la pantalla de...", "junta al equipo para crear un programa que...".
+- Agentes: programador, revisor de código, auditor de seguridad, diseñador, juez de ideas, investigador. Gastan más uso: JARVIS los llama solo cuando vale la pena.
+- **IAs externas:** "pregúntale a Gemini...", "¿qué opina GPT de...?", "segunda opinión de otras IAs sobre...". Necesitan las claves `GEMINI_API_KEY` u `OPENROUTER_API_KEY` en `.env`.
+
 ## Seguridad (solo tus sistemas, sin cambiar nada)
 - "prueba la seguridad del servidor" / "audita este equipo": SSH, puertos, cortafuegos, actualizaciones, usuarios, intentos de entrada y lynis.
 - "qué puertos tiene abiertos el servidor": escaneo con nmap (solo localhost o lo que esté en `JARVIS_OBJETIVOS_SEGURIDAD` del `.env`).
 - "revisa el certificado y las cabeceras de https://...": TLS y cabeceras de seguridad de una web tuya.
 - "busca vulnerabilidades en el proyecto ...": `npm audit` y `pip-audit`.
+- "audita el código de ...": bandit, semgrep y secretos olvidados en el código (gitleaks).
+- "audita todos mis servidores": uno por uno lo que está en `JARVIS_OBJETIVOS_SEGURIDAD`, con un informe resumen.
 - El informe queda en `outputs/seguridad/` con los comandos para arreglar; JARVIS no aplica nada solo.
 
 ## Desde la app de Android

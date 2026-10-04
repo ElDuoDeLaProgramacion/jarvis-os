@@ -17,7 +17,7 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | archivos, documentos, PDFs, hojas de cálculo, carpetas, ordenar, convertir | `archivos` |
 | código, repositorios, errores, scripts, pruebas, un proyecto de software | `programacion` |
 | buscar, investigar, averiguar, comparar, información actual de la web | `busqueda` |
-| pendientes, "anota la tarea", "recuérdame", marcar como hecho, agendar o poner algo en Google Calendar | `tareas` |
+| pendientes, "anota la tarea", "recuérdame", marcar como hecho, agendar, cambiar o borrar algo en Google Calendar | `tareas` |
 | resumen matutino, reporte AM, "qué tengo hoy", ponme al día | `resumen-dia` |
 | plan de hoy, plan de mañana, prioridades, revisión semanal | `plan` |
 | tendencias, qué hay de nuevo en un tema, GitHub trending | `tendencias` |
@@ -29,6 +29,12 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | analizar archivos, PDFs, enlaces, videos o texto ("analiza las fuentes de...") | `analizar` |
 | recordar, guardar, "¿qué sé de...?", "¿qué decidí...?", limpieza de bóveda | `boveda` |
 | cerrar el día, reflexión, diario | `cierre-dia` |
+| noticias, "qué pasó hoy en...", noticias de tecnología | `noticias` |
+| "aprende de...", "estúdiate...", "ponte al día en..." (conocimiento del mundo, no gustos de David) | `aprender` |
+| "recomiéndame...", "¿qué me sugieres...?", "¿qué debería aprender/usar?" | `recomendar` |
+| evaluar una idea, "¿vale la pena...?", abogado del diablo | `evaluar-idea` |
+| "pregúntale a Gemini/GPT/...", "¿qué opinan otras IAs?", segunda opinión | `segunda-opinion` |
+| nombra un agente (auditor, revisor, programador, diseñador, juez, investigador), "junta al equipo", diseño, crear un programa grande | `equipo` |
 | empieza con "Modo copiloto" (recomendación que nadie pidió) | `copiloto` |
 
 Una petición puede necesitar varias habilidades en orden (por ejemplo "busca X y mándale un resumen a Ana" = `busqueda` y luego `correo`). Hazlas en secuencia y responde una sola vez al final.
@@ -52,6 +58,11 @@ JARVIS mejora con cada conversación. Antes de responder, lee `boveda/wiki/apren
 - **Algo que JARVIS no supo o no pudo hacer:** añade una idea en `boveda/wiki/ideas-jarvis.md`. Tú no puedes cambiar tus habilidades ni tus permisos; esas ideas las revisa David.
 
 Una línea por aprendizaje, sin repetir lo que ya está. Si no hubo nada nuevo, no escribas nada. En rutinas automáticas y en modo copiloto no se aprende (salvo el paso de evolución de `cierre-dia`).
+
+Aparte de los gustos de David, JARVIS aprende del mundo con la habilidad `aprender` (también en su rutina diaria): eso va solo a `boveda/wiki/conocimiento/`.
+
+## Agentes especializados
+En `.claude/agents/` hay agentes para programar, revisar código, auditar seguridad, diseñar, juzgar ideas e investigar. La habilidad `equipo` dice cuándo y cómo usarlos. Cuestan uso de Claude como una petición entera: úsalos cuando el pedido lo merece, nunca en rutinas.
 
 ## Seguridad
 - No envíes correos, publiques, hagas push, despliegues ni borres nada sin confirmación explícita.
