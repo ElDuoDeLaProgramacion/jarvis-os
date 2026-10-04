@@ -165,6 +165,23 @@ class PruebaApi(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as e:
                 self.pedir(ruta)
             self.assertEqual(e.exception.code, 404)
+        # Eliminar: va a la papelera de la bóveda, con su ruta, y no sale de outputs/.
+        h.PAPELERA = self.dir / ".papelera"
+        fuera = self.dir.parent / (self.dir.name + "-fuera.md")
+        fuera.write_text("no es de outputs")
+        self.addCleanup(fuera.unlink, missing_ok=True)
+        (self.dir / "nota.txt").write_text("no es un informe")
+        _, d = self.pedir("/api/propuestas/borrar", {"ids": [
+            "2026-10-04-landing", "informe/seguridad/2026-10-03-servidor.md",
+            f"informe/../{fuera.name}", "informe/nota.txt", "../x"]})
+        self.assertEqual(d["borradas"], 2)
+        self.assertFalse(carpeta.exists())
+        dia = next(h.PAPELERA.iterdir())
+        self.assertTrue((dia / "panel" / "2026-10-04-landing" / "panel-marketing.json").exists())
+        self.assertTrue((dia / "panel" / "2026-10-04-landing.md").exists())
+        self.assertTrue((dia / "seguridad" / "2026-10-03-servidor.md").exists())
+        self.assertTrue(fuera.exists() and (self.dir / "nota.txt").exists())
+        self.assertEqual(self.pedir("/api/propuestas")[1]["propuestas"], [])
         with self.assertRaises(urllib.error.HTTPError) as e:
             self.pedir("/api/propuestas", token="otro")
         self.assertEqual(e.exception.code, 401)

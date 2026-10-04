@@ -379,7 +379,7 @@ class Manejador(BaseHTTPRequestHandler):
 
     def do_POST(self):
         ruta = urlparse(self.path).path
-        if ruta not in ("/api/pedir", "/api/voz", "/api/ia"):
+        if ruta not in ("/api/pedir", "/api/voz", "/api/ia", "/api/propuestas/borrar"):
             return self._json({"error": "no existe"}, 404)
         if not self._autorizado():
             return
@@ -387,6 +387,17 @@ class Manejador(BaseHTTPRequestHandler):
             return self._voz()
         if ruta == "/api/ia":
             return self._ia()
+        if ruta == "/api/propuestas/borrar":
+            try:
+                largo = int(self.headers.get("Content-Length", 0))
+                if not 0 <= largo <= 200000:
+                    return self._json({"error": "largo inválido"}, 413)
+                ids = json.loads(self.rfile.read(largo) or b"{}").get("ids", [])
+                if not isinstance(ids, list):
+                    raise ValueError
+            except (ValueError, AttributeError):
+                return self._json({"error": "json"}, 400)
+            return self._json({"ok": True, "borradas": self.modulo_hud.borrar_propuestas(ids)})
         try:
             largo = int(self.headers.get("Content-Length", 0))
             if not 0 <= largo <= 20000:   # negativo: read(-1) esperaría el fin de la conexión

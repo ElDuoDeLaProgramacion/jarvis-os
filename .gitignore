@@ -30,3 +30,4 @@ android/debug.keystore
 
 # Modelo de Vosk: lo descarga el workflow al armar el APK
 android/app/src/main/assets/
+boveda/.papelera/

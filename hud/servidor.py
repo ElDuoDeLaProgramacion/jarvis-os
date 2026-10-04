@@ -254,6 +254,48 @@ def propuesta(id_panel):
             "conclusion": conclusion.read_text(encoding="utf-8", errors="replace") if conclusion.is_file() else None}
 
 
+PAPELERA = BOVEDA / ".papelera"   # Obsidian no muestra carpetas con punto; Syncthing sí la sincroniza
+DIAS_PAPELERA = 30
+
+
+def _de_la_propuesta(id_propuesta):
+    """Archivos o carpetas de una propuesta (validados dentro de outputs/)."""
+    if id_propuesta.startswith("informe/"):
+        destino = (SALIDAS / id_propuesta[8:]).resolve()
+        ok = SALIDAS.resolve() in destino.parents and destino.suffix in (".md", ".html") and destino.is_file()
+        return [destino] if ok else []
+    if not ID_PANEL.fullmatch(id_propuesta):
+        return []
+    return [p for p in (PANELES / id_propuesta, PANELES / f"{id_propuesta}.md") if p.exists()]
+
+
+def borrar_propuestas(ids):
+    """Mueve las propuestas a boveda/.papelera/AAAA-MM-DD/<ruta en outputs> (se recuperan de ahí durante
+    DIAS_PAPELERA días). Devuelve cuántas."""
+    hoy = PAPELERA / date.today().isoformat()
+    movidas = 0
+    for id_propuesta in list(ids)[:500]:
+        cosas = _de_la_propuesta(str(id_propuesta))
+        for cosa in cosas:
+            destino = hoy / cosa.resolve().relative_to(SALIDAS.resolve())   # misma ruta que tenía en outputs/
+            if destino.exists():
+                destino = destino.with_name(f"{destino.stem}-{int(time.time())}{destino.suffix}")
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(cosa), str(destino))
+        movidas += bool(cosas)
+    # Lo que lleva más de DIAS_PAPELERA días en la papelera ya no vuelve.
+    if PAPELERA.is_dir():
+        limite = date.today().toordinal() - DIAS_PAPELERA
+        for dia in PAPELERA.iterdir():
+            try:
+                viejo = date.fromisoformat(dia.name).toordinal() < limite
+            except ValueError:
+                continue
+            if viejo and dia.is_dir():
+                shutil.rmtree(dia, ignore_errors=True)
+    return movidas
+
+
 def archivo_vendor(nombre):
     """Bibliotecas de hud/vendor/ que usa la ventana de propuestas. None si no es una de ellas."""
     ruta = (VENDOR / nombre).resolve()
@@ -525,6 +567,8 @@ class Manejador(BaseHTTPRequestHandler):
             COLA.mkdir(exist_ok=True)
             (COLA / "lienzo-camara").touch()
             return self._json({"ok": True})
+        if ruta == "/api/propuestas/borrar":
+            return self._borrar_propuestas()
         if ruta != "/api/encolar":
             return self._json({"error": "no existe"}, 404)
         largo = int(self.headers.get("Content-Length", 0))
@@ -538,6 +582,24 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"ok": True, "via": "voz"})
         ok = encolar(pedido)
         self._json({"ok": ok, "via": "cola"}, 200 if ok else 400)
+
+    def _borrar_propuestas(self):
+        # Solo la propia página del HUD: JSON (otra web no puede mandarlo sin permiso del navegador)
+        # y, si el navegador dice de dónde viene, que sea de aquí.
+        origen = self.headers.get("Origin", "")
+        if not self.headers.get("Content-Type", "").startswith("application/json") or \
+                (origen and urlparse(origen).hostname not in ("localhost", "127.0.0.1")):
+            return self._json({"error": "no permitido"}, 403)
+        try:
+            largo = int(self.headers.get("Content-Length", 0))
+            if not 0 <= largo <= 200000:
+                return self._json({"error": "largo inválido"}, 413)
+            ids = json.loads(self.rfile.read(largo) or b"{}").get("ids", [])
+            if not isinstance(ids, list):
+                raise ValueError
+        except (ValueError, AttributeError):
+            return self._json({"error": "JSON inválido"}, 400)
+        self._json({"ok": True, "borradas": borrar_propuestas(ids)})
 
     def _lienzo(self):
         """Guarda lo hecho en el lienzo 3D: imagen, escena (JSON) y una nota en boveda/outputs/lienzo/."""

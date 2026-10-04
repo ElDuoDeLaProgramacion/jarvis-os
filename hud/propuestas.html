@@ -61,6 +61,12 @@
   .vista iframe { height: 100%; }
   .diagrama iframe { background: transparent; height: 120px; }
   .oculto { display: none !important; }
+  #borrar:hover, .peligro { color: var(--peligro) !important; border-color: var(--peligro) !important; }
+  .eleccion { max-width: 900px; }
+  .eleccion h4 { color: var(--acento-2); font: 500 12px var(--mono); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .1em; }
+  .eleccion label { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--linea); cursor: pointer; }
+  .eleccion label:hover { background: var(--panel); }
+  .eleccion .acciones { position: sticky; top: 60px; display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 0; background: var(--fondo); }
   .volver { color: var(--acento); text-decoration: none; font: 12px var(--mono); }
   .diapos { background: var(--panel-2); }
   .diapo { aspect-ratio: 16 / 9; max-height: 70vh; margin: 0 auto; padding: 5% 7%; overflow: auto; background: #0f1218;
@@ -77,6 +83,8 @@
   <h1>JARVIS <small>· PROPUESTAS</small></h1>
   <select id="elegir" aria-label="Panel"></select>
   <button id="recargar" type="button" title="Buscar paneles nuevos">Actualizar</button>
+  <button id="borrar" type="button" title="Eliminar la que estás viendo">Eliminar</button>
+  <button id="seleccionar" type="button" title="Elegir varias para eliminarlas">Seleccionar</button>
 </header>
 <div id="info"></div>
 <nav id="pestanas"></nav>
@@ -103,8 +111,9 @@ function cabeceras () {
   return { Authorization: 'Bearer ' + token }
 }
 
-async function pedir (ruta) {
-  const r = await fetch(ruta, { headers: cabeceras(), cache: 'no-store' })
+async function pedir (ruta, cuerpo) {
+  const r = await fetch(ruta, cuerpo === undefined ? { headers: cabeceras(), cache: 'no-store' }
+    : { method: 'POST', headers: { ...cabeceras(), 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) })
   if (r.status === 401) throw new Error('Abre la app de JARVIS y entra con tu clave; luego vuelve aquí.')
   if (!r.ok) throw new Error('No pude leer las propuestas (' + r.status + ').')
   return r.json()
@@ -318,8 +327,50 @@ async function abrir (id) {
   verPestana(tabs.some(([c]) => c === pestana) ? pestana : tabs.some(([c]) => c === guardada) ? guardada : tabs[0][0])
 }
 
+let lista = []
+
+// Eliminar no borra del todo: lo mueve a boveda/.papelera/ y se vacía solo a los 30 días.
+async function eliminar (ids) {
+  if (!ids.length) return
+  const que = ids.length === 1 ? 'esta propuesta' : `estas ${ids.length} propuestas`
+  if (!confirm(`¿Eliminar ${que}? Irán a la papelera de la bóveda (boveda/.papelera) y se borran solas a los 30 días.`)) return
+  try {
+    await pedir(API + '/borrar', { ids })
+  } catch (e) {
+    alert('No pude eliminarlas: ' + e.message)
+    return
+  }
+  if (ids.includes(actual)) { actual = null; history.replaceState(null, '', location.pathname) }
+  firma = ''
+  modoEleccion = false
+  cargarLista()
+}
+
+let modoEleccion = false
+function elegirVarias () {
+  modoEleccion = true
+  $('pestanas').replaceChildren()
+  $('info').replaceChildren('Marca las que quieras eliminar.')
+  const cont = el('div', { className: 'eleccion' })
+  const cuenta = el('button', { type: 'button', className: 'peligro', textContent: 'Eliminar (0)' })
+  const marcadas = () => [...cont.querySelectorAll('input:checked')].map((c) => c.value)
+  cont.onchange = () => { cuenta.textContent = `Eliminar (${marcadas().length})` }
+  cuenta.onclick = () => eliminar(marcadas())
+  const todas = boton('Marcar todas', () => { cont.querySelectorAll('input').forEach((c) => { c.checked = true }); cont.onchange() })
+  const salir = boton('Cancelar', () => { modoEleccion = false; firma = ''; actual = null; cargarLista() })
+  cont.append(el('div', { className: 'acciones' }, cuenta, todas, salir))
+  const grupos = new Map()
+  for (const p of lista) {
+    if (!grupos.has(p.tipo)) grupos.set(p.tipo, [el('h4', { textContent: NOMBRES[p.tipo] || p.tipo.replace(/-/g, ' ') })])
+    grupos.get(p.tipo).push(el('label', {}, el('input', { type: 'checkbox', value: p.id }),
+      `${p.fecha} · ${p.titulo}${p.roles.length ? ' · ' + p.roles.join(', ') : ''}`))
+  }
+  for (const g of grupos.values()) cont.append(...g)
+  $('contenido').replaceChildren(cont)
+}
+
 async function cargarLista () {
-  let lista
+  if (modoEleccion) return   // no cambiar la lista mientras David marca
   try {
     lista = (await pedir(API)).propuestas
   } catch (e) {
@@ -350,6 +401,8 @@ async function cargarLista () {
 if (EN_APP) $('elegir').before(el('a', { href: '/app/', textContent: '‹ Chat', className: 'volver' }))
 $('elegir').onchange = () => { history.replaceState(null, '', '#' + encodeURIComponent($('elegir').value)); cargarLista() }
 $('recargar').onclick = () => { firma = ''; cargarLista() }
+$('borrar').onclick = () => { if (actual && !modoEleccion) eliminar([actual]) }
+$('seleccionar').onclick = () => { if (lista.length) elegirVarias() }
 addEventListener('hashchange', () => cargarLista())
 cargarLista()
 // Un panel tarda: la lista se refresca sola para que aparezca el nuevo.
