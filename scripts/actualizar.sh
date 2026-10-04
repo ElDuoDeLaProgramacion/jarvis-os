@@ -7,6 +7,8 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p logs
+# Cuando lo corre el cron o una tarea de Windows (sin terminal), todo va al registro.
+[ -t 1 ] || exec >>logs/actualizar.log 2>&1
 exec 8>logs/.actualizar.lock
 flock -n 8 || exit 0
 

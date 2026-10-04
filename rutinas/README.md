@@ -48,4 +48,5 @@ powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\instalar-inicio.ps
 - Instala antes el HUD (`hud\instalar.bat`) y la voz (`voz\instalar.bat`). Si solo quieres el HUD, añade `-SinVoz`.
 - Para que el HUD ocupe toda la pantalla, añade `-PantallaCompleta`.
 - Si tu distribución de WSL no se llama `Ubuntu`, añade `-Distro "NombreExacto"`.
+- También crea la tarea **Actualizar**: al iniciar sesión y cada 2 horas trae lo nuevo de GitHub, sin `git pull` a mano (registro en `logs\actualizar.log`). Si no la quieres, añade `-SinActualizar`.
 - Para quitarlo: `powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\desinstalar-inicio.ps1`

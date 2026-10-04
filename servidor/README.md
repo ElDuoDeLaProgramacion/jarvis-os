@@ -118,9 +118,9 @@ Get-ScheduledTask -TaskPath "\JARVIS\" | Disable-ScheduledTask
 Para volver atrás, cambia `Disable` por `Enable`. Si cambias `rutinas/rutinas.csv`, en el servidor ejecuta `./servidor/rutinas.sh`.
 
 ## Día a día
-- **Actualizar:** `cd jarvis-os && git pull && sudo systemctl restart jarvis-app jarvis-whatsapp`
+- **Actualizar:** es automático. Cada 15 minutos el servidor trae lo nuevo de GitHub (`scripts/actualizar.sh`) y reinicia lo que cambió; queda anotado en `logs/actualizar.log`. Si cambió `servidor/instalar.sh` (paquetes nuevos), el registro te pide correrlo. Para forzarlo ya: `./scripts/actualizar.sh`.
 - **Ver si todo corre:** `systemctl status jarvis-app jarvis-whatsapp`
-- **Registros:** `logs/jarvis.log`, `logs/whatsapp.log`, `logs/rutinas.log` y `journalctl -u jarvis-app`
+- **Registros:** `logs/jarvis.log`, `logs/whatsapp.log`, `logs/rutinas.log`, `logs/actualizar.log` y `journalctl -u jarvis-app`
 
 ## Lo que no se puede con el PC apagado
 - El volumen y "abre Spotify" por voz del PC. Desde la app, la música funciona si conectaste Spotify en el servidor (arriba).

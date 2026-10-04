@@ -70,7 +70,15 @@ else
   echo "y vuelve a correr este instalador."
 fi
 
-paso "Rutinas (cron)"
+paso "Actualización automática"
+# scripts/actualizar.sh (cron, cada 15 min) solo puede reiniciar los servicios de JARVIS, nada más.
+regla=/etc/sudoers.d/jarvis-actualizar
+sc=$(command -v systemctl)
+echo "$YO ALL=(root) NOPASSWD: $sc restart jarvis-app, $sc restart jarvis-app jarvis-whatsapp" | sudo tee "$regla" >/dev/null
+sudo chmod 440 "$regla"
+sudo visudo -cf "$regla" >/dev/null || { sudo rm -f "$regla"; echo "Aviso: no pude crear $regla"; }
+
+paso "Rutinas y actualización (cron)"
 ./servidor/rutinas.sh
 
 paso "Syncthing (bóveda sincronizada con el PC)"
