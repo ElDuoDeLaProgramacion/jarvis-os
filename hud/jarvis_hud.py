@@ -82,6 +82,11 @@ class Api:
         except Exception:
             pass
 
+    def abrir_propuestas(self):
+        """Botón Propuestas: lo que proponen los paneles de IAs, en su propia ventana."""
+        webview.create_window("JARVIS · Propuestas", f"{URL}/propuestas", width=1400, height=900,
+                              background_color=FONDO)
+
 
 def main():
     p = argparse.ArgumentParser(description="HUD de JARVIS")

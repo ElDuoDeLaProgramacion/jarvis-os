@@ -6,6 +6,7 @@ tags: [jarvis, memoria]
 
 > Qué se decidió, cuándo y por qué. La más reciente va arriba. Relacionado: [[aprendizajes]], [[proyectos/jarvis-os]].
 
+- 2026-10-04 · Paneles de IAs en todo trabajo grande (código, diseño, planes grandes, marketing, ideas), con Claude al mando verificando; lo rápido y personal lo hace Claude solo. Las IAs externas reciben la memoria de la bóveda sin lo privado (chats, correos, personas, dinero, diario, seguridad), para que todas trabajen con el mismo cerebro.
 - 2026-10-04 · Un solo JARVIS: la voz y el HUD del PC mandan los pedidos al servidor (misma memoria, .env y conversación que el celular). Lo que toca archivos, proyectos, pantalla o copiloto se sigue haciendo en el PC. Obsidian abre la copia de la bóveda que Syncthing sincroniza.
 - 2026-10-04 · El servidor y el PC se actualizan solos desde GitHub (servidor cada 15 min, PC al iniciar sesión y cada 2 h) en vez de hacer git pull a mano. Se descartó una app de escritorio conectada al servidor porque el PC perdería archivos, programación, copiloto y gestos.
 - 2026-10-04 · JARVIS hace pruebas de seguridad solo de los sistemas de David (este equipo, el servidor y lo que esté en `JARVIS_OBJETIVOS_SEGURIDAD`), sin fuerza bruta, exploits ni cambios: da los comandos para arreglar.

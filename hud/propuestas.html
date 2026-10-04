@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Lo que muestra esta página lo escriben IAs externas: se limpia con DOMPurify y lo que se ejecuta
+     (maquetas HTML, diagramas) va en iframes aislados, sin acceso a la API ni a la bóveda. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self'; frame-src 'self' about: blob: data:; base-uri 'none'; form-action 'none'">
+<title>JARVIS · Propuestas</title>
+<link rel="stylesheet" href="vendor/highlight.css">
+<style>
+  :root {
+    --fondo: #07080a; --panel: #0d0f12; --panel-2: #12151a; --linea: #1d2127; --texto: #c9cdd3; --claro: #eef0f2;
+    --tenue: #6b727c; --acento: #c6e84b; --acento-2: #8b6cf2; --peligro: #f06b5b;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--fondo); color: var(--texto); font: 14px/1.55 system-ui, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    padding: 12px 16px; background: var(--fondo); border-bottom: 1px solid var(--linea); }
+  header h1 { margin: 0; font: 600 15px var(--mono); letter-spacing: .3em; color: var(--claro); }
+  header h1 small { color: var(--acento); letter-spacing: .2em; font-weight: 500; }
+  select, button { background: var(--panel); color: var(--texto); border: 1px solid var(--linea); font: 12px var(--mono);
+    padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+  button:hover, select:hover { border-color: var(--acento); color: var(--acento); }
+  header h1 { white-space: nowrap; }
+  #elegir { flex: 1 1 220px; min-width: 0; max-width: 520px; }
+  #info { padding: 10px 16px 0; color: var(--tenue); font-size: 13px; }
+  #info b { color: var(--claro); font-weight: 500; }
+  nav { display: flex; gap: 6px; overflow-x: auto; padding: 12px 16px; border-bottom: 1px solid var(--linea); }
+  nav button { white-space: nowrap; flex: none; }
+  nav button.activo { color: var(--fondo); background: var(--acento); border-color: var(--acento); }
+  main { padding: 16px; }
+  .vacio { color: var(--tenue); text-align: center; padding: 60px 16px; }
+  .rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 14px; align-items: start; }
+  .tarjeta { background: var(--panel); border: 1px solid var(--linea); border-radius: 10px; min-width: 0; }
+  .tarjeta > h3 { margin: 0; padding: 10px 14px; font: 500 12px var(--mono); color: var(--acento-2);
+    border-bottom: 1px solid var(--linea); display: flex; justify-content: space-between; gap: 8px; }
+  .tarjeta > h3 small { color: var(--tenue); }
+  .cuerpo { padding: 4px 14px 12px; overflow-wrap: anywhere; }
+  .cuerpo.conclusion { max-width: 900px; }
+  .error { color: var(--peligro); }
+  .cuerpo h1, .cuerpo h2, .cuerpo h3, .cuerpo h4 { color: var(--claro); line-height: 1.3; }
+  .cuerpo h1 { font-size: 20px; } .cuerpo h2 { font-size: 17px; } .cuerpo h3, .cuerpo h4 { font-size: 15px; }
+  .cuerpo a { color: var(--acento); }
+  .cuerpo table { border-collapse: collapse; display: block; overflow-x: auto; }
+  .cuerpo th, .cuerpo td { border: 1px solid var(--linea); padding: 4px 8px; }
+  .cuerpo blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--acento-2); color: var(--tenue); }
+  .cuerpo :not(pre) > code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font: 12.5px var(--mono); }
+  .bloque { margin: 12px 0; border: 1px solid var(--linea); border-radius: 8px; overflow: hidden; background: #0d1117; }
+  .bloque .barra { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 5px 8px; background: var(--panel-2);
+    border-bottom: 1px solid var(--linea); font: 11px var(--mono); color: var(--tenue); }
+  .bloque .barra > span:first-child { flex: 1 1 120px; min-width: 0; text-transform: uppercase; letter-spacing: .1em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bloque .barra .modelo { text-transform: none; letter-spacing: 0; color: var(--acento-2); }
+  .bloque .barra button { padding: 3px 8px; font-size: 11px; }
+  .bloque pre { margin: 0; padding: 12px; overflow: auto; max-height: 560px; font: 12.5px/1.5 var(--mono); }
+  .bloque pre code.hljs { padding: 0; background: none; }
+  .bloque iframe { display: block; width: 100%; border: 0; background: #fff; }
+  .vista { resize: vertical; overflow: hidden; height: 460px; min-height: 160px; }
+  .vista iframe { height: 100%; }
+  .diagrama iframe { background: transparent; height: 120px; }
+  .oculto { display: none !important; }
+  .volver { color: var(--acento); text-decoration: none; font: 12px var(--mono); }
+  .diapos { background: var(--panel-2); }
+  .diapo { aspect-ratio: 16 / 9; max-height: 70vh; margin: 0 auto; padding: 5% 7%; overflow: auto; background: #0f1218;
+    color: var(--claro); display: flex; flex-direction: column; justify-content: center; }
+  .diapo h1, .diapo h2 { color: var(--acento); font-size: clamp(18px, 3vw, 30px); margin: 0 0 .6em; }
+  .diapo li, .diapo p { font-size: clamp(13px, 1.7vw, 19px); }
+  .diapos:fullscreen .diapo { max-height: none; height: 100vh; aspect-ratio: auto; }
+  .vista:fullscreen { height: 100vh; }
+  .galeria .bloque { margin: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>JARVIS <small>· PROPUESTAS</small></h1>
+  <select id="elegir" aria-label="Panel"></select>
+  <button id="recargar" type="button" title="Buscar paneles nuevos">Actualizar</button>
+</header>
+<div id="info"></div>
+<nav id="pestanas"></nav>
+<main id="contenido"><div class="vacio">Cargando…</div></main>
+
+<script src="vendor/marked.js"></script>
+<script src="vendor/purify.js"></script>
+<script src="vendor/highlight.js"></script>
+<script>
+const $ = (id) => document.getElementById(id)
+// En el HUD del PC no hace falta clave; servida por la app del servidor (/app/propuestas) usa la de la app.
+const EN_APP = location.pathname.startsWith('/app/')
+const API = '/api/propuestas'
+const MERMAID = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js'
+const VISUALES = ['html', 'mermaid', 'slides', 'svg']
+let actual = null, datos = null, pestana = null, firma = ''
+
+function cabeceras () {
+  if (!EN_APP) return {}
+  let token = ''
+  try { token = localStorage.getItem('jarvis-token') || '' } catch (e) {}
+  return { Authorization: 'Bearer ' + token }
+}
+
+async function pedir (ruta) {
+  const r = await fetch(ruta, { headers: cabeceras(), cache: 'no-store' })
+  if (r.status === 401) throw new Error('Abre la app de JARVIS y entra con tu clave; luego vuelve aquí.')
+  if (!r.ok) throw new Error('No pude leer las propuestas (' + r.status + ').')
+  return r.json()
+}
+
+function el (etiqueta, props = {}, ...hijos) {
+  const e = document.createElement(etiqueta)
+  Object.assign(e, props)
+  for (const h of hijos) if (h != null) e.append(h)
+  return e
+}
+
+function markdown (texto) {
+  const div = el('div')
+  div.innerHTML = DOMPurify.sanitize(marked.parse(texto || '', { gfm: true, breaks: false }))
+  for (const a of div.querySelectorAll('a')) { a.target = '_blank'; a.rel = 'noopener noreferrer' }
+  return div
+}
+
+function lenguaje (code) {
+  const m = /language-([\w+#.-]+)/.exec(code.className || '')
+  return m ? m[1].toLowerCase() : ''
+}
+
+function boton (texto, alClic) {
+  return el('button', { type: 'button', textContent: texto, onclick: alClic })
+}
+
+function copiar (texto, b) {
+  const listo = () => { const t = b.textContent; b.textContent = 'Copiado'; setTimeout(() => { b.textContent = t }, 1200) }
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(texto).then(listo, () => {})
+  else {
+    const area = el('textarea', { value: texto }); document.body.append(area); area.select()
+    try { document.execCommand('copy'); listo() } catch (e) {}
+    area.remove()
+  }
+}
+
+function pantallaCompleta (nodo) {
+  if (document.fullscreenElement) document.exitFullscreen()
+  else if (nodo.requestFullscreen) nodo.requestFullscreen()
+}
+
+// Un iframe sin allow-same-origin: lo de dentro corre aislado y no puede llamar a la API ni leer la página.
+function aislado (html) {
+  const f = el('iframe', { title: 'Vista previa', loading: 'lazy' })
+  f.setAttribute('sandbox', 'allow-scripts allow-modals allow-forms allow-popups')
+  f.srcdoc = html
+  return f
+}
+
+const escapar = (t) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+
+function diagrama (codigo) {
+  const f = aislado(`<!doctype html><meta charset="utf-8"><style>body{margin:0;padding:12px;background:#0d1117;color:#ddd;font:13px system-ui}</style>
+<pre class="mermaid">${escapar(codigo)}</pre><script src="${MERMAID}"><\/script><script>
+const avisar = (fallo) => parent.postMessage({ alto: document.documentElement.scrollHeight, fallo }, '*')
+if (!window.mermaid) { document.body.textContent = 'Sin internet no puedo dibujar el diagrama; abajo está el código.'; avisar(true) }
+else { mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' })
+  mermaid.run().then(() => setTimeout(avisar, 50), (e) => { document.body.textContent = 'No pude dibujarlo: ' + e.message; avisar(true) }) }
+<\/script>`)
+  return f
+}
+
+addEventListener('message', (e) => {
+  if (!e.data || typeof e.data.alto !== 'number') return
+  for (const f of document.querySelectorAll('.diagrama iframe')) {
+    if (f.contentWindow !== e.source) continue
+    f.style.height = Math.min(Math.max(e.data.alto, 40), 1400) + 'px'
+    if (e.data.fallo) f.closest('.bloque').querySelector('pre').classList.remove('oculto')
+  }
+})
+
+function diapositivas (codigo) {
+  const partes = codigo.split(/^\s*---+\s*$/m).map((p) => p.trim()).filter(Boolean)
+  let i = 0
+  const cont = el('div', { className: 'diapos' })
+  const hoja = el('div', { className: 'diapo' })
+  const cuenta = el('span')
+  const pintar = () => {
+    hoja.replaceChildren(...markdown(partes[i]).childNodes)
+    cuenta.textContent = `${i + 1} / ${partes.length}`
+  }
+  const ir = (d) => { i = Math.min(Math.max(i + d, 0), partes.length - 1); pintar() }
+  cont.tabIndex = 0
+  cont.onkeydown = (e) => { if (e.key === 'ArrowRight' || e.key === ' ') ir(1); if (e.key === 'ArrowLeft') ir(-1) }
+  hoja.onclick = () => ir(1)
+  cont.append(hoja)
+  pintar()
+  return { cont, controles: [boton('‹', () => ir(-1)), cuenta, boton('›', () => ir(1)),
+    boton('Pantalla completa', () => pantallaCompleta(cont))] }
+}
+
+// Convierte cada bloque ``` en algo útil: código resaltado, maqueta en vivo, diagrama o diapositivas.
+function mejorarBloques (raiz, modelo) {
+  for (const code of [...raiz.querySelectorAll('pre > code')]) {
+    const pre = code.parentElement
+    const leng = lenguaje(code)
+    const fuente = code.textContent
+    const caja = el('div', { className: 'bloque' })
+    const barra = el('div', { className: 'barra' })
+    caja.dataset.leng = leng
+    barra.append(el('span', {}, leng === 'slides' ? 'presentación' : leng === 'mermaid' ? 'diagrama' : (leng || 'texto'),
+      modelo ? el('small', { className: 'modelo', textContent: ' · ' + modelo }) : null))
+    const verCodigo = el('pre', {}, el('code', { className: leng && hljs.getLanguage(leng) ? 'language-' + leng : '', textContent: fuente }))
+    try { hljs.highlightElement(verCodigo.firstChild) } catch (e) {}
+
+    if (leng === 'html' || leng === 'svg') {
+      const vista = el('div', { className: 'vista' }, aislado(leng === 'svg' ? `<body style="margin:0">${fuente}` : fuente))
+      verCodigo.classList.add('oculto')
+      const alternar = boton('Ver código', () => {
+        const mostrar = verCodigo.classList.toggle('oculto')
+        vista.classList.toggle('oculto', !mostrar)
+        alternar.textContent = mostrar ? 'Ver código' : 'Vista previa'
+      })
+      barra.append(alternar, boton('Pantalla completa', () => pantallaCompleta(vista)), boton('Copiar', function () { copiar(fuente, this) }))
+      caja.append(barra, vista, verCodigo)
+    } else if (leng === 'mermaid') {
+      const vista = el('div', { className: 'diagrama' }, diagrama(fuente))
+      verCodigo.classList.add('oculto')
+      barra.append(boton('Ver código', () => verCodigo.classList.toggle('oculto')), boton('Copiar', function () { copiar(fuente, this) }))
+      caja.append(barra, vista, verCodigo)
+    } else if (leng === 'slides') {
+      const d = diapositivas(fuente)
+      barra.append(...d.controles, boton('Copiar', function () { copiar(fuente, this) }))
+      caja.append(barra, d.cont)
+    } else {
+      barra.append(boton('Copiar', function () { copiar(fuente, this) }))
+      caja.append(barra, verCodigo)
+    }
+    pre.replaceWith(caja)
+  }
+}
+
+function tarjeta (r) {
+  const t = el('section', { className: 'tarjeta' })
+  t.append(el('h3', {}, r.modelo || 'IA', el('small', { textContent: r.proveedor || '' })))
+  const c = el('div', { className: 'cuerpo' })
+  if (r.error) c.append(el('p', { className: 'error', textContent: 'Error: ' + r.error }))
+  else { c.append(...markdown(r.texto).childNodes); mejorarBloques(c, '') }
+  t.append(c)
+  return t
+}
+
+function verPestana (clave) {
+  pestana = clave
+  for (const b of $('pestanas').children) b.classList.toggle('activo', b.dataset.clave === clave)
+  const main = $('contenido')
+  main.replaceChildren()
+  if (clave === 'conclusion') {
+    const c = el('div', { className: 'cuerpo conclusion' })
+    c.append(...markdown(datos.conclusion.replace(/^---\n[\s\S]*?\n---\n/, '')).childNodes)
+    mejorarBloques(c, '')
+    main.append(c)
+  } else if (clave === 'galeria') {
+    // Solo lo que se ve: maquetas, diagramas, presentaciones y código, de todas las IAs juntas.
+    const g = el('div', { className: 'rejilla galeria' })
+    for (const p of datos.paneles) for (const r of p.respuestas || []) {
+      if (r.error) continue
+      const tmp = markdown(r.texto)
+      mejorarBloques(tmp, `${r.modelo} (${p.rol})`)
+      for (const b of tmp.querySelectorAll('.bloque')) g.append(b)
+    }
+    main.append(g.children.length ? g : el('div', { className: 'vacio', textContent: 'Las IAs no propusieron código, maquetas ni diagramas en este panel.' }))
+  } else {
+    const p = datos.paneles[Number(clave)]
+    const g = el('div', { className: 'rejilla' })
+    for (const r of p.respuestas || []) g.append(tarjeta(r))
+    main.append(g)
+  }
+  try { localStorage.setItem('jarvis-propuestas-pestana', clave) } catch (e) {}
+}
+
+async function abrir (id) {
+  actual = id
+  $('elegir').value = id
+  try {
+    datos = await pedir(API + '/' + encodeURIComponent(id))
+  } catch (e) {
+    $('contenido').replaceChildren(el('div', { className: 'vacio', textContent: e.message }))
+    return
+  }
+  const pregunta = datos.paneles.map((p) => p.pregunta).find(Boolean) || ''
+  $('info').replaceChildren(el('b', { textContent: id }), pregunta ? ' · ' + pregunta.split('\n')[0].slice(0, 200) : '')
+  const tabs = []
+  if (datos.conclusion) tabs.push(['conclusion', 'Conclusión'])
+  tabs.push(['galeria', 'Lo visual'])
+  datos.paneles.forEach((p, i) => tabs.push([String(i), `${p.rol} (${(p.respuestas || []).length})`]))
+  $('pestanas').replaceChildren(...tabs.map(([clave, texto]) => {
+    const b = boton(texto, () => verPestana(clave)); b.dataset.clave = clave; return b
+  }))
+  let guardada = null
+  try { guardada = localStorage.getItem('jarvis-propuestas-pestana') } catch (e) {}
+  verPestana(tabs.some(([c]) => c === pestana) ? pestana : tabs.some(([c]) => c === guardada) ? guardada : tabs[0][0])
+}
+
+async function cargarLista () {
+  let lista
+  try {
+    lista = (await pedir(API)).propuestas
+  } catch (e) {
+    $('contenido').replaceChildren(el('div', { className: 'vacio', textContent: e.message }))
+    return
+  }
+  if (!lista.length) {
+    $('elegir').replaceChildren(el('option', { textContent: 'Sin paneles todavía' }))
+    $('contenido').replaceChildren(el('div', { className: 'vacio', textContent:
+      'Aún no hay propuestas. Pídele a JARVIS un panel, por ejemplo: "que varias IAs propongan la landing de mi canal".' }))
+    return
+  }
+  $('elegir').replaceChildren(...lista.map((p) => el('option', { value: p.id,
+    textContent: `${p.fecha} · ${p.titulo}${p.roles.length ? ' · ' + p.roles.join(', ') : ''}` })))
+  // Sin elegir uno (#id en la dirección), se sigue el más nuevo: así aparece solo el panel que está en marcha.
+  const pedido = decodeURIComponent(location.hash.slice(1))
+  const p = lista.find((x) => x.id === pedido) || lista[0]
+  const nueva = p.id + '|' + p.roles.join(',') + '|' + p.conclusion
+  if (p.id !== actual || nueva !== firma) { firma = nueva; abrir(p.id) } else $('elegir').value = actual
+}
+
+if (EN_APP) $('elegir').before(el('a', { href: '/app/', textContent: '‹ Chat', className: 'volver' }))
+$('elegir').onchange = () => { history.replaceState(null, '', '#' + encodeURIComponent($('elegir').value)); cargarLista() }
+$('recargar').onclick = () => { firma = ''; cargarLista() }
+addEventListener('hashchange', () => cargarLista())
+cargarLista()
+// Un panel tarda: la lista se refresca sola para que aparezca el nuevo.
+setInterval(() => { if (!document.hidden) cargarLista() }, 20000)
+</script>
+</body>
+</html>

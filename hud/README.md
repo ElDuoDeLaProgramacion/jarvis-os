@@ -30,6 +30,10 @@ El botón **＋ Analizar** (o decir "Jarvis, analiza este archivo") abre una ven
 - Abierta por voz: JARVIS transcribe audio y video y te responde hablando.
 - Abierta con el botón: el análisis va a la cola y aparece en "Actividad" (audio y video sin transcribir).
 
+## Propuestas de las IAs
+
+El botón **Propuestas** (o "Jarvis, abre las propuestas") abre `http://localhost:7777/propuestas`: lo que propusieron los paneles de IAs (habilidad `panel`), con la conclusión, una pestaña "Lo visual" (maquetas HTML en vivo, diagramas, presentaciones y código con botón de copiar) y una columna por IA. Lee `boveda/outputs/panel/`. Las maquetas corren en un marco aislado, sin acceso a la API del HUD. Las bibliotecas van en `hud/vendor/`; los diagramas cargan Mermaid de internet solo cuando hacen falta.
+
 ## Cambiar los botones
 
 Edita la lista `COMANDOS` al inicio de `hud/servidor.py`: cada entrada es `("Etiqueta", "pedido que se encola")`.

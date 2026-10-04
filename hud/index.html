@@ -134,6 +134,7 @@
     <input id="pedido" placeholder="Pídele algo a JARVIS… (se encola y se ejecuta)" autocomplete="off">
     <button>Enviar</button>
     <button type="button" id="abrir-analizar" title="Analizar archivos, enlaces o texto">＋ Analizar</button>
+    <button type="button" id="abrir-propuestas" title="Lo que proponen los paneles de IAs: código, diseños, presentaciones">Propuestas</button>
   </form>
 </main>
 
@@ -408,6 +409,11 @@ async function enviarAnalisis() {
   }
 }
 $("abrir-analizar").onclick = () => abrirAnalizar(false);
+$("abrir-propuestas").onclick = () => {
+  // En el programa del HUD, ventana propia; en un navegador, otra pestaña.
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.abrir_propuestas) window.pywebview.api.abrir_propuestas();
+  else window.open("/propuestas", "jarvis-propuestas");
+};
 $("a-subir").onclick = () => $("a-archivos").click();
 $("a-archivos").onchange = e => { agregarArchivos(e.target.files); e.target.value = ""; };
 $("a-web").onclick = () => { $("a-entrada").placeholder = "Pega el enlace (https://...) y pulsa Enter"; $("a-entrada").focus(); };

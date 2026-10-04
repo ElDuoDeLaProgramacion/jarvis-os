@@ -21,7 +21,7 @@ import time
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 RAIZ = Path(__file__).resolve().parent.parent
 BOVEDA = RAIZ / "boveda"
@@ -157,6 +157,64 @@ def leer_nota(ruta):
     if BOVEDA.resolve() not in destino.parents or destino.suffix != ".md" or not destino.exists():
         return None
     return destino.read_text(encoding="utf-8", errors="replace")
+
+
+# ---------- Propuestas de los paneles de IAs ----------
+# La habilidad "panel" deja cada panel en outputs/panel/AAAA-MM-DD-<tema>/ (un panel-<rol>.json por
+# especialidad) y la conclusión al lado, en outputs/panel/AAAA-MM-DD-<tema>.md.
+PANELES = BOVEDA / "outputs" / "panel"
+ID_PANEL = re.compile(r"[\w-][\w.-]*")
+VENDOR = HUD / "vendor"
+
+
+def propuestas_lista(limite=40):
+    if not PANELES.is_dir():
+        return []
+    carpetas = sorted((c for c in PANELES.iterdir() if c.is_dir() and ID_PANEL.fullmatch(c.name)),
+                      key=lambda c: c.stat().st_mtime, reverse=True)
+    lista = []
+    for c in carpetas[:limite]:
+        roles = []
+        for j in sorted(c.glob("*.json")):
+            try:
+                roles.append(json.loads(j.read_text(encoding="utf-8")).get("rol") or j.stem)
+            except (ValueError, OSError):
+                continue
+        m = re.match(r"(\d{4}-\d{2}-\d{2})-?(.*)", c.name)
+        lista.append({"id": c.name, "fecha": m.group(1) if m else "",
+                      "titulo": (m.group(2) if m else c.name).replace("-", " ") or c.name,
+                      "roles": roles, "conclusion": (PANELES / f"{c.name}.md").is_file()})
+    return lista
+
+
+def propuesta(id_panel):
+    """Todo lo de un panel: la conclusión y las respuestas de cada IA. None si no existe."""
+    if not ID_PANEL.fullmatch(id_panel or ""):
+        return None
+    carpeta = PANELES / id_panel
+    if not carpeta.is_dir():
+        return None
+    paneles = []
+    for j in sorted(carpeta.glob("*.json")):
+        if j.stat().st_size > 5 * 1024 * 1024:
+            continue
+        try:
+            datos = json.loads(j.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            continue
+        if isinstance(datos, dict) and isinstance(datos.get("respuestas"), list):
+            paneles.append(datos)
+    conclusion = PANELES / f"{id_panel}.md"
+    return {"id": id_panel, "paneles": paneles,
+            "conclusion": conclusion.read_text(encoding="utf-8", errors="replace") if conclusion.is_file() else None}
+
+
+def archivo_vendor(nombre):
+    """Bibliotecas de hud/vendor/ que usa la ventana de propuestas. None si no es una de ellas."""
+    ruta = (VENDOR / nombre).resolve()
+    if ruta.parent != VENDOR.resolve() or ruta.suffix not in (".js", ".css") or not ruta.is_file():
+        return None
+    return ruta
 
 
 # ---------- Cola ----------
@@ -374,15 +432,29 @@ class Manejador(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(cuerpo)
 
+    def _archivo(self, ruta):
+        cuerpo = ruta.read_bytes()
+        tipos = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+                 ".css": "text/css; charset=utf-8"}
+        self.send_response(200)
+        self.send_header("Content-Type", tipos.get(ruta.suffix, "application/octet-stream"))
+        self.send_header("Content-Length", str(len(cuerpo)))
+        self.end_headers()
+        self.wfile.write(cuerpo)
+
     def do_GET(self):
         url = urlparse(self.path)
-        if url.path in ("/", "/index.html", "/lienzo"):
-            cuerpo = (HUD / ("lienzo.html" if url.path == "/lienzo" else "index.html")).read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(cuerpo)))
-            self.end_headers()
-            self.wfile.write(cuerpo)
+        paginas = {"/": "index.html", "/index.html": "index.html", "/lienzo": "lienzo.html",
+                   "/propuestas": "propuestas.html"}
+        if url.path in paginas:
+            self._archivo(HUD / paginas[url.path])
+        elif url.path.startswith("/vendor/") and archivo_vendor(url.path[8:]):
+            self._archivo(archivo_vendor(url.path[8:]))
+        elif url.path == "/api/propuestas":
+            self._json({"propuestas": propuestas_lista()})
+        elif url.path.startswith("/api/propuestas/"):
+            datos = propuesta(unquote(url.path[16:]))
+            self._json(datos if datos else {"error": "no existe"}, 200 if datos else 404)
         elif url.path == "/api/estado":
             self._json(estado_completo())
         elif url.path == "/api/analizar/abrir":
