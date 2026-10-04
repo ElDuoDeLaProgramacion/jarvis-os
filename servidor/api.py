@@ -168,23 +168,24 @@ class Conversacion:
         """Anota el pedido y lo atiende en segundo plano. origen "pc": viene de la voz o el HUD del PC."""
         with self.cerrojo:
             self.ocupado += 1
-        self.anotar("yo", texto, **({"origen": origen} if origen != "app" else {}))
-        threading.Thread(target=self._atender, args=(texto, origen), daemon=True).start()
+        n = self.anotar("yo", texto, **({"origen": origen} if origen != "app" else {}))
+        threading.Thread(target=self._atender, args=(texto, origen, n), daemon=True).start()
+        return n
 
-    def _atender(self, texto, origen="app"):
+    def _atender(self, texto, origen="app", n=None):
         try:
             with self.turno:
                 orden = orden_musica(texto)
                 if orden:
-                    self.anotar("jarvis", musica_al_instante(orden))
+                    self.anotar("jarvis", musica_al_instante(orden), para=n)
                     return
                 inicio = time.time()
                 respuesta = self._jarvis(texto)
                 uri = self._musica_pedida(inicio, poner=origen != "pc")   # el PC la pone en su Spotify
                 if uri:
-                    self.anotar("jarvis", respuesta, abrir=uri)
+                    self.anotar("jarvis", respuesta, abrir=uri, para=n)
                 else:
-                    self.anotar("jarvis", respuesta)
+                    self.anotar("jarvis", respuesta, para=n)
         finally:
             with self.cerrojo:
                 self.ocupado -= 1
@@ -367,8 +368,8 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"error": "json"}, 400)
         if not texto:
             return self._json({"error": "vacío"}, 400)
-        self.conversacion.pedir(texto, origen)
-        self._json({"ok": True}, 202)
+        n = self.conversacion.pedir(texto, origen)
+        self._json({"ok": True, "n": n}, 202)   # la respuesta llevará "para": n
 
     def _voz(self):
         """Audio WAV de la app de Android: lo transcribe y lo pide como texto. Devuelve lo que entendió."""
@@ -391,8 +392,8 @@ class Manejador(BaseHTTPRequestHandler):
             archivo.unlink(missing_ok=True)
         if not es_pedido(texto):
             return self._json({"texto": ""}, 200)
-        self.conversacion.pedir(texto)
-        self._json({"texto": texto}, 202)
+        n = self.conversacion.pedir(texto)
+        self._json({"texto": texto, "n": n}, 202)
 
     def log_message(self, formato, *args):
         pass

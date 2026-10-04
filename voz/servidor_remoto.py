@@ -81,14 +81,15 @@ def preguntar(texto, limite_min=20):
     Lanza ConnectionError si el servidor no responde (apagado, sin Tailscale, clave mala)."""
     mensajes = _llamar("/api/conversacion?desde=0")["mensajes"]
     desde = mensajes[-1]["n"] if mensajes else 0
-    _llamar("/api/pedir", {"texto": texto, "origen": "pc"})
+    mio = _llamar("/api/pedir", {"texto": texto, "origen": "pc"}).get("n")
     fin = time.monotonic() + limite_min * 60
     while time.monotonic() < fin:
         time.sleep(1.5)
         datos = _llamar(f"/api/conversacion?desde={desde}")
-        if datos["ocupado"]:
+        # Solo la respuesta a este pedido: otro pedido (del celular) puede terminar mientras tanto.
+        suyos = [m for m in datos["mensajes"] if m["de"] == "jarvis" and (mio is None or m.get("para") == mio)]
+        if mio is None and datos["ocupado"]:
             continue
-        suyos = [m for m in datos["mensajes"] if m["de"] == "jarvis"]
         if suyos:
             abrir = next((m["abrir"] for m in reversed(suyos) if m.get("abrir")), None)
             return " ".join(m["texto"] for m in suyos), abrir
