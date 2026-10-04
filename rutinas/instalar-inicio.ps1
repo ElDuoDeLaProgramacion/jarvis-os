@@ -5,6 +5,7 @@ param(
     [string]$Distro = "Ubuntu",
     [switch]$SinVoz,
     [switch]$SinWhatsApp,
+    [switch]$SinActualizar,
     [switch]$PantallaCompleta
 )
 
@@ -43,6 +44,19 @@ if (-not $SinWhatsApp -and (Test-Path "$repo\whatsapp\sesion\creds.json")) {
     Registrar "WhatsApp" "cmd.exe" "/c start `"JARVIS WhatsApp`" /min wsl.exe -d $Distro --cd /mnt/p/jarvis-os --exec ./whatsapp/iniciar.sh" "PT40S"
 } elseif (-not $SinWhatsApp) {
     Write-Host "WhatsApp: aún sin vincular. En Ubuntu ejecuta ./whatsapp/iniciar.sh y escanea el QR (whatsapp\README.md)."
+}
+
+# Actualización automática: al iniciar sesión y cada 2 horas trae lo nuevo de GitHub (sin git pull a mano).
+# conhost --headless evita que se abra una ventana negra cada vez.
+if (-not $SinActualizar) {
+    $accion = New-ScheduledTaskAction -Execute "conhost.exe" `
+        -Argument "--headless wsl.exe -d $Distro --cd /mnt/p/jarvis-os --exec ./scripts/actualizar.sh"
+    $disparador = New-ScheduledTaskTrigger -AtLogOn -User $usuario
+    $disparador.Delay = "PT1M"
+    $disparador.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours 2)).Repetition
+    Register-ScheduledTask -TaskPath $carpeta -TaskName "Actualizar" -Action $accion `
+        -Trigger $disparador -Settings $ajustes -Force | Out-Null
+    Write-Host "OK  al iniciar sesión y cada 2 horas  ->  Actualizar (registro en logs\actualizar.log)"
 }
 
 Write-Host ""

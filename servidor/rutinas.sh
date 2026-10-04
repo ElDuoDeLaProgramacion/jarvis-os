@@ -12,6 +12,8 @@ with open("rutinas/rutinas.csv", encoding="utf-8") as f:
         hora, minuto = r["hora"].strip().split(":")
         pedido = shlex.quote(r["pedido"].strip()).replace("%", r"\%")
         print(f"{int(minuto)} {int(hora)} * * * cd {shlex.quote(repo)} && ./scripts/rutina.sh {pedido} >> logs/rutinas.log 2>&1")
+# Cada 15 minutos trae lo nuevo de GitHub (scripts/actualizar.sh), así no hace falta git pull.
+print(f"*/15 * * * * cd {shlex.quote(repo)} && ./scripts/actualizar.sh")
 print("# fin JARVIS rutinas")
 PY
 )
