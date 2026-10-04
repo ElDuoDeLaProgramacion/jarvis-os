@@ -403,6 +403,11 @@ class Manejador(BaseHTTPRequestHandler):
             return self._analizar()
         if ruta == "/api/lienzo":
             return self._lienzo()
+        if ruta == "/api/lienzo/camara":
+            # El lienzo avisa cada 2 s que quiere la cámara; los gestos de la voz la sueltan mientras tanto.
+            COLA.mkdir(exist_ok=True)
+            (COLA / "lienzo-camara").touch()
+            return self._json({"ok": True})
         if ruta != "/api/encolar":
             return self._json({"error": "no existe"}, 404)
         largo = int(self.headers.get("Content-Length", 0))
