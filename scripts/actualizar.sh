@@ -33,7 +33,7 @@ while IFS= read -r f; do
   git show "HEAD:$f" > "$mezcla/base"; git show "origin/main:$f" > "$mezcla/github"
   if git merge-file -q "$mezcla/$n" "$mezcla/base" "$mezcla/github"; then :
   else cp "$mezcla/tuya$n" "$mezcla/$n"; nota "$f: tus cambios y los de GitHub chocan; se queda tu versión"; fi
-  git checkout -q -- "$f"
+  git checkout -q HEAD -- "$f"   # índice y archivo: también si estaba preparado con git add
   mezcladas+=("$f")
 done < <(git diff --name-only HEAD origin/main -- boveda/)
 
