@@ -53,6 +53,8 @@ permitidas=(
   "Bash(git add:*)" "Bash(git commit:*)" "Bash(npm test:*)" "Bash(python3:*)" "Bash(pdftotext:*)"
   # Pruebas de seguridad: el script solo revisa (no cambia nada) y solo los sistemas de David.
   "Bash(scripts/seguridad.sh:*)" "Bash(./scripts/seguridad.sh:*)"
+  # IAs externas (Gemini, OpenRouter) para una segunda opinión; ya entra en python3, se nombra por claridad.
+  "Bash(python3 scripts/ia_externa.py:*)"
 )
 # Agentes especializados (.claude/agents/: programador, revisor, auditor, diseñador, juez, investigador).
 # Heredan estas mismas herramientas; en la cola (rutinas y botones) no se usan, por el gasto.

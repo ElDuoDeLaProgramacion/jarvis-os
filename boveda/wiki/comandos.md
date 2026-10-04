@@ -35,6 +35,7 @@ tags: [jarvis, ayuda]
 ## Agentes especializados
 - "pídele al auditor que revise el servidor", "que el revisor mire mi proyecto X", "que el diseñador proponga la pantalla de...", "junta al equipo para crear un programa que...".
 - Agentes: programador, revisor de código, auditor de seguridad, diseñador, juez de ideas, investigador. Gastan más uso: JARVIS los llama solo cuando vale la pena.
+- **IAs externas:** "pregúntale a Gemini...", "¿qué opina GPT de...?", "segunda opinión de otras IAs sobre...". Necesitan las claves `GEMINI_API_KEY` u `OPENROUTER_API_KEY` en `.env`.
 
 ## Seguridad (solo tus sistemas, sin cambiar nada)
 - "prueba la seguridad del servidor" / "audita este equipo": SSH, puertos, cortafuegos, actualizaciones, usuarios, intentos de entrada y lynis.
