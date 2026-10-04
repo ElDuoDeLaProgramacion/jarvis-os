@@ -7,7 +7,7 @@ tags: [jarvis, ayuda]
 > Todo empieza con "Jarvis, ...". También puedes escribirlo en la caja del HUD. Relacionado: [[inicio]], [[ideas-jarvis]].
 
 ## Al instante (sin pasar por Claude ni gastar uso)
-- **Abrir programas:** "abre Chrome / Word / Excel / Spotify / WhatsApp / la calculadora / VS Code".
+- **Abrir programas:** "abre Chrome / Word / Excel / Spotify / WhatsApp / la calculadora / VS Code". Aguanta errores de la voz ("abri, Spotify", "abre spotifai") y funciona también al contestar sin "Jarvis".
 - **Cerrar:**
   - "cierra esta pestaña"
   - "cierra la ventana"
