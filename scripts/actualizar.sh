@@ -19,9 +19,29 @@ if [ "$rama" != main ]; then nota "estás en la rama $rama, no actualizo"; exit 
 git fetch -q origin main || { nota "no pude conectar con GitHub"; exit 1; }
 antes=$(git rev-parse HEAD)
 [ "$antes" = "$(git rev-parse origin/main)" ] && exit 0
+
+# La bóveda cambia aquí (JARVIS, Syncthing) y a veces también en GitHub. Esas notas se mezclan
+# línea a línea antes de avanzar; si chocan de verdad, se queda tu versión y se anota.
+mezcla=$(mktemp -d); trap 'rm -rf "$mezcla"' EXIT
+mezcladas=()
+while IFS= read -r f; do
+  [ -n "$f" ] && [ -f "$f" ] || continue
+  git diff --quiet HEAD -- "$f" && continue
+  git cat-file -e "origin/main:$f" 2>/dev/null || continue
+  n=${#mezcladas[@]}
+  cp "$f" "$mezcla/$n"; cp "$f" "$mezcla/tuya$n"
+  git show "HEAD:$f" > "$mezcla/base"; git show "origin/main:$f" > "$mezcla/github"
+  if git merge-file -q "$mezcla/$n" "$mezcla/base" "$mezcla/github"; then :
+  else cp "$mezcla/tuya$n" "$mezcla/$n"; nota "$f: tus cambios y los de GitHub chocan; se queda tu versión"; fi
+  git checkout -q -- "$f"
+  mezcladas+=("$f")
+done < <(git diff --name-only HEAD origin/main -- boveda/)
+
 if ! salida=$(git merge -q --ff-only origin/main 2>&1); then
+  for i in "${!mezcladas[@]}"; do cp "$mezcla/tuya$i" "${mezcladas[$i]}"; done
   nota "no pude actualizar (¿cambios locales en los mismos archivos?):"; echo "$salida"; exit 1
 fi
+for i in "${!mezcladas[@]}"; do cp "$mezcla/$i" "${mezcladas[$i]}"; done
 cambios=$(git diff --name-only "$antes" HEAD)
 nota "actualizado $(git rev-parse --short "$antes") -> $(git rev-parse --short HEAD):"
 echo "$cambios" | sed 's/^/  /'
