@@ -27,6 +27,10 @@ scripts/          jarvis.sh (petición directa), encolar.sh, corredor.sh, rutina
 cola/             intenciones pendientes, en curso, hechas y fallidas
 rutinas/          horarios del día real para el Programador de tareas de Windows
 hud/              la pantalla de JARVIS (programa de Windows + servidor local)
+voz/              voz del PC: "Jarvis", gestos y Spotify
+whatsapp/         puente de WhatsApp por QR
+servidor/         API y app del celular para el servidor
+android/          app de Android que escucha "Jarvis" siempre
 ```
 
 ## Requisitos (Windows + WSL)
@@ -86,17 +90,25 @@ No hay comandos fijos: le hablas normal. Ejemplos:
 - "Revisa mis suscripciones" → "¿cuánto pago al mes?" → "¿cómo cancelo Netflix?"
 - "Recuerda que la reunión con el cliente es el lunes" → "¿qué sé del cliente?"
 - "Cierra el día"
+- "Prueba la seguridad del servidor" / "¿Qué puertos tiene abiertos?"
+
+La lista completa de lo que entiende está en la bóveda: `boveda/wiki/comandos.md`.
 
 ## WhatsApp
 JARVIS se vincula a tu WhatsApp con un QR, como WhatsApp Web. Le das órdenes en tu chat contigo mismo y te contesta ahí. También anota tus chats en la bóveda para leerlos y resumirlos, y te prepara respuestas que solo envía si dices "sí". Instalación y límites en [whatsapp/README.md](whatsapp/README.md).
 
 ## Servidor y app del celular
-JARVIS puede vivir en un servidor gratis de Oracle Cloud, con la bóveda dentro. Así WhatsApp, las rutinas y una app de chat con micrófono para el celular siguen funcionando con el PC apagado. La bóveda se sincroniza con el PC. Guía paso a paso en [servidor/README.md](servidor/README.md).
+JARVIS puede vivir en un servidor (Oracle Cloud gratis, Clouding u otro Ubuntu), con la bóveda dentro. Así WhatsApp, las rutinas y la app del celular siguen funcionando con el PC apagado. La bóveda se sincroniza con el PC. Guía paso a paso en [servidor/README.md](servidor/README.md).
+
+En el celular hay dos opciones: la app web (chat con micrófono) y la **app de Android**, que escucha "Jarvis" todo el tiempo, también con la pantalla apagada. El APK está en [Releases](https://github.com/ElDuoDeLaProgramacion/jarvis-os/releases/latest).
+
+## Actualizar
+Es automático: el servidor trae lo nuevo de GitHub cada 15 minutos y el PC al iniciar sesión y cada 2 horas (`scripts/actualizar.sh`). Nunca pisa cambios locales: si una nota de la bóveda cambió aquí y en GitHub, mezcla las dos, y si chocan se queda tu versión. Todo queda en `logs/actualizar.log`. Para forzarlo ya: `./scripts/actualizar.sh`. La app de Android se actualiza instalando el `jarvis.apk` nuevo encima.
 
 ## Arranque automático
 
 - Las rutinas de 7, 9, 14 y 19 h: `rutinas\instalar-rutinas.ps1`.
-- El HUD y la voz al iniciar sesión: `rutinas\instalar-inicio.ps1`.
+- El HUD, la voz y la actualización automática al iniciar sesión: `rutinas\instalar-inicio.ps1`.
 
 Detalles en [rutinas/README.md](rutinas/README.md).
 
@@ -162,3 +174,5 @@ Para dejar algo en cola tú mismo: `./scripts/encolar.sh "investiga X"` y luego 
 3. **HUD** (hecha): panel oscuro de una sola pantalla servido en local.
 4. **Voz** (hecha): palabra de activación "Jarvis" y gestos con la cámara en Windows, STT local (faster-whisper) y TTS local (voces de Windows o Piper).
 5. **Fuentes reales** (hecha): Gmail y Google Calendar por conectores de claude.ai; GitHub, YouTube, TikTok e Instagram con `scripts/canales.py`.
+6. **Fuera del PC** (hecha): WhatsApp, servidor con la bóveda sincronizada, app web y app de Android.
+7. **Seguridad y mantenimiento** (hecha): pruebas de seguridad de tus sistemas y actualización automática.

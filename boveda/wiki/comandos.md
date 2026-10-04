@@ -28,6 +28,18 @@ tags: [jarvis, ayuda]
 - **Memoria:** "recuerda que...", "¿qué decidí sobre...?", "limpieza de bóveda".
 - **Día a día:** "plan de hoy", "resumen matutino", "cierra el día", "revisa mis suscripciones", "tendencias".
 
+## Seguridad (solo tus sistemas, sin cambiar nada)
+- "prueba la seguridad del servidor" / "audita este equipo": SSH, puertos, cortafuegos, actualizaciones, usuarios, intentos de entrada y lynis.
+- "qué puertos tiene abiertos el servidor": escaneo con nmap (solo localhost o lo que esté en `JARVIS_OBJETIVOS_SEGURIDAD` del `.env`).
+- "revisa el certificado y las cabeceras de https://...": TLS y cabeceras de seguridad de una web tuya.
+- "busca vulnerabilidades en el proyecto ...": `npm audit` y `pip-audit`.
+- El informe queda en `outputs/seguridad/` con los comandos para arreglar; JARVIS no aplica nada solo.
+
+## Desde la app de Android
+- Di "Jarvis", espera el pitido y di el pedido. Funciona con la pantalla apagada. Si JARVIS pregunta algo, contestas tras el segundo pitido sin decir "Jarvis".
+- "pon música de Queen", "pausa", "siguiente": suena en el Spotify del celular.
+- Todo lo de "Con Claude" funciona igual, salvo lo que necesita el PC (archivos de `P:\`, pantalla, gestos, volumen).
+
 ## Desde el celular (WhatsApp)
 - Escríbete a ti mismo (el chat "Tú") lo mismo que le dirías por voz: "plan de hoy", "agéndame...", "resume mis correos". JARVIS contesta en ese chat. Ver `whatsapp/README.md`.
 - **Tus chats:** "¿qué me escribieron hoy?", "¿qué dijo Ana?", "respóndele a Ana que llego a las 8" (te muestra el mensaje y lo envía solo si dices "sí").
