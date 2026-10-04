@@ -6,6 +6,8 @@
 #   scripts/seguridad.sh puertos <host>           puertos abiertos y versiones (nmap, sin scripts intrusivos)
 #   scripts/seguridad.sh web <https://host[/..]>  cabeceras de seguridad, certificado y versiones de TLS
 #   scripts/seguridad.sh dependencias <carpeta>   vulnerabilidades conocidas en las dependencias de un proyecto
+#   scripts/seguridad.sh codigo <carpeta>         análisis estático del código y secretos olvidados (bandit, semgrep, gitleaks)
+#   scripts/seguridad.sh objetivos                los sistemas que se pueden probar (para auditar varios a la vez)
 #
 # Nada de fuerza bruta, exploits ni pruebas de carga: eso lo corre David a mano si quiere.
 set -uo pipefail
@@ -139,10 +141,54 @@ dependencias() {
   [ -f "$d/package-lock.json" ] || ls "$d"/requirements*.txt >/dev/null 2>&1 || echo "No encontré package-lock.json ni requirements*.txt"
 }
 
+carpeta_de_david() {
+  local d
+  d=$(realpath "$1" 2>/dev/null) || { echo "No existe: $1" >&2; exit 1; }
+  case "$d" in "$PWD"*|/mnt/p/*|"$HOME"/*) ;; *) echo "Fuera de las carpetas de David: $d" >&2; exit 2 ;; esac
+  echo "$d"
+}
+
+codigo() {
+  local d hubo=0
+  d=$(carpeta_de_david "$1") || exit $?
+  titulo "Análisis estático de $d"
+  if find "$d" -name '*.py' -not -path '*/.venv/*' -not -path '*/node_modules/*' | grep -q .; then
+    hubo=1
+    if command -v bandit >/dev/null; then
+      bandit -r "$d" -q -ll -x "$d/.venv,$d/venv,$d/node_modules" 2>&1 | tail -40
+    else falta bandit "pipx && pipx install bandit"; fi
+  fi
+  if command -v semgrep >/dev/null; then
+    hubo=1
+    titulo "Semgrep (reglas p/default)"
+    semgrep scan --config p/default --metrics=off --quiet --error --severity ERROR --severity WARNING "$d" 2>&1 | tail -60
+  else
+    echo "(semgrep no está instalado: pipx install semgrep — revisa JavaScript, Go, Java y más)"
+  fi
+  titulo "Secretos en el código"
+  if command -v gitleaks >/dev/null; then
+    gitleaks detect --source "$d" --no-banner --redact 2>&1 | tail -20
+  else
+    # Sin gitleaks: búsqueda simple de patrones comunes (sin mostrar el valor).
+    grep -rIinE --exclude-dir={.git,node_modules,.venv,venv} --exclude='*.lock' \
+      '(api[_-]?key|secret|token|password|passwd)["'"'"' ]*[:=][ "'"'"']*[A-Za-z0-9_\-]{12,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9]{20,}' \
+      "$d" 2>/dev/null | cut -d: -f1,2 | head -20 | sed 's/$/  (posible secreto; revisa esa línea)/'
+    echo "(para una búsqueda completa instala gitleaks: sudo apt install -y gitleaks)"
+  fi
+  [ "$hubo" = 1 ] || echo "No encontré código Python ni semgrep instalado para otros lenguajes."
+}
+
+objetivos() {
+  echo "localhost ($(hostname))"
+  echo "${JARVIS_OBJETIVOS_SEGURIDAD:-}" | tr ',;' '\n\n' | sed 's/^ *//; /^$/d'
+}
+
 case "${1:-}" in
   local) local_ ;;
   puertos) [ -n "${2:-}" ] || { echo "Falta el host"; exit 1; }; puertos "$2" ;;
   web) [ -n "${2:-}" ] || { echo "Falta la dirección"; exit 1; }; web "$2" ;;
   dependencias) [ -n "${2:-}" ] || { echo "Falta la carpeta"; exit 1; }; dependencias "$2" ;;
-  *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  codigo) [ -n "${2:-}" ] || { echo "Falta la carpeta"; exit 1; }; codigo "$2" ;;
+  objetivos) objetivos ;;
+  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

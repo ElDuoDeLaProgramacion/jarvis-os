@@ -1,6 +1,6 @@
 ---
 name: seguridad
-description: Pruebas de seguridad de los sistemas de David (el servidor de JARVIS, este equipo, sus webs y proyectos). Revisa SSH, puertos, cortafuegos, actualizaciones, cabeceras web, TLS y dependencias, y deja un informe con arreglos. Úsala para "prueba la seguridad del servidor", "audita...", "qué puertos tiene abiertos...", "revisa el certificado de..." o "busca vulnerabilidades en el proyecto...".
+description: Pruebas de seguridad de los sistemas de David (uno o varios servidores, este equipo, sus webs, programas y proyectos). Revisa SSH, puertos, cortafuegos, actualizaciones, cabeceras web, TLS, dependencias y el código de sus programas, y deja un informe con arreglos. Úsala para "prueba la seguridad del servidor", "audita...", "qué puertos tiene abiertos...", "revisa el certificado de..." o "busca vulnerabilidades en el proyecto...", "audita el código de..." o "audita todos mis servidores".
 ---
 # Seguridad
 
@@ -19,10 +19,14 @@ David es ingeniero de sistemas y de ciberseguridad: habla técnico, con nombres 
 | "qué puertos tiene abiertos X", "escanea X" | `scripts/seguridad.sh puertos <host>` |
 | una web o la app ("revisa https://...") | `scripts/seguridad.sh web <url>` |
 | un proyecto ("vulnerabilidades en las dependencias de X") | `scripts/seguridad.sh dependencias <carpeta>` |
+| el código de un programa ("audita el código de X", "¿tiene secretos o fallos de seguridad?") | `scripts/seguridad.sh codigo <carpeta>` y también `dependencias` |
+| "todos mis servidores", "audita todo" | `scripts/seguridad.sh objetivos` y, por cada uno, `puertos` (y `web` si tiene web) |
 
 "El servidor" es la máquina donde corres si `hostname` es `jarvis`; desde el PC, usa `puertos` y `web` contra su dirección (debe estar en la lista). Para una revisión completa combina `local`, `puertos` sobre su IP pública (lo que ve internet) y `web`.
 
 Si falta una herramienta (nmap, lynis, pip-audit), el script lo dice: pásale a David el comando de instalación.
+
+**Varios sistemas a la vez:** si son más de dos, lanza un agente `auditor-seguridad` por objetivo en paralelo (habilidad `equipo`) y junta todo en un informe `AAAA-MM-DD-todos.md` con una tabla resumen (objetivo, hallazgos Altos, Medios, Bajos) y un enlace a cada informe individual. En rutinas automáticas, hazlos uno tras otro sin agentes.
 
 ## Informe
 Escribe `boveda/outputs/seguridad/AAAA-MM-DD-<objetivo>.md` (frontmatter `fecha`, `tipo: seguridad`, `tags`):

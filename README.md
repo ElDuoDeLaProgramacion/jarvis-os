@@ -18,6 +18,7 @@ Totalmente modular: cualquier pieza se puede intercambiar.
 
 ```
 .claude/skills/   una carpeta por habilidad, cada una con su SKILL.md
+.claude/agents/   agentes especializados (programador, revisor, auditor, diseñador, juez, investigador)
 CLAUDE.md         reglas del enrutador
 boveda/           vault de Obsidian
   raw/            todo lo capturado (sin procesar)
@@ -148,21 +149,32 @@ Para probar los canales: `python3 scripts/canales.py`.
 | `whatsapp` | Lee y resume tus chats de WhatsApp y prepara respuestas que confirmas con "sí" | (no guarda nada) |
 | `copiloto` | Recomendaciones sin que las pidas mientras juegas ajedrez o programas (solo lectura) | (no guarda nada) |
 | `analizar` | Analiza archivos, PDFs, enlaces, YouTube, audio, video y texto desde la ventana de análisis | `outputs/analisis/` |
-| `seguridad` | Pruebas de seguridad de tus sistemas (SSH, puertos, cortafuegos, actualizaciones, web, TLS, dependencias) sin cambiar nada. Objetivos extra en `JARVIS_OBJETIVOS_SEGURIDAD` (.env) | `outputs/seguridad/` |
+| `seguridad` | Pruebas de seguridad de uno o varios sistemas (SSH, puertos, cortafuegos, actualizaciones, web, TLS, dependencias, código y secretos) sin cambiar nada. Objetivos extra en `JARVIS_OBJETIVOS_SEGURIDAD` (.env) | `outputs/seguridad/` |
+| `noticias` | Noticias del día de tus temas, con ⚠ en lo que te toca actuar | `outputs/noticias/` |
+| `aprender` | JARVIS aprende solo de noticias, tendencias e investigaciones y guarda conocimiento estable | `wiki/conocimiento/` |
+| `recomendar` | Recomendaciones según tu perfil, gustos y proyectos | `outputs/recomendaciones/` |
+| `evaluar-idea` | El agente juez puntúa una idea, con riesgos y cómo probarla barato | `outputs/ideas/` |
+| `equipo` | Reparte un pedido entre los agentes especializados y junta sus respuestas | `outputs/equipo/` |
 | `suscripciones` | Cobros recurrentes desde los recibos de Gmail: total al mes, renovaciones próximas y cómo cancelar | `wiki/suscripciones.md`, `outputs/suscripciones/` |
 | `boveda` | Lee y escribe memoria; mantiene el grafo enlazado | `raw/`, `wiki/` |
 | `cierre-dia` | Reflexión del día y cola de mañana | `outputs/diario/` |
 
 Regla: habilidades pequeñas de un solo propósito superan a un prompt gigante.
 
+### Agentes especializados
+
+En `.claude/agents/` hay seis agentes que JARVIS puede llamar (directamente o con la habilidad `equipo`): `programador`, `revisor-codigo`, `auditor-seguridad`, `disenador`, `juez-ideas` e `investigador`. Cada uno tiene sus propias instrucciones y herramientas, y trabajan en paralelo cuando el pedido lo permite ("audita todos mis servidores" lanza un auditor por servidor). Cada agente gasta uso de Claude como una petición entera, así que las rutinas automáticas no los usan.
+
 ## Día real (rutinas automáticas)
 
 | Hora | Rutina | Qué pasa |
 |---|---|---|
+| 6:45 | "Noticias" | Noticias de tus temas en `outputs/noticias/` |
 | 7:00 | "Resumen matutino" | Correo, agenda, pendientes y noticias, en `outputs/resumenes/` |
 | 9:00 | "Plan de hoy" | Las 3 prioridades aterrizan en la bóveda |
 | 14:00 | "Revisa pendientes" | Tareas del día y correos que esperan respuesta |
 | 19:00 | "Cierra el día" | Reflexión registrada, mañana en cola |
+| 19:30 | "Aprender" | Lo que vale la pena recordar de lo del día pasa a `wiki/conocimiento/` |
 | Siempre | Cualquier pregunta | La bóveda recuerda todo |
 
 Instálalas una vez en Windows siguiendo [rutinas/README.md](rutinas/README.md). Funcionan así: el Programador de tareas encola la intención en `cola/` y el corredor la ejecuta.
@@ -178,3 +190,4 @@ Para dejar algo en cola tú mismo: `./scripts/encolar.sh "investiga X"` y luego 
 5. **Fuentes reales** (hecha): Gmail y Google Calendar por conectores de claude.ai; GitHub, YouTube, TikTok e Instagram con `scripts/canales.py`.
 6. **Fuera del PC** (hecha): WhatsApp, servidor con la bóveda sincronizada, app web y app de Android.
 7. **Seguridad y mantenimiento** (hecha): pruebas de seguridad de tus sistemas y actualización automática.
+8. **Equipo de agentes** (hecha): agentes especializados, noticias, aprendizaje autónomo, recomendaciones y evaluación de ideas.

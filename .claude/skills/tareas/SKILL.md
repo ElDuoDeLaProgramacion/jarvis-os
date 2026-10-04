@@ -1,6 +1,6 @@
 ---
 name: tareas
-description: Gestiona la lista de pendientes de David. Añadir, listar, completar o reprogramar tareas. Úsala para "anota la tarea", "qué tengo pendiente", "marca como hecho", "recuérdame hacer".
+description: Gestiona la lista de pendientes de David. Añadir, listar, completar o reprogramar tareas. Úsala para "anota la tarea", "qué tengo pendiente", "marca como hecho", "recuérdame hacer", "agenda...", "elimina del calendario...".
 ---
 # Tareas
 
@@ -21,6 +21,7 @@ Formato de cada línea:
 Si David pide agendar algo, ponerlo en el calendario o "agrega el pendiente a Google Calendar":
 1. Crea el evento con el conector **claude.ai Google Calendar** (`create_event`) en el calendario principal, hora de Bogotá. Si no dice hora, ponlo de día completo en la fecha de la tarea. Si dice cuánto antes avisar, añade el recordatorio.
 2. Si viene de una tarea de `boveda/wiki/tareas.md`, deja la tarea como está y añádele ` 📆 en calendario`.
-3. Mover o cambiar un evento (`update_event`) solo si David lo pide. Borrar eventos no puedes: dile que lo haga él desde Google Calendar.
+3. Mover o cambiar un evento (`update_event`) solo si David lo pide.
+4. **Borrar un evento** ("elimina", "cancela", "quita del calendario"): búscalo y, sin borrar todavía, pregunta "¿Borro <título> del <día> a las <hora>? Sí o no." Si coincide más de uno, nómbralos y pregunta cuál. Solo en la respuesta "sí" de David tienes `delete_event`; bórralo entonces y confirma. Si la herramienta no está disponible, es que no hubo ese "sí": no insistas y dile que lo borre él. Nunca borres en rutinas ni varios eventos de una vez sin nombrarlos.
 
 Responde en voz confirmando en una frase, o leyendo como máximo 5 tareas.
