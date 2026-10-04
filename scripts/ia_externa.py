@@ -75,7 +75,9 @@ def llamar(proveedor, ruta, cuerpo=None, timeout=120):
             return json.load(r)
     except urllib.error.HTTPError as e:
         detalle = e.read().decode("utf-8", "replace")[:300]
-        raise RuntimeError(f"{proveedor} respondió {e.code}: {detalle}") from None
+        error = RuntimeError(f"{proveedor} respondió {e.code}: {detalle}")
+        error.codigo = e.code
+        raise error from None
     except urllib.error.URLError as e:
         raise RuntimeError(f"No pude conectar con {proveedor}: {e.reason}") from None
 
@@ -86,38 +88,48 @@ def modelos(proveedor):
     return sorted(i.removeprefix("models/") for i in ids if i)
 
 
-def modelo_por_defecto(proveedor):
+def candidatos(proveedor):
+    """Modelos a probar en orden. Si uno no tiene cuota gratis (429) o ya no existe (404), se pasa al siguiente."""
     elegido = os.environ.get(PROVEEDORES[proveedor]["modelo"])
     if elegido:
-        return elegido
+        return [elegido]
     if proveedor == "openrouter":
-        # Sin saldo: un modelo gratis (":free"). Con saldo, David puede fijar OPENROUTER_MODELO=openrouter/auto.
+        # Sin saldo: los modelos gratis (":free"). Con saldo, David puede fijar OPENROUTER_MODELO=openrouter/auto.
         gratis = [m for m in modelos("openrouter") if m.endswith(":free")]
-        for familia in ("deepseek", "qwen", "llama", "gemini", "mistral", "gpt"):
-            for m in gratis:
-                if familia in m:
-                    return m
-        if gratis:
-            return gratis[0]
-        raise RuntimeError("OpenRouter no ofrece modelos gratis ahora; pon OPENROUTER_MODELO en .env")
-    # Gemini cambia de versión a menudo: el "flash" más nuevo que tenga la clave (rápido y con capa gratis).
-    flash = [m for m in modelos("gemini") if "flash" in m and "gemini" in m
-             and not any(x in m for x in ("lite", "image", "tts", "audio", "live", "embedding", "exp", "preview"))]
-    if not flash:
+        orden = [m for familia in ("deepseek", "qwen", "llama", "gemini", "mistral", "gpt")
+                 for m in gratis if familia in m]
+        lista = list(dict.fromkeys(orden + gratis))
+        if not lista:
+            raise RuntimeError("OpenRouter no ofrece modelos gratis ahora; pon OPENROUTER_MODELO en .env")
+        return lista[:6]
+    # Gemini cambia de versión a menudo y no todos sus modelos tienen capa gratis: primero los "flash"
+    # más nuevos, luego los "flash-lite".
+    todos = [m for m in modelos("gemini") if "gemini" in m and "flash" in m
+             and not any(x in m for x in ("image", "tts", "audio", "live", "embedding", "exp", "preview", "thinking"))]
+    flash = sorted((m for m in todos if "lite" not in m), reverse=True)
+    lite = sorted((m for m in todos if "lite" in m), reverse=True)
+    if not todos:
         raise RuntimeError("No encontré un modelo Gemini flash; pon GEMINI_MODELO en .env "
                            "(mira la lista con: python3 scripts/ia_externa.py modelos gemini)")
-    return sorted(flash)[-1]
+    return (flash + lite)[:6]
 
 
 def preguntar(proveedor, pregunta, modelo=None):
-    modelo = modelo or modelo_por_defecto(proveedor)
-    datos = llamar(proveedor, "/chat/completions", {
-        "model": modelo,
-        "messages": [{"role": "system", "content": SISTEMA}, {"role": "user", "content": pregunta}],
-    })
-    texto = (datos.get("choices") or [{}])[0].get("message", {}).get("content") or ""
-    usado = datos.get("model") or modelo
-    return usado, texto.strip()
+    ultimo = None
+    for m in ([modelo] if modelo else candidatos(proveedor)):
+        try:
+            datos = llamar(proveedor, "/chat/completions", {
+                "model": m,
+                "messages": [{"role": "system", "content": SISTEMA}, {"role": "user", "content": pregunta}],
+            })
+        except RuntimeError as e:
+            if getattr(e, "codigo", None) in (404, 429):
+                ultimo = e
+                continue
+            raise
+        texto = (datos.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+        return datos.get("model") or m, texto.strip()
+    raise RuntimeError(f"ningún modelo tiene cuota ahora (puede ser el límite diario gratis). Último error: {ultimo}")
 
 
 def main():
