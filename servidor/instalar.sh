@@ -13,7 +13,7 @@ paso() { echo; echo "== $*"; }
 
 paso "Paquetes del sistema"
 sudo apt-get update -qq
-sudo apt-get install -y -qq git curl python3 python3-venv cron syncthing >/dev/null
+sudo apt-get install -y -qq git curl python3 python3-venv cron syncthing nmap lynis >/dev/null
 
 paso "Zona horaria: $ZONA (para que las rutinas salgan a tu hora)"
 sudo timedatectl set-timezone "$ZONA"

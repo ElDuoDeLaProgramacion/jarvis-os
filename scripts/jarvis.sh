@@ -51,6 +51,8 @@ permitidas=(
   "Bash(date:*)" "Bash(mkdir:*)" "Bash(ls:*)" "Bash(mv:*)"
   "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git init:*)" "Bash(git checkout -b:*)"
   "Bash(git add:*)" "Bash(git commit:*)" "Bash(npm test:*)" "Bash(python3:*)" "Bash(pdftotext:*)"
+  # Pruebas de seguridad: el script solo revisa (no cambia nada) y solo los sistemas de David.
+  "Bash(scripts/seguridad.sh:*)" "Bash(./scripts/seguridad.sh:*)"
 )
 # Conectores de claude.ai: "claude.ai Gmail" → mcp__claude_ai_Gmail (se listan ambas grafías por si acaso).
 # Fuera a propósito (send_message y reply solo con --confirmado): forward, trash_*, *_spam, *label* y delete_draft (Gmail);
