@@ -121,6 +121,14 @@ def musica_al_instante(orden):
         return f"Spotify no respondió ({e}). Abre Spotify en el celular y dale play una vez."
 
 
+def ia_externa():
+    """scripts/ia_externa.py, para que el PC use las IAs externas con las claves del servidor."""
+    spec = importlib.util.spec_from_file_location("ia_externa", RAIZ / "scripts" / "ia_externa.py")
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
 def hud():
     """Las funciones del HUD (tareas, plan, comandos) sin duplicarlas."""
     spec = importlib.util.spec_from_file_location("hud_servidor", RAIZ / "hud" / "servidor.py")
@@ -297,6 +305,7 @@ class Manejador(BaseHTTPRequestHandler):
     conversacion = None
     token = ""
     modulo_hud = None
+    modulo_ia = None
     transcriptor = None
 
     def _json(self, datos, codigo=200):
@@ -340,6 +349,11 @@ class Manejador(BaseHTTPRequestHandler):
             self._archivo(url.path[12:], HUD_DIR / "vendor")
         elif url.path.startswith("/app/"):
             self._archivo(url.path[5:] or "index.html")
+        elif url.path == "/api/ia":
+            if self._autorizado():
+                ia = self.modulo_ia
+                ia.cargar_env()
+                self._json({"proveedores": [n for n, p in ia.PROVEEDORES.items() if os.environ.get(p["clave"])]})
         elif url.path == "/api/propuestas":
             if self._autorizado():
                 self._json({"propuestas": self.modulo_hud.propuestas_lista()})
@@ -365,12 +379,25 @@ class Manejador(BaseHTTPRequestHandler):
 
     def do_POST(self):
         ruta = urlparse(self.path).path
-        if ruta not in ("/api/pedir", "/api/voz"):
+        if ruta not in ("/api/pedir", "/api/voz", "/api/ia", "/api/propuestas/borrar"):
             return self._json({"error": "no existe"}, 404)
         if not self._autorizado():
             return
         if ruta == "/api/voz":
             return self._voz()
+        if ruta == "/api/ia":
+            return self._ia()
+        if ruta == "/api/propuestas/borrar":
+            try:
+                largo = int(self.headers.get("Content-Length", 0))
+                if not 0 <= largo <= 200000:
+                    return self._json({"error": "largo inválido"}, 413)
+                ids = json.loads(self.rfile.read(largo) or b"{}").get("ids", [])
+                if not isinstance(ids, list):
+                    raise ValueError
+            except (ValueError, AttributeError):
+                return self._json({"error": "json"}, 400)
+            return self._json({"ok": True, "borradas": self.modulo_hud.borrar_propuestas(ids)})
         try:
             largo = int(self.headers.get("Content-Length", 0))
             if not 0 <= largo <= 20000:   # negativo: read(-1) esperaría el fin de la conexión
@@ -384,6 +411,29 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"error": "vacío"}, 400)
         n = self.conversacion.pedir(texto, origen)
         self._json({"ok": True, "n": n}, 202)   # la respuesta llevará "para": n
+
+    def _ia(self):
+        """El PC le pide a Gemini u OpenRouter con las claves del servidor (scripts/ia_externa.py)."""
+        try:
+            largo = int(self.headers.get("Content-Length", 0))
+            if not 0 <= largo <= 400000:
+                return self._json({"error": "largo inválido"}, 413)
+            datos = json.loads(self.rfile.read(largo) or b"{}")
+            proveedor, ruta, cuerpo = datos.get("proveedor"), datos.get("ruta"), datos.get("cuerpo")
+        except (ValueError, AttributeError):
+            return self._json({"error": "json"}, 400)
+        ia = self.modulo_ia
+        ia.cargar_env()
+        # Solo estas dos rutas: el servidor no es un proxy abierto hacia esas APIs.
+        if proveedor not in ia.PROVEEDORES or ruta not in ("/models", "/chat/completions") \
+                or (ruta == "/chat/completions") != isinstance(cuerpo, dict):
+            return self._json({"error": "pedido no permitido"}, 400)
+        if not os.environ.get(ia.PROVEEDORES[proveedor]["clave"]):
+            return self._json({"error": f"el servidor no tiene {ia.PROVEEDORES[proveedor]['clave']}"}, 404)
+        try:
+            self._json(ia.llamar(proveedor, ruta, cuerpo))
+        except RuntimeError as e:
+            self._json({"error": str(e)}, getattr(e, "codigo", 502))
 
     def _voz(self):
         """Audio WAV de la app de Android: lo transcribe y lo pide como texto. Devuelve lo que entendió."""
@@ -424,6 +474,7 @@ def main():
     Manejador.token = token
     Manejador.conversacion = Conversacion()
     Manejador.modulo_hud = hud()
+    Manejador.modulo_ia = ia_externa()
     Manejador.transcriptor = Transcriptor()
     servidor = ThreadingHTTPServer(("127.0.0.1", args.puerto), Manejador)
     print(f"App de JARVIS en http://127.0.0.1:{args.puerto}/app/", flush=True)

@@ -65,12 +65,59 @@ def cargar_env():
         os.environ.setdefault(nombre.strip(), valor.strip().strip('"').strip("'"))
 
 
+def servidor():
+    """(dirección, clave) del JARVIS del servidor si este equipo es el PC conectado a él; si no, None."""
+    base, token = os.environ.get("JARVIS_SERVIDOR", "").strip(), os.environ.get("JARVIS_API_TOKEN", "").strip()
+    if not base or len(token) < 24:
+        return None
+    return base.rstrip("/").removesuffix("/app"), token
+
+
+_remotas = None
+
+
 def configuradas():
-    return [n for n, p in PROVEEDORES.items() if os.environ.get(p["clave"])]
+    """Las IAs con clave aquí. En el PC sin claves propias, las del servidor: las claves viven solo allí."""
+    global _remotas
+    locales = [n for n, p in PROVEEDORES.items() if os.environ.get(p["clave"])]
+    if locales or not servidor():
+        return locales
+    if _remotas is None:
+        try:
+            _remotas = [n for n in pedir_al_servidor("GET", "/api/ia", timeout=15).get("proveedores", [])
+                        if n in PROVEEDORES]
+        except RuntimeError as e:
+            print(f"(no pude preguntarle al servidor qué IAs tiene: {e})", file=sys.stderr)
+            _remotas = []
+    return _remotas
+
+
+def pedir_al_servidor(metodo, ruta, cuerpo=None, timeout=150):
+    base, token = servidor()
+    req = urllib.request.Request(base + ruta, data=json.dumps(cuerpo).encode() if cuerpo is not None else None,
+                                 method=metodo, headers={"Authorization": f"Bearer {token}",
+                                                         "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        try:
+            detalle = json.load(e).get("error", "")
+        except ValueError:
+            detalle = ""
+        error = RuntimeError(f"el servidor respondió {e.code}: {detalle}"[:400])
+        error.codigo = e.code
+        raise error from None
+    except (OSError, http.client.HTTPException, ValueError) as e:
+        raise RuntimeError(f"no pude conectar con el servidor ({e})") from None
 
 
 def llamar(proveedor, ruta, cuerpo=None, timeout=120):
     p = PROVEEDORES[proveedor]
+    if not os.environ.get(p["clave"]) and servidor():
+        # El PC usa las claves del servidor a través de su API (servidor/api.py, /api/ia).
+        return pedir_al_servidor("POST", "/api/ia", {"proveedor": proveedor, "ruta": ruta, "cuerpo": cuerpo},
+                                 timeout + 30)
     datos = json.dumps(cuerpo).encode() if cuerpo is not None else None
     req = urllib.request.Request(
         p["base"] + ruta, data=datos, method="POST" if datos else "GET",

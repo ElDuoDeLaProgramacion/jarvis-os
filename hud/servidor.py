@@ -162,12 +162,13 @@ def leer_nota(ruta):
 # ---------- Propuestas de los paneles de IAs ----------
 # La habilidad "panel" deja cada panel en outputs/panel/AAAA-MM-DD-<tema>/ (un panel-<rol>.json por
 # especialidad) y la conclusión al lado, en outputs/panel/AAAA-MM-DD-<tema>.md.
-PANELES = BOVEDA / "outputs" / "panel"
+SALIDAS = BOVEDA / "outputs"
+PANELES = SALIDAS / "panel"
 ID_PANEL = re.compile(r"[\w-][\w.-]*")
 VENDOR = HUD / "vendor"
 
 
-def propuestas_lista(limite=40):
+def _paneles(limite):
     if not PANELES.is_dir():
         return []
     carpetas = sorted((c for c in PANELES.iterdir() if c.is_dir() and ID_PANEL.fullmatch(c.name)),
@@ -181,14 +182,58 @@ def propuestas_lista(limite=40):
             except (ValueError, OSError):
                 continue
         m = re.match(r"(\d{4}-\d{2}-\d{2})-?(.*)", c.name)
-        lista.append({"id": c.name, "fecha": m.group(1) if m else "",
+        lista.append({"id": c.name, "tipo": "panel", "fecha": m.group(1) if m else "",
                       "titulo": (m.group(2) if m else c.name).replace("-", " ") or c.name,
-                      "roles": roles, "conclusion": (PANELES / f"{c.name}.md").is_file()})
+                      "roles": roles, "conclusion": (PANELES / f"{c.name}.md").is_file(),
+                      "cambio": c.stat().st_mtime})
     return lista
+
+
+def _informes(limite):
+    """Lo demás que JARVIS escribió en outputs/: auditorías, código, planes, páginas HTML..."""
+    if not SALIDAS.is_dir():
+        return []
+    con_carpeta = {c.name for c in PANELES.iterdir() if c.is_dir()} if PANELES.is_dir() else set()
+    archivos = []
+    for p in SALIDAS.rglob("*"):
+        rel = p.relative_to(SALIDAS)
+        if p.suffix not in (".md", ".html") or not p.is_file() or any(x.startswith(".") for x in rel.parts):
+            continue
+        if rel.parts[0] == "panel" and (len(rel.parts) > 2 or p.stem in con_carpeta):
+            continue   # eso ya sale dentro de su panel
+        archivos.append(p)
+    archivos.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    lista = []
+    for p in archivos[:limite]:
+        rel = p.relative_to(SALIDAS)
+        m = re.match(r"(\d{4}-\d{2}-\d{2})-?(.*)", p.stem)
+        lista.append({"id": "informe/" + rel.as_posix(), "tipo": rel.parts[0] if len(rel.parts) > 1 else "otros",
+                      "fecha": m.group(1) if m else time.strftime("%Y-%m-%d", time.localtime(p.stat().st_mtime)),
+                      "titulo": ((m.group(2) if m else p.stem) or p.stem).replace("-", " ")
+                      + (" (página)" if p.suffix == ".html" else ""),
+                      "roles": [], "conclusion": False, "cambio": p.stat().st_mtime})
+    return lista
+
+
+def propuestas_lista(limite=40):
+    """Paneles de IAs e informes de outputs/, lo más reciente primero."""
+    return sorted(_paneles(limite) + _informes(limite * 2), key=lambda x: x["cambio"], reverse=True)
+
+
+def informe(rel):
+    destino = (SALIDAS / rel).resolve()
+    if SALIDAS.resolve() not in destino.parents or destino.suffix not in (".md", ".html") \
+            or not destino.is_file() or destino.stat().st_size > 5 * 1024 * 1024:
+        return None
+    return {"id": "informe/" + rel, "paneles": [], "conclusion": None,
+            "informe": {"ruta": rel, "formato": destino.suffix[1:],
+                        "texto": destino.read_text(encoding="utf-8", errors="replace")}}
 
 
 def propuesta(id_panel):
     """Todo lo de un panel: la conclusión y las respuestas de cada IA. None si no existe."""
+    if (id_panel or "").startswith("informe/"):
+        return informe(id_panel[8:])
     if not ID_PANEL.fullmatch(id_panel or ""):
         return None
     carpeta = PANELES / id_panel
@@ -207,6 +252,48 @@ def propuesta(id_panel):
     conclusion = PANELES / f"{id_panel}.md"
     return {"id": id_panel, "paneles": paneles,
             "conclusion": conclusion.read_text(encoding="utf-8", errors="replace") if conclusion.is_file() else None}
+
+
+PAPELERA = BOVEDA / ".papelera"   # Obsidian no muestra carpetas con punto; Syncthing sí la sincroniza
+DIAS_PAPELERA = 30
+
+
+def _de_la_propuesta(id_propuesta):
+    """Archivos o carpetas de una propuesta (validados dentro de outputs/)."""
+    if id_propuesta.startswith("informe/"):
+        destino = (SALIDAS / id_propuesta[8:]).resolve()
+        ok = SALIDAS.resolve() in destino.parents and destino.suffix in (".md", ".html") and destino.is_file()
+        return [destino] if ok else []
+    if not ID_PANEL.fullmatch(id_propuesta):
+        return []
+    return [p for p in (PANELES / id_propuesta, PANELES / f"{id_propuesta}.md") if p.exists()]
+
+
+def borrar_propuestas(ids):
+    """Mueve las propuestas a boveda/.papelera/AAAA-MM-DD/<ruta en outputs> (se recuperan de ahí durante
+    DIAS_PAPELERA días). Devuelve cuántas."""
+    hoy = PAPELERA / date.today().isoformat()
+    movidas = 0
+    for id_propuesta in list(ids)[:500]:
+        cosas = _de_la_propuesta(str(id_propuesta))
+        for cosa in cosas:
+            destino = hoy / cosa.resolve().relative_to(SALIDAS.resolve())   # misma ruta que tenía en outputs/
+            if destino.exists():
+                destino = destino.with_name(f"{destino.stem}-{int(time.time())}{destino.suffix}")
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(cosa), str(destino))
+        movidas += bool(cosas)
+    # Lo que lleva más de DIAS_PAPELERA días en la papelera ya no vuelve.
+    if PAPELERA.is_dir():
+        limite = date.today().toordinal() - DIAS_PAPELERA
+        for dia in PAPELERA.iterdir():
+            try:
+                viejo = date.fromisoformat(dia.name).toordinal() < limite
+            except ValueError:
+                continue
+            if viejo and dia.is_dir():
+                shutil.rmtree(dia, ignore_errors=True)
+    return movidas
 
 
 def archivo_vendor(nombre):
@@ -480,6 +567,8 @@ class Manejador(BaseHTTPRequestHandler):
             COLA.mkdir(exist_ok=True)
             (COLA / "lienzo-camara").touch()
             return self._json({"ok": True})
+        if ruta == "/api/propuestas/borrar":
+            return self._borrar_propuestas()
         if ruta != "/api/encolar":
             return self._json({"error": "no existe"}, 404)
         largo = int(self.headers.get("Content-Length", 0))
@@ -493,6 +582,24 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"ok": True, "via": "voz"})
         ok = encolar(pedido)
         self._json({"ok": ok, "via": "cola"}, 200 if ok else 400)
+
+    def _borrar_propuestas(self):
+        # Solo la propia página del HUD: JSON (otra web no puede mandarlo sin permiso del navegador)
+        # y, si el navegador dice de dónde viene, que sea de aquí.
+        origen = self.headers.get("Origin", "")
+        if not self.headers.get("Content-Type", "").startswith("application/json") or \
+                (origen and urlparse(origen).hostname not in ("localhost", "127.0.0.1")):
+            return self._json({"error": "no permitido"}, 403)
+        try:
+            largo = int(self.headers.get("Content-Length", 0))
+            if not 0 <= largo <= 200000:
+                return self._json({"error": "largo inválido"}, 413)
+            ids = json.loads(self.rfile.read(largo) or b"{}").get("ids", [])
+            if not isinstance(ids, list):
+                raise ValueError
+        except (ValueError, AttributeError):
+            return self._json({"error": "JSON inválido"}, 400)
+        self._json({"ok": True, "borradas": borrar_propuestas(ids)})
 
     def _lienzo(self):
         """Guarda lo hecho en el lienzo 3D: imagen, escena (JSON) y una nota en boveda/outputs/lienzo/."""
