@@ -59,6 +59,11 @@ def va_al_servidor(pedido):
     return not DEL_PC.search(plano)
 
 
+def nombra_el_servidor(pedido):
+    """True si David pidió algo del servidor ("audita el servidor"): eso no se puede hacer en el PC."""
+    return bool(AL_SERVIDOR.search(_plano(pedido)))
+
+
 def _llamar(ruta, cuerpo=None, espera=20):
     e = _env()
     base = re.sub(r"/(app/?)?$", "", e["JARVIS_SERVIDOR"].strip())
@@ -79,7 +84,15 @@ def _llamar(ruta, cuerpo=None, espera=20):
 def preguntar(texto, limite_min=20):
     """Pide al servidor y espera su respuesta. Devuelve (texto, spotify:... o None).
     Lanza ConnectionError si el servidor no responde (apagado, sin Tailscale, clave mala)."""
-    mensajes = _llamar("/api/conversacion?desde=0")["mensajes"]
+    # Al iniciar sesión, Tailscale tarda unos segundos en conectarse: se reintenta antes de rendirse.
+    for intento in range(3):
+        try:
+            mensajes = _llamar("/api/conversacion?desde=0")["mensajes"]
+            break
+        except ConnectionError:
+            if intento == 2:
+                raise
+            time.sleep(4)
     desde = mensajes[-1]["n"] if mensajes else 0
     mio = _llamar("/api/pedir", {"texto": texto, "origen": "pc"}).get("n")
     fin = time.monotonic() + limite_min * 60
