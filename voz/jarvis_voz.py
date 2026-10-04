@@ -14,6 +14,7 @@ Uso:  python jarvis_voz.py            (ver opciones con --help)
 """
 
 import argparse
+import difflib
 import json
 import queue
 import re
@@ -311,9 +312,27 @@ NUMEROS = {"una": 1, "un": 1, "uno": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco
            "siete": 7, "ocho": 8, "nueve": 9, "diez": 10}
 
 
+def plano_orden(pedido):
+    """'Abri, Spotify.' -> 'abri spotify': sin tildes, sin puntuación y con un solo espacio."""
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", normalizar(pedido)).split())
+
+
+# La voz oye "abri", "abra", "abrace" o "abre y Spotify"; y "putify", "spotifai" o "cromo".
+ABRIR = re.compile(r"(abre|abreme|abrir|abri|abrime|abra|abrame|abrace|inicia|iniciame|lanza|ejecuta)"
+                   r" (y |me |el programa |la app |la aplicacion |el |la )?(.+)")
+
+
+def app_por_nombre(nombre):
+    """Nombre dicho -> clave de ABRIBLES, aunque la voz lo haya oído un poco mal."""
+    if nombre in ABRIBLES:
+        return nombre
+    parecidos = difflib.get_close_matches(nombre, list(ABRIBLES), n=1, cutoff=0.75)
+    return parecidos[0] if parecidos else None
+
+
 def accion_musica(pedido):
     """'abre Spotify', 'pausa la música', 'siguiente canción', 'sube el volumen' -> (tipo, objetivo, veces)."""
-    plano = normalizar(pedido).strip(" .,!¡¿?")
+    plano = plano_orden(pedido)
     # "pasa 3 canciones", "salta dos temas", "retrocede 2 canciones", "devuélvete una canción"
     m = re.fullmatch(r"(pasa|pasale|salta|saltate|adelanta|retrocede|regresa|devuelvete|devuelve|vuelve) "
                      r"(\d{1,2}|" + "|".join(NUMEROS) + r") (canciones|cancion|temas|tema|rolas|rola)( atras)?", plano)
@@ -321,9 +340,9 @@ def accion_musica(pedido):
         n = int(m.group(2)) if m.group(2).isdigit() else NUMEROS[m.group(2)]
         atras = m.group(1).startswith(("retro", "regres", "devuel", "vuelve")) or bool(m.group(4))
         return ("saltar", "atras" if atras else "adelante", max(1, min(n, 50)))
-    m = re.fullmatch(r"(abre|abreme|abrir|inicia|abri) (el |la |el programa |la app )?(.+)", plano)
-    if m and m.group(3) in ABRIBLES:
-        return ("abrir", ABRIBLES[m.group(3)], 1)
+    m = ABRIR.fullmatch(plano)
+    if m and app_por_nombre(m.group(3)):
+        return ("abrir", ABRIBLES[app_por_nombre(m.group(3))], 1)
     if re.fullmatch(rf"(pausa|pausar|para|deten|detén|quita)( {MUSICA})?|pon pausa|dale pausa", plano):
         return ("tecla", "play/pause media", 1)
     if re.fullmatch(rf"(sigue|reanuda|continua|play|dale play|ponle play)( {MUSICA})?", plano):
@@ -582,19 +601,21 @@ class Jarvis:
 
     def atender(self, pedido, origen="voz", reanudar=None):
         confirmado = bool(reanudar) and origen in ("voz", "texto") and es_si(pedido)
-        navegacion = accion_navegacion(pedido) if origen in ("voz", "texto") and not reanudar else None
+        # Las órdenes al instante (abrir, cerrar, música) valen también al responder sin "Jarvis".
+        rapida = origen in ("voz", "texto")
+        navegacion = accion_navegacion(pedido) if rapida else None
         if navegacion and navegacion[0] == "programa?":
             try:
                 navegacion = ("programa", navegacion[1]) if programa_abierto(navegacion[1]) else None
             except OSError:
                 navegacion = None
-        copiloto = accion_copiloto(pedido) if origen in ("voz", "texto") and not reanudar else None
+        copiloto = accion_copiloto(pedido) if rapida else None
         if copiloto is not None and self.copiloto is not None:
             self.copiloto.activo = copiloto
             log(f"\nTú ({origen}): {pedido}")
             self.hablar("Copiloto activo. Te aviso si veo algo útil." if copiloto else "Copiloto apagado.")
             return
-        musica = accion_musica(pedido) if origen in ("voz", "texto") and not reanudar else None
+        musica = accion_musica(pedido) if rapida else None
         if musica:
             log(f"\nTú ({origen}): {pedido}")
             if musica[1] == LIENZO and not hud_responde():
