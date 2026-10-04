@@ -162,12 +162,13 @@ def leer_nota(ruta):
 # ---------- Propuestas de los paneles de IAs ----------
 # La habilidad "panel" deja cada panel en outputs/panel/AAAA-MM-DD-<tema>/ (un panel-<rol>.json por
 # especialidad) y la conclusión al lado, en outputs/panel/AAAA-MM-DD-<tema>.md.
-PANELES = BOVEDA / "outputs" / "panel"
+SALIDAS = BOVEDA / "outputs"
+PANELES = SALIDAS / "panel"
 ID_PANEL = re.compile(r"[\w-][\w.-]*")
 VENDOR = HUD / "vendor"
 
 
-def propuestas_lista(limite=40):
+def _paneles(limite):
     if not PANELES.is_dir():
         return []
     carpetas = sorted((c for c in PANELES.iterdir() if c.is_dir() and ID_PANEL.fullmatch(c.name)),
@@ -181,14 +182,58 @@ def propuestas_lista(limite=40):
             except (ValueError, OSError):
                 continue
         m = re.match(r"(\d{4}-\d{2}-\d{2})-?(.*)", c.name)
-        lista.append({"id": c.name, "fecha": m.group(1) if m else "",
+        lista.append({"id": c.name, "tipo": "panel", "fecha": m.group(1) if m else "",
                       "titulo": (m.group(2) if m else c.name).replace("-", " ") or c.name,
-                      "roles": roles, "conclusion": (PANELES / f"{c.name}.md").is_file()})
+                      "roles": roles, "conclusion": (PANELES / f"{c.name}.md").is_file(),
+                      "cambio": c.stat().st_mtime})
     return lista
+
+
+def _informes(limite):
+    """Lo demás que JARVIS escribió en outputs/: auditorías, código, planes, páginas HTML..."""
+    if not SALIDAS.is_dir():
+        return []
+    con_carpeta = {c.name for c in PANELES.iterdir() if c.is_dir()} if PANELES.is_dir() else set()
+    archivos = []
+    for p in SALIDAS.rglob("*"):
+        rel = p.relative_to(SALIDAS)
+        if p.suffix not in (".md", ".html") or not p.is_file() or any(x.startswith(".") for x in rel.parts):
+            continue
+        if rel.parts[0] == "panel" and (len(rel.parts) > 2 or p.stem in con_carpeta):
+            continue   # eso ya sale dentro de su panel
+        archivos.append(p)
+    archivos.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    lista = []
+    for p in archivos[:limite]:
+        rel = p.relative_to(SALIDAS)
+        m = re.match(r"(\d{4}-\d{2}-\d{2})-?(.*)", p.stem)
+        lista.append({"id": "informe/" + rel.as_posix(), "tipo": rel.parts[0] if len(rel.parts) > 1 else "otros",
+                      "fecha": m.group(1) if m else time.strftime("%Y-%m-%d", time.localtime(p.stat().st_mtime)),
+                      "titulo": ((m.group(2) if m else p.stem) or p.stem).replace("-", " ")
+                      + (" (página)" if p.suffix == ".html" else ""),
+                      "roles": [], "conclusion": False, "cambio": p.stat().st_mtime})
+    return lista
+
+
+def propuestas_lista(limite=40):
+    """Paneles de IAs e informes de outputs/, lo más reciente primero."""
+    return sorted(_paneles(limite) + _informes(limite * 2), key=lambda x: x["cambio"], reverse=True)
+
+
+def informe(rel):
+    destino = (SALIDAS / rel).resolve()
+    if SALIDAS.resolve() not in destino.parents or destino.suffix not in (".md", ".html") \
+            or not destino.is_file() or destino.stat().st_size > 5 * 1024 * 1024:
+        return None
+    return {"id": "informe/" + rel, "paneles": [], "conclusion": None,
+            "informe": {"ruta": rel, "formato": destino.suffix[1:],
+                        "texto": destino.read_text(encoding="utf-8", errors="replace")}}
 
 
 def propuesta(id_panel):
     """Todo lo de un panel: la conclusión y las respuestas de cada IA. None si no existe."""
+    if (id_panel or "").startswith("informe/"):
+        return informe(id_panel[8:])
     if not ID_PANEL.fullmatch(id_panel or ""):
         return None
     carpeta = PANELES / id_panel

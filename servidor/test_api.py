@@ -72,6 +72,7 @@ class PruebaApi(unittest.TestCase):
         api.Manejador.token = "t" * 30
         api.Manejador.conversacion = api.Conversacion(self.dir / "conversacion.json")
         api.Manejador.modulo_hud = api.hud()
+        api.Manejador.modulo_ia = api.ia_externa()
         api.DATOS = self.dir
         falso = self.dir / "transcribir.py"
         falso.write_text(TRANSCRIPTOR_FALSO)
@@ -138,19 +139,29 @@ class PruebaApi(unittest.TestCase):
 
     def test_propuestas(self):
         h = api.Manejador.modulo_hud
+        h.SALIDAS = self.dir
         h.PANELES = self.dir / "panel"
         carpeta = h.PANELES / "2026-10-04-landing"
         carpeta.mkdir(parents=True)
         (carpeta / "panel-marketing.json").write_text(json.dumps(
             {"rol": "marketing", "pregunta": "p", "respuestas": [{"modelo": "m", "texto": "```html\n<b>x</b>\n```"}]}))
         (h.PANELES / "2026-10-04-landing.md").write_text("# Conclusión")
+        (self.dir / "seguridad").mkdir()
+        (self.dir / "seguridad" / "2026-10-03-servidor.md").write_text("# Auditoría")
         _, d = self.pedir("/api/propuestas")
-        self.assertEqual(d["propuestas"][0]["roles"], ["marketing"])
-        self.assertTrue(d["propuestas"][0]["conclusion"])
+        panel = next(p for p in d["propuestas"] if p["tipo"] == "panel")
+        self.assertEqual(panel["roles"], ["marketing"])
+        self.assertTrue(panel["conclusion"])
+        # Las auditorías y demás informes también salen; la conclusión del panel no se repite como informe.
+        self.assertEqual([p["id"] for p in d["propuestas"] if p["tipo"] != "panel"],
+                         ["informe/seguridad/2026-10-03-servidor.md"])
+        _, d = self.pedir("/api/propuestas/informe%2Fseguridad%2F2026-10-03-servidor.md")
+        self.assertEqual(d["informe"]["texto"], "# Auditoría")
         _, d = self.pedir("/api/propuestas/2026-10-04-landing")
         self.assertEqual(d["conclusion"], "# Conclusión")
         self.assertEqual(d["paneles"][0]["respuestas"][0]["modelo"], "m")
-        for ruta in ("/api/propuestas/..", "/api/propuestas/..%2F..%2Fservidor", "/api/propuestas/nada"):
+        for ruta in ("/api/propuestas/..", "/api/propuestas/..%2F..%2Fservidor", "/api/propuestas/nada",
+                     "/api/propuestas/informe%2F..%2Fconversacion.json", "/api/propuestas/informe%2F..%2F..%2Fx.md"):
             with self.assertRaises(urllib.error.HTTPError) as e:
                 self.pedir(ruta)
             self.assertEqual(e.exception.code, 404)
@@ -164,6 +175,49 @@ class PruebaApi(unittest.TestCase):
             self.assertIn("javascript", r.headers["Content-Type"])
         with self.assertRaises(urllib.error.HTTPError):
             urllib.request.urlopen(self.base + "/app/vendor/..%2Fservidor.py")
+
+    def test_el_pc_usa_las_ias_del_servidor(self):
+        """El PC no tiene claves: ia_externa.py pasa por /api/ia y el servidor llama con las suyas."""
+        import types
+        llamadas = []
+        falso = types.SimpleNamespace(
+            PROVEEDORES={"gemini": {"clave": "CLAVE_SRV_PRUEBA"}, "openrouter": {"clave": "OTRA_SRV_PRUEBA"}},
+            cargar_env=lambda: None)
+
+        def llamar(proveedor, ruta, cuerpo=None):
+            llamadas.append((proveedor, ruta))
+            if ruta == "/models":
+                return {"data": [{"id": "models/gemini-9-flash"}]}
+            return {"model": "gemini-9-flash", "choices": [{"message": {"content": "hola desde el servidor"}}]}
+        falso.llamar = llamar
+        api.Manejador.modulo_ia = falso
+        os.environ["CLAVE_SRV_PRUEBA"] = "x"
+        self.addCleanup(os.environ.pop, "CLAVE_SRV_PRUEBA", None)
+        # Lo que no es /models ni /chat/completions no pasa.
+        req = urllib.request.Request(self.base + "/api/ia", data=json.dumps(
+            {"proveedor": "gemini", "ruta": "/files", "cuerpo": None}).encode(),
+            headers={"Authorization": "Bearer " + "t" * 30})
+        with self.assertRaises(urllib.error.HTTPError) as e:
+            urllib.request.urlopen(req)
+        self.assertEqual(e.exception.code, 400)
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import ia_externa
+        antes = {k: os.environ.pop(k, None) for k in ("GEMINI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_MODELO")}
+        os.environ.update(JARVIS_SERVIDOR=self.base + "/app/", JARVIS_API_TOKEN="t" * 30)
+
+        def restaurar():
+            for k in ("JARVIS_SERVIDOR", "JARVIS_API_TOKEN"):
+                os.environ.pop(k, None)
+            os.environ.update({k: v for k, v in antes.items() if v is not None})
+        self.addCleanup(restaurar)
+        ia_externa._remotas = None
+        self.assertEqual(ia_externa.configuradas(), ["gemini"])
+        usado, texto = ia_externa.preguntar("gemini", "hola")
+        self.assertEqual(texto, "hola desde el servidor")
+        self.assertEqual(llamadas, [("gemini", "/models"), ("gemini", "/chat/completions")])
+        with self.assertRaises(RuntimeError):   # el servidor no tiene clave de OpenRouter
+            ia_externa.llamar("openrouter", "/models")
 
     def test_musica_al_instante_sin_claude(self):
         self.pedir("/api/pedir", {"texto": "Jarvis, pasa tres canciones"})

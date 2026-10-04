@@ -91,6 +91,8 @@ const $ = (id) => document.getElementById(id)
 const EN_APP = location.pathname.startsWith('/app/')
 const API = '/api/propuestas'
 const MERMAID = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js'
+const NOMBRES = { panel: 'Paneles de IAs', seguridad: 'Auditorías de seguridad', programacion: 'Programación',
+  equipo: 'Equipo de agentes', ideas: 'Ideas', planes: 'Planes', 'ia-externa': 'Otras IAs', otros: 'Otros' }
 const VISUALES = ['html', 'mermaid', 'slides', 'svg']
 let actual = null, datos = null, pestana = null, firma = ''
 
@@ -252,7 +254,22 @@ function verPestana (clave) {
   for (const b of $('pestanas').children) b.classList.toggle('activo', b.dataset.clave === clave)
   const main = $('contenido')
   main.replaceChildren()
-  if (clave === 'conclusion') {
+  if (clave === 'informe') {
+    const inf = datos.informe
+    const c = el('div', { className: 'cuerpo conclusion' })
+    if (inf.formato === 'html') {
+      // Una página que hizo JARVIS: se ve en vivo, aislada, como las maquetas de las IAs.
+      c.append(el('pre', {}, el('code', { className: 'language-html', textContent: inf.texto })))
+      mejorarBloques(c, inf.ruta)
+      const vista = c.querySelector('.vista')
+      if (vista) vista.style.height = '75vh'
+      c.style.maxWidth = 'none'
+    } else {
+      c.append(...markdown(inf.texto.replace(/^---\n[\s\S]*?\n---\n/, '')).childNodes)
+      mejorarBloques(c, '')
+    }
+    main.append(c)
+  } else if (clave === 'conclusion') {
     const c = el('div', { className: 'cuerpo conclusion' })
     c.append(...markdown(datos.conclusion.replace(/^---\n[\s\S]*?\n---\n/, '')).childNodes)
     mejorarBloques(c, '')
@@ -286,10 +303,12 @@ async function abrir (id) {
     return
   }
   const pregunta = datos.paneles.map((p) => p.pregunta).find(Boolean) || ''
-  $('info').replaceChildren(el('b', { textContent: id }), pregunta ? ' · ' + pregunta.split('\n')[0].slice(0, 200) : '')
+  $('info').replaceChildren(el('b', { textContent: datos.informe ? datos.informe.ruta : id }),
+    pregunta ? ' · ' + pregunta.split('\n')[0].slice(0, 200) : '')
   const tabs = []
+  if (datos.informe) tabs.push(['informe', datos.informe.formato === 'html' ? 'Página' : 'Informe'])
   if (datos.conclusion) tabs.push(['conclusion', 'Conclusión'])
-  tabs.push(['galeria', 'Lo visual'])
+  if (!datos.informe) tabs.push(['galeria', 'Lo visual'])
   datos.paneles.forEach((p, i) => tabs.push([String(i), `${p.rol} (${(p.respuestas || []).length})`]))
   $('pestanas').replaceChildren(...tabs.map(([clave, texto]) => {
     const b = boton(texto, () => verPestana(clave)); b.dataset.clave = clave; return b
@@ -308,13 +327,19 @@ async function cargarLista () {
     return
   }
   if (!lista.length) {
-    $('elegir').replaceChildren(el('option', { textContent: 'Sin paneles todavía' }))
+    $('elegir').replaceChildren(el('option', { textContent: 'Nada todavía' }))
     $('contenido').replaceChildren(el('div', { className: 'vacio', textContent:
-      'Aún no hay propuestas. Pídele a JARVIS un panel, por ejemplo: "que varias IAs propongan la landing de mi canal".' }))
+      'Aún no hay propuestas ni informes. Pídele a JARVIS un panel ("que varias IAs propongan la landing de mi canal") o una auditoría.' }))
     return
   }
-  $('elegir').replaceChildren(...lista.map((p) => el('option', { value: p.id,
-    textContent: `${p.fecha} · ${p.titulo}${p.roles.length ? ' · ' + p.roles.join(', ') : ''}` })))
+  // Agrupados por tipo (paneles, seguridad, programación...), en el orden del más reciente de cada uno.
+  const grupos = new Map()
+  for (const p of lista) {
+    if (!grupos.has(p.tipo)) grupos.set(p.tipo, el('optgroup', { label: NOMBRES[p.tipo] || p.tipo.replace(/-/g, ' ') }))
+    grupos.get(p.tipo).append(el('option', { value: p.id,
+      textContent: `${p.fecha} · ${p.titulo}${p.roles.length ? ' · ' + p.roles.join(', ') : ''}` }))
+  }
+  $('elegir').replaceChildren(...grupos.values())
   // Sin elegir uno (#id en la dirección), se sigue el más nuevo: así aparece solo el panel que está en marcha.
   const pedido = decodeURIComponent(location.hash.slice(1))
   const p = lista.find((x) => x.id === pedido) || lista[0]

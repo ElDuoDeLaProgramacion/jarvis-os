@@ -32,7 +32,7 @@ El botón **＋ Analizar** (o decir "Jarvis, analiza este archivo") abre una ven
 
 ## Propuestas de las IAs
 
-El botón **Propuestas** (o "Jarvis, abre las propuestas") abre `http://localhost:7777/propuestas`: lo que propusieron los paneles de IAs (habilidad `panel`), con la conclusión, una pestaña "Lo visual" (maquetas HTML en vivo, diagramas, presentaciones y código con botón de copiar) y una columna por IA. Lee `boveda/outputs/panel/`. Las maquetas corren en un marco aislado, sin acceso a la API del HUD. Las bibliotecas van en `hud/vendor/`; los diagramas cargan Mermaid de internet solo cuando hacen falta.
+El botón **Propuestas** (o "Jarvis, abre las propuestas") abre `http://localhost:7777/propuestas`: lo que propusieron los paneles de IAs (habilidad `panel`), con la conclusión, una pestaña "Lo visual" (maquetas HTML en vivo, diagramas, presentaciones y código con botón de copiar) y una columna por IA. Lee `boveda/outputs/panel/` y además muestra los demás informes de `boveda/outputs/` (auditorías, programación, planes...) y las páginas `.html` que haya creado JARVIS, agrupados por tipo. Las maquetas corren en un marco aislado, sin acceso a la API del HUD. Las bibliotecas van en `hud/vendor/`; los diagramas cargan Mermaid de internet solo cuando hacen falta.
 
 ## Cambiar los botones
 

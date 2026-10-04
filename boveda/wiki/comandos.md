@@ -15,7 +15,7 @@ tags: [jarvis, ayuda]
   - "cierra las pestañas de búsqueda de Google"
   - "cierra las pestañas de YouTube"
 - **Lienzo 3D:** "abre el lienzo 3D" para dibujar y construir en 3D con las manos frente a la cámara.
-- **Propuestas:** "abre las propuestas" para ver el código, las maquetas, los diagramas y las presentaciones que propusieron los paneles de IAs.
+- **Propuestas:** "abre las propuestas" para ver el código, las maquetas, los diagramas y las presentaciones que propusieron los paneles de IAs, y también las auditorías, informes y páginas que JARVIS dejó en `outputs/`.
 - **Música:** "pausa", "play", "siguiente canción", "canción anterior", "sube el volumen", "baja el volumen".
 - **Copiloto:** "activa el copiloto", "apaga el copiloto".
 
