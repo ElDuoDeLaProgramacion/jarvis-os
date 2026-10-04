@@ -26,14 +26,18 @@ mezcla=$(mktemp -d); trap 'rm -rf "$mezcla"' EXIT
 mezcladas=()
 while IFS= read -r f; do
   [ -n "$f" ] && [ -f "$f" ] || continue
-  git diff --quiet HEAD -- "$f" && continue
   git cat-file -e "origin/main:$f" 2>/dev/null || continue
+  # Una nota que GitHub trae nueva y aquí ya existe sin estar en git (llegó por Syncthing) también se mezcla.
+  nueva=0; git cat-file -e "HEAD:$f" 2>/dev/null || nueva=1
+  [ $nueva = 0 ] && git diff --quiet HEAD -- "$f" && continue
   n=${#mezcladas[@]}
   cp "$f" "$mezcla/$n"; cp "$f" "$mezcla/tuya$n"
-  git show "HEAD:$f" > "$mezcla/base"; git show "origin/main:$f" > "$mezcla/github"
+  if [ $nueva = 1 ]; then : > "$mezcla/base"; else git show "HEAD:$f" > "$mezcla/base"; fi
+  git show "origin/main:$f" > "$mezcla/github"
   if git merge-file -q "$mezcla/$n" "$mezcla/base" "$mezcla/github"; then :
   else cp "$mezcla/tuya$n" "$mezcla/$n"; nota "$f: tus cambios y los de GitHub chocan; se queda tu versión"; fi
-  git checkout -q HEAD -- "$f"   # índice y archivo: también si estaba preparado con git add
+  if [ $nueva = 1 ]; then git rm -q --cached --ignore-unmatch -- "$f"; rm -f "$f"
+  else git checkout -q HEAD -- "$f"; fi   # índice y archivo: también si estaba preparado con git add
   mezcladas+=("$f")
 done < <(git diff --name-only HEAD origin/main -- boveda/)
 
