@@ -156,7 +156,7 @@ Para probar los canales: `python3 scripts/canales.py`.
 | `evaluar-idea` | El agente juez puntúa una idea, con riesgos y cómo probarla barato | `outputs/ideas/` |
 | `equipo` | Reparte un pedido entre los agentes especializados y junta sus respuestas | `outputs/equipo/` |
 | `segunda-opinion` | Pregunta a IAs externas a Claude (Gemini, y por OpenRouter GPT, Llama, DeepSeek...) y compara | `outputs/ia-externa/` |
-| `panel` | Varias IAs por especialidad (auditoría, programación, planeación, ideas, diseño) revisan lo mismo en paralelo con los agentes de Claude; JARVIS verifica y concluye | `outputs/panel/` |
+| `panel` | Varias IAs por especialidad, de cualquier tema (auditoría, programación, marketing, diseño, finanzas, contenido, presentaciones...), revisan o proponen lo mismo en paralelo con los agentes de Claude; JARVIS verifica y concluye. Lo que proponen se ve en la ventana de propuestas | `outputs/panel/` |
 | `suscripciones` | Cobros recurrentes desde los recibos de Gmail: total al mes, renovaciones próximas y cómo cancelar | `wiki/suscripciones.md`, `outputs/suscripciones/` |
 | `boveda` | Lee y escribe memoria; mantiene el grafo enlazado | `raw/`, `wiki/` |
 | `cierre-dia` | Reflexión del día y cola de mañana | `outputs/diario/` |
@@ -167,7 +167,9 @@ Regla: habilidades pequeñas de un solo propósito superan a un prompt gigante.
 
 En `.claude/agents/` hay seis agentes que JARVIS puede llamar (directamente o con la habilidad `equipo`): `programador`, `revisor-codigo`, `auditor-seguridad`, `disenador`, `juez-ideas` e `investigador`. Cada uno tiene sus propias instrucciones y herramientas, y trabajan en paralelo cuando el pedido lo permite ("audita todos mis servidores" lanza un auditor por servidor). Cada agente gasta uso de Claude como una petición entera, así que las rutinas automáticas no los usan.
 
-**IAs externas.** Para que JARVIS consulte otras IAs, pon en `.env` `GEMINI_API_KEY` (gratis en https://aistudio.google.com/apikey) y/o `OPENROUTER_API_KEY` (https://openrouter.ai/settings/keys: una clave para GPT, Llama, DeepSeek, Mistral, Grok y más; sin saldo usa sus modelos gratis, con límite diario, y con saldo prepago cualquier modelo). Ponlas en el `.env` del servidor y del PC. Prueba con `python3 scripts/ia_externa.py --todas "hola"`. Para un panel por especialidad: `python3 scripts/ia_externa.py panel --rol auditoria --n 3 "..."`. JARVIS nunca les manda secretos, correos ni chats salvo que se lo pidas.
+**IAs externas.** Para que JARVIS consulte otras IAs, pon en `.env` `GEMINI_API_KEY` (gratis en https://aistudio.google.com/apikey) y/o `OPENROUTER_API_KEY` (https://openrouter.ai/settings/keys: una clave para GPT, Llama, DeepSeek, Mistral, Grok y más; sin saldo usa sus modelos gratis, con límite diario, y con saldo prepago cualquier modelo). Ponlas en el `.env` del servidor y del PC. Prueba con `python3 scripts/ia_externa.py --todas "hola"`. Para un panel por especialidad: `python3 scripts/ia_externa.py panel --rol auditoria --n 3 "..."` (`--rol` acepta cualquier tema).
+
+**Ventana de propuestas.** El código, las maquetas, los diagramas y las presentaciones que proponen los paneles se ven en `http://localhost:7777/propuestas` (botón **Propuestas** del HUD o "Jarvis, abre las propuestas") y en el celular con el botón **Propuestas** de la app. Las maquetas corren aisladas en la página, sin acceso a JARVIS. JARVIS nunca les manda secretos, correos ni chats salvo que se lo pidas.
 
 ## Día real (rutinas automáticas)
 

@@ -13,7 +13,7 @@ Script: `python3 scripts/ia_externa.py` (lee las claves de `.env`; las pone Davi
 | "¿qué opinan otras IAs?", segunda opinión | `python3 scripts/ia_externa.py --todas "..."` |
 | sobre un documento o informe | añade `--archivo <ruta>` |
 | qué modelos gratis hay | `python3 scripts/ia_externa.py modelos gratis` |
-| varias IAs por especialidad a la vez ("con todas las IAs", "panel") | habilidad `panel` |
+| varias IAs por especialidad a la vez ("con todas las IAs", "panel"), o David quiere ver lo que proponen (código, maqueta, presentación) | habilidad `panel` |
 
 Sin `OPENROUTER_MODELO`, OpenRouter usa un modelo gratis (`:free`), que tiene límite diario. Si un modelo de pago falla por falta de saldo, prueba su versión `:free` o díselo a David.
 

@@ -15,6 +15,7 @@ tags: [jarvis, ayuda]
   - "cierra las pestañas de búsqueda de Google"
   - "cierra las pestañas de YouTube"
 - **Lienzo 3D:** "abre el lienzo 3D" para dibujar y construir en 3D con las manos frente a la cámara.
+- **Propuestas:** "abre las propuestas" para ver el código, las maquetas, los diagramas y las presentaciones que propusieron los paneles de IAs.
 - **Música:** "pausa", "play", "siguiente canción", "canción anterior", "sube el volumen", "baja el volumen".
 - **Copiloto:** "activa el copiloto", "apaga el copiloto".
 
@@ -36,7 +37,7 @@ tags: [jarvis, ayuda]
 - "pídele al auditor que revise el servidor", "que el revisor mire mi proyecto X", "que el diseñador proponga la pantalla de...", "junta al equipo para crear un programa que...".
 - Agentes: programador, revisor de código, auditor de seguridad, diseñador, juez de ideas, investigador. Gastan más uso: JARVIS los llama solo cuando vale la pena.
 - **IAs externas:** "pregúntale a Gemini...", "¿qué opina GPT de...?", "segunda opinión de otras IAs sobre...". Necesitan las claves `GEMINI_API_KEY` u `OPENROUTER_API_KEY` en `.env`.
-- **Panel de IAs:** "audita y evalúa el proyecto X con todas las IAs", "que varias IAs opinen de esta idea". Varias IAs por especialidad (auditoría, programación, planeación, ideas, diseño) más los agentes de Claude; JARVIS verifica y te da la conclusión en `outputs/panel/`.
+- **Panel de IAs:** "audita y evalúa el proyecto X con todas las IAs", "que varias IAs propongan la landing de mi canal", "panel de marketing y diseño para...". De cualquier tema, varias IAs por especialidad más los agentes de Claude; JARVIS verifica y te da la conclusión en `outputs/panel/`. Lo que proponen lo ves en la ventana de propuestas (botón del HUD o de la app).
 
 ## Seguridad (solo tus sistemas, sin cambiar nada)
 - "prueba la seguridad del servidor" / "audita este equipo": SSH, puertos, cortafuegos, actualizaciones, usuarios, intentos de entrada y lynis.

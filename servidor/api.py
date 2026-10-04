@@ -28,11 +28,12 @@ import unicodedata
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 RAIZ = Path(__file__).resolve().parent.parent
 REPRODUCIR = RAIZ / "cola" / "reproducir.txt"   # la habilidad musica deja aquí el spotify:... que eligió
 APP = Path(__file__).resolve().parent / "app"
+HUD_DIR = RAIZ / "hud"
 DATOS = RAIZ / "cola" / "app"
 CONVERSACION = DATOS / "conversacion.json"
 SEGUIR_MIN = 30           # minutos en que un pedido sigue la misma conversación (igual que WhatsApp)
@@ -41,7 +42,8 @@ MAX_MENSAJES = 200
 MAX_AUDIO = 5 * 1024 * 1024    # unos 2 minutos de WAV a 16 kHz; una orden dura segundos
 TRANSCRIBIR = [str(RAIZ / "whatsapp" / ".venv" / "bin" / "python"), str(RAIZ / "whatsapp" / "transcribir.py")]
 TIPOS = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
-         ".json": "application/manifest+json", ".svg": "image/svg+xml", ".png": "image/png"}
+         ".css": "text/css; charset=utf-8", ".json": "application/manifest+json", ".svg": "image/svg+xml",
+         ".png": "image/png"}
 
 SI = re.compile(r"^(si|sí|sip|dale|claro|confirmo|confirmado|hazlo|envialo|envíalo|mandalo|mándalo"
                 r"|de una|ok|okay|listo|adelante)(?=$|[\s.,!?¡¿])", re.I)
@@ -313,9 +315,9 @@ class Manejador(BaseHTTPRequestHandler):
             self._json({"error": "token"}, 401)
         return ok
 
-    def _archivo(self, nombre):
-        ruta = (APP / nombre).resolve()
-        if ruta.parent != APP.resolve() or not ruta.is_file():
+    def _archivo(self, nombre, carpeta=APP):
+        ruta = (carpeta / nombre).resolve()
+        if ruta.parent != carpeta.resolve() or not ruta.is_file():
             return self._json({"error": "no existe"}, 404)
         cuerpo = ruta.read_bytes()
         self.send_response(200)
@@ -331,8 +333,20 @@ class Manejador(BaseHTTPRequestHandler):
             self.send_response(302)
             self.send_header("Location", "/app/")
             self.end_headers()
+        elif url.path == "/app/propuestas":
+            # La misma ventana del HUD; pide los datos con el token que la app guardó.
+            self._archivo("propuestas.html", HUD_DIR)
+        elif url.path.startswith("/app/vendor/"):
+            self._archivo(url.path[12:], HUD_DIR / "vendor")
         elif url.path.startswith("/app/"):
             self._archivo(url.path[5:] or "index.html")
+        elif url.path == "/api/propuestas":
+            if self._autorizado():
+                self._json({"propuestas": self.modulo_hud.propuestas_lista()})
+        elif url.path.startswith("/api/propuestas/"):
+            if self._autorizado():
+                datos = self.modulo_hud.propuesta(unquote(url.path[16:]))
+                self._json(datos if datos else {"error": "no existe"}, 200 if datos else 404)
         elif url.path == "/api/conversacion":
             if self._autorizado():
                 try:

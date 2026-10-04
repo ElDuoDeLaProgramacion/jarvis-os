@@ -9,8 +9,10 @@ clave, los modelos de OpenRouter (GPT, Gemini, Llama, DeepSeek, Mistral, Grok...
     python3 scripts/ia_externa.py --todas "pregunta"             todas las configuradas, una tras otra
     python3 scripts/ia_externa.py --archivo nota.md "pregunta"   añade el texto de un archivo a la pregunta
     python3 scripts/ia_externa.py modelos [gemini|openrouter|gratis]  modelos disponibles (gratis = los :free de OpenRouter)
-    python3 scripts/ia_externa.py panel --rol auditoria [--n 3] --archivo resumen.md "pregunta"
-        un panel de varias IAs a la vez, elegidas por especialidad (roles: ver ROLES), en paralelo
+    python3 scripts/ia_externa.py panel --rol auditoria [--n 3] [--guardar carpeta] --archivo resumen.md "pregunta"
+        un panel de varias IAs a la vez, elegidas por especialidad, en paralelo. --rol acepta cualquier
+        tema (ROLES trae instrucciones afinadas para los comunes); --guardar deja panel-<rol>.json para
+        la ventana de propuestas del HUD
 
 Claves en .env (las pone David a mano): GEMINI_API_KEY y OPENROUTER_API_KEY.
 Modelos opcionales: GEMINI_MODELO y OPENROUTER_MODELO (si no, Gemini usa el flash más nuevo
@@ -23,6 +25,7 @@ import concurrent.futures
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -137,37 +140,89 @@ def preguntar(proveedor, pregunta, modelo=None, sistema=SISTEMA, lista=None):
 
 # Panel: para cada especialidad, qué pedirle a cada IA y qué modelos suelen ser mejores en eso
 # (palabras del nombre del modelo, de más a menos preferido). Los nombres cambian: lo que no
-# coincide queda al final, pero sigue pudiendo entrar.
+# coincide queda al final, pero sigue pudiendo entrar. Son solo los más comunes: cualquier otro
+# tema sirve como --rol (por ejemplo "nutricion" o "musica") y usa el experto genérico.
+CODIGO = ["coder", "devstral", "codestral", "qwen3", "deepseek", "gpt-oss", "kimi", "glm", "llama"]
+RAZONA = ["r1", "deepseek", "qwen3", "kimi", "gpt-oss", "glm", "nemotron", "llama", "mistral"]
+CREATIVO = ["gemini", "llama", "kimi", "mistral", "qwen", "deepseek", "gpt-oss", "glm"]
+GENERAL = ["deepseek", "qwen3", "kimi", "llama", "gemini", "gpt-oss", "mistral", "glm"]
 ROLES = {
     "auditoria": ("Eres auditor de ciberseguridad sénior. Revisa lo que te pasan y lista vulnerabilidades y "
-                  "malas prácticas concretas, cada una con gravedad (Alta, Media, Baja), por qué importa y el arreglo. "
-                  "No inventes: si algo no se puede saber con lo que ves, dilo.",
-                  ["r1", "deepseek", "qwen3", "gpt-oss", "kimi", "glm", "nemotron", "llama", "mistral"]),
+                  "malas prácticas concretas, cada una con gravedad (Alta, Media, Baja), por qué importa y el arreglo "
+                  "(con el código corregido si aplica). No inventes: si algo no se puede saber con lo que ves, dilo.",
+                  RAZONA),
     "programacion": ("Eres ingeniero de software sénior. Evalúa la calidad del código y la arquitectura: errores, "
                      "deuda técnica, pruebas, mantenibilidad y rendimiento. Da una nota de 1 a 10 y las 5 mejoras "
-                     "más valiosas en orden.",
-                     ["coder", "devstral", "codestral", "qwen3", "deepseek", "gpt-oss", "kimi", "glm", "llama"]),
+                     "más valiosas en orden, cada una con el código propuesto.", CODIGO),
     "planeacion": ("Eres jefe de producto y planeación. Evalúa el proyecto como producto: objetivo, alcance, "
-                   "prioridades, riesgos y qué falta. Propón los próximos 5 pasos en orden y qué dejarías de hacer.",
-                   ["kimi", "llama", "gemini", "mistral", "qwen", "deepseek", "gpt-oss", "glm"]),
+                   "prioridades, riesgos y qué falta. Propón los próximos 5 pasos en orden y qué dejarías de hacer. "
+                   "Si ayuda, dibuja el plan como diagrama.", CREATIVO),
     "ideas": ("Eres un juez de ideas exigente. Puntúa de 1 a 10 problema real, diferencia, viabilidad, costo y "
-              "potencial; luego los 3 riesgos más serios y cómo probar la idea barato en una semana.",
-              ["r1", "deepseek", "kimi", "llama", "qwen", "gemini", "mistral", "gpt-oss"]),
+              "potencial; luego los 3 riesgos más serios y cómo probar la idea barato en una semana.", RAZONA),
     "diseno": ("Eres diseñador de producto e interfaces. Critica la experiencia y la interfaz: claridad, jerarquía, "
-               "accesibilidad y flujo. Da las 5 mejoras de más impacto.",
-               ["gemini", "llama", "qwen", "mistral", "kimi", "gpt-oss"]),
+               "accesibilidad y flujo. Da las 5 mejoras de más impacto y una maqueta de la pantalla propuesta "
+               "en HTML.", CREATIVO),
+    "marketing": ("Eres estratega de marketing. Propón público objetivo, propuesta de valor, mensajes, canales y "
+                  "3 campañas concretas con textos de ejemplo y cómo medir cada una. Si encaja, entrega un lienzo "
+                  "(canvas) o una landing en HTML.", CREATIVO),
+    "negocio": ("Eres consultor de negocio. Analiza modelo de negocio, ingresos, costos, competencia y riesgos. "
+                "Entrega un Business Model Canvas y los 3 movimientos con más retorno.", RAZONA),
+    "contenido": ("Eres creador de contenido y guionista. Propón ideas de videos o publicaciones con gancho, guion "
+                  "breve, título y formato por plataforma.", CREATIVO),
+    "presentaciones": ("Eres experto en presentaciones. Entrega la presentación completa diapositiva por diapositiva: "
+                       "título, puntos clave y notas del orador.", CREATIVO),
+    "finanzas": ("Eres analista financiero. Revisa números, supuestos, flujo de caja y escenarios; señala riesgos y "
+                 "da recomendaciones concretas con cifras. No es asesoría profesional: dilo si hace falta un experto.",
+                 RAZONA),
+    "datos": ("Eres científico de datos. Propón qué medir, cómo analizarlo, consultas o código (SQL o Python) y "
+              "qué conclusiones se pueden sacar y cuáles no.", CODIGO),
+    "devops": ("Eres ingeniero DevOps. Revisa despliegue, servidores, CI, copias de seguridad, monitoreo y costos. "
+               "Da los cambios concretos con los archivos de configuración propuestos.", CODIGO),
+    "producto": ("Eres jefe de producto. Define usuarios, problemas, funciones priorizadas (MoSCoW), métricas de "
+                 "éxito y el flujo principal como diagrama.", CREATIVO),
+    "investigacion": ("Eres investigador. Explica el estado del tema, lo que se sabe con certeza, lo dudoso, las "
+                      "opciones comparadas y qué fuentes consultar.", RAZONA),
+    "educacion": ("Eres profesor experto. Explica el tema con un plan de aprendizaje por pasos, ejemplos, "
+                  "ejercicios y cómo comprobar que se entendió.", GENERAL),
+    "legal": ("Eres asesor legal general. Señala riesgos legales, licencias, privacidad y términos a revisar. "
+              "Aclara que no sustituye a un abogado y cuándo hace falta uno.", RAZONA),
+    "redaccion": ("Eres editor y redactor. Mejora el texto: claridad, tono, estructura y errores; entrega la "
+                  "versión reescrita completa.", CREATIVO),
 }
+# Para temas sin rol propio: el mismo encargo, con el tema como especialidad.
+GENERICO = ("Eres experto sénior en {tema}. Analiza lo que te pasan desde tu especialidad: qué está bien, qué "
+            "falla, riesgos y las 5 propuestas más valiosas en orden, concretas y con ejemplos.")
+ALIAS = {"seguridad": "auditoria", "codigo": "programacion", "plan": "planeacion", "diseño": "diseno",
+         "ux": "diseno", "ui": "diseno", "negocios": "negocio", "ventas": "marketing", "redes": "contenido",
+         "videos": "contenido", "presentacion": "presentaciones", "diapositivas": "presentaciones",
+         "dinero": "finanzas", "analisis": "datos", "servidores": "devops", "infraestructura": "devops",
+         "aprender": "educacion", "textos": "redaccion"}
+
+# Cómo entregar lo que se puede ver: JARVIS lo muestra en la ventana de propuestas del HUD y de la app.
+FORMATO = ("Formato de lo visual: el código o los cambios van en bloques ``` con el lenguaje (```diff para "
+           "cambios a archivos existentes); pantallas, landings, lienzos o maquetas en un solo bloque ```html "
+           "autocontenido (CSS y JS dentro, sin recursos externos); diagramas en ```mermaid; una presentación en "
+           "un bloque ```slides con las diapositivas separadas por una línea ---. Solo usa estos bloques cuando "
+           "aporten.")
 
 
-def ranking(rol, ids):
-    preferidos = ROLES[rol][1]
+def rol_de(nombre):
+    """Devuelve (clave, instrucciones, preferidos). Acepta cualquier tema, no solo los de ROLES."""
+    clave = " ".join((nombre or "").strip().lower().split())
+    clave = ALIAS.get(clave, clave)
+    if clave in ROLES:
+        return clave, ROLES[clave][0], ROLES[clave][1]
+    return clave or "general", GENERICO.format(tema=clave or "el tema"), GENERAL
+
+
+def ranking(preferidos, ids):
     def nota(m):
         b = m.lower()
         return next((i for i, k in enumerate(preferidos) if k in b), len(preferidos))
     return sorted(ids, key=nota)
 
 
-def armar_panel(rol, n):
+def armar_panel(preferidos, n):
     """Lista de (proveedor, [modelos a probar en orden]) con n miembros de familias distintas."""
     miembros = []
     if "gemini" in configuradas():
@@ -182,7 +237,7 @@ def armar_panel(rol, n):
         pool = todos if os.environ.get("OPENROUTER_PANEL_DE_PAGO") == "1" else [m for m in todos if m.endswith(":free")]
         pool = [m for m in pool if m != "openrouter/auto"]
         usadas = set()
-        ordenados = ranking(rol, pool)
+        ordenados = ranking(preferidos, pool)
         for m in ordenados:
             familia = m.split("/")[0]
             if familia in usadas:
@@ -198,24 +253,36 @@ def armar_panel(rol, n):
     return miembros[:n]
 
 
-def panel(rol, pregunta, n):
-    miembros = armar_panel(rol, n)
+def panel(nombre, pregunta, n, guardar=None):
+    rol, instrucciones, preferidos = rol_de(nombre)
+    miembros = armar_panel(preferidos, n)
     if not miembros:
         print("No pude armar el panel: no hay IAs externas disponibles.")
         return 1
-    sistema = ROLES[rol][0] + " Responde en español, directo y con argumentos."
-    print(f"# Panel de {rol}: {len(miembros)} IAs\n")
+    sistema = f"{instrucciones} Responde en español, directo y con argumentos. {FORMATO}"
+    respuestas = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(miembros)) as ex:
         futuros = [ex.submit(preguntar, prov, pregunta, None, sistema, lista) for prov, lista in miembros]
-        fallo = 0
         for (prov, lista), f in zip(miembros, futuros):
             try:
                 usado, texto = f.result()
-                print(f"## {usado}\n{texto}\n")
+                respuestas.append({"modelo": usado, "proveedor": prov, "texto": texto})
             except Exception as e:
-                print(f"## {lista[0]}\nError: {e}\n")
-                fallo = 1
-    return fallo
+                respuestas.append({"modelo": lista[0], "proveedor": prov, "error": str(e)})
+    if guardar:
+        # Para la ventana de propuestas (hud/propuestas.html): un JSON por rol en la carpeta del panel.
+        carpeta = Path(guardar)
+        carpeta.mkdir(parents=True, exist_ok=True)
+        destino = carpeta / ("panel-" + "".join(c if c.isalnum() else "-" for c in rol).strip("-") + ".json")
+        destino.write_text(json.dumps({
+            "fecha": time.strftime("%Y-%m-%d %H:%M"), "rol": rol, "pregunta": pregunta[:2000],
+            "respuestas": respuestas}, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"# Panel de {rol}: {len(miembros)} IAs\n")
+    for r in respuestas:
+        print(f"## {r['modelo']}\n{r.get('texto') or 'Error: ' + r.get('error', '')}\n")
+    if guardar:
+        print(f"(guardado en {destino})")
+    return 1 if any("error" in r for r in respuestas) else 0
 
 
 def main():
@@ -226,7 +293,8 @@ def main():
     a.add_argument("--modelo", help="modelo concreto (en OpenRouter: proveedor/modelo)")
     a.add_argument("--todas", action="store_true", help="preguntar a todas las configuradas")
     a.add_argument("--archivo", help="añadir el texto de este archivo a la pregunta")
-    a.add_argument("--rol", help="panel: " + ", ".join(ROLES))
+    a.add_argument("--rol", help="panel: cualquier tema; con instrucciones propias: " + ", ".join(ROLES))
+    a.add_argument("--guardar", help="panel: carpeta donde guardar las respuestas para la ventana de propuestas")
     a.add_argument("--n", type=int, default=3, help="panel: cuántas IAs (máximo 6)")
     args = a.parse_intermixed_args()
 
@@ -260,9 +328,9 @@ def main():
         a.error("falta la pregunta")
 
     if es_panel:
-        if args.rol not in ROLES:
-            a.error(f"--rol debe ser uno de: {', '.join(ROLES)}")
-        return panel(args.rol, pregunta, max(1, min(args.n, 6)))
+        if not args.rol:
+            a.error("falta --rol (un tema: auditoria, marketing, nutricion...)")
+        return panel(args.rol, pregunta, max(1, min(args.n, 6)), args.guardar)
 
     if args.todas:
         elegidas = listas

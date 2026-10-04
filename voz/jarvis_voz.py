@@ -293,7 +293,9 @@ REPRODUCIR = COLA / "reproducir.txt"   # la habilidad musica deja aquí el spoti
 URI_SPOTIFY = re.compile(r"^spotify:(track|album|playlist|artist|show|episode):[A-Za-z0-9]{10,40}$")
 MUSICA = "(la )?(musica|cancion|tema|spotify|rola)"
 # "Jarvis, abre ...": nombre dicho -> lo que Windows sabe abrir (programa registrado o enlace de la app).
-LIENZO = "http://localhost:7777/lienzo"
+HUD_WEB = "http://localhost:7777/"
+LIENZO = HUD_WEB + "lienzo"
+PROPUESTAS = HUD_WEB + "propuestas"
 ABRIBLES = {
     "spotify": "spotify:", "chrome": "chrome.exe", "google chrome": "chrome.exe", "edge": "msedge.exe",
     "firefox": "firefox.exe", "brave": "brave.exe", "word": "winword.exe", "excel": "excel.exe",
@@ -305,6 +307,10 @@ ABRIBLES = {
     # Lienzo 3D del HUD (hud/lienzo.html): cámara + manos para dibujar y construir en 3D.
     "lienzo": LIENZO, "lienzo 3d": LIENZO, "el lienzo 3d": LIENZO, "camara 3d": LIENZO, "la camara 3d": LIENZO,
     "la camara para dibujar": LIENZO, "modo 3d": LIENZO,
+    # Ventana de propuestas del HUD (hud/propuestas.html): lo que proponen los paneles de IAs.
+    "propuestas": PROPUESTAS, "las propuestas": PROPUESTAS, "la ventana de propuestas": PROPUESTAS,
+    "las propuestas de las ias": PROPUESTAS, "lo que propusieron las ias": PROPUESTAS, "panel de ias": PROPUESTAS,
+    "el panel de ias": PROPUESTAS,
 }
 
 
@@ -390,17 +396,20 @@ def ejecutar_musica(tipo, objetivo, veces):
         return ""
     if tipo == "abrir":
         import os
-        if objetivo == LIENZO:
-            # Que los gestos suelten la cámara ya, antes de que el lienzo la pida.
-            COLA.mkdir(exist_ok=True)
-            (COLA / "lienzo-camara").touch()
+        if objetivo.startswith(HUD_WEB):
+            if objetivo == LIENZO:
+                # Que los gestos suelten la cámara ya, antes de que el lienzo la pida.
+                COLA.mkdir(exist_ok=True)
+                (COLA / "lienzo-camara").touch()
             # Ventana propia de Chrome o Edge (sin pestañas ni barra); si no, el navegador de siempre.
             programa = navegador_app()
             if programa:
-                subprocess.Popen([programa, f"--app={LIENZO}"])
+                subprocess.Popen([programa, f"--app={objetivo}"])
             else:
-                os.startfile(LIENZO)
-            return "Abro el lienzo 3D. Pellizca con la mano derecha para dibujar."
+                os.startfile(objetivo)
+            if objetivo == LIENZO:
+                return "Abro el lienzo 3D. Pellizca con la mano derecha para dibujar."
+            return "Abro las propuestas de las IAs."
         try:
             os.startfile(objetivo)
         except OSError:
@@ -618,8 +627,8 @@ class Jarvis:
         musica = accion_musica(pedido) if rapida else None
         if musica:
             log(f"\nTú ({origen}): {pedido}")
-            if musica[1] == LIENZO and not hud_responde():
-                # El lienzo lo sirve el HUD: si está cerrado, lo abrimos primero.
+            if str(musica[1]).startswith(HUD_WEB) and not hud_responde():
+                # El lienzo y las propuestas los sirve el HUD: si está cerrado, lo abrimos primero.
                 subprocess.Popen(["cmd", "/c", str(RAIZ / "hud" / "abrir-hud.bat"), "--distro", self.args.distro],
                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
                 for _ in range(20):
