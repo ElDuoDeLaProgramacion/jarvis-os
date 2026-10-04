@@ -31,6 +31,12 @@ Escribe `boveda/outputs/seguridad/AAAA-MM-DD-<objetivo>.md` (frontmatter `fecha`
 3. Lo que está bien, en una lista corta.
 4. Enlaza el informe anterior del mismo objetivo si existe y di qué cambió.
 
+Arreglos que pueden dejar a David fuera del servidor. Escríbelos siempre así:
+- Antes de `PasswordAuthentication no`, el primer paso es crear una llave SSH en el PC y copiarla al servidor (`ssh-keygen -t ed25519` y añadir la `.pub` a `~/.ssh/authorized_keys`), y comprobar que entra sin contraseña. "Clave" es ambiguo: di "llave SSH".
+- Los cambios de sshd van en `/etc/ssh/sshd_config.d/00-endurecer.conf`. En Ubuntu de nube `50-cloud-init.conf` trae `PasswordAuthentication yes` y sshd usa el primer valor que lee, así que un `99-` no tiene efecto. Valida con `sudo sshd -t` y comprueba con `sudo sshd -T | grep -i passwordauth`.
+- No actives ufw sin `sudo ufw allow OpenSSH` (y Tailscale si se usa) antes de `ufw enable`.
+- Siempre: deja una sesión abierta mientras prueba otra nueva, y di cómo deshacerlo (consola web del proveedor).
+
 Criterios típicos: `PermitRootLogin yes` o `PasswordAuthentication yes` con SSH expuesto = Alta; sin cortafuegos con puertos abiertos a internet = Alta; actualizaciones de seguridad pendientes = Media (Alta si hay más de una semana); puertos que solo escuchan en 127.0.0.1 o Tailscale no son exposición; cabeceras web faltantes = Baja salvo HSTS en un sitio con login.
 
 No copies al informe secretos que aparezcan en la salida (claves, tokens).
