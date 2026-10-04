@@ -6,7 +6,8 @@ y espera el "¿Sí?". Con la cámara, la mano maneja el ratón (voz/gestos.py).
 1. Escucha el micrófono todo el tiempo y corta cada frase por los silencios.
 2. Transcribe en local con faster-whisper (el audio no sale de la máquina) y
    solo atiende las frases que empiezan por "Jarvis".
-3. Pasa el pedido a scripts/jarvis.sh dentro de WSL (Claude Code + habilidades).
+3. Pasa el pedido al JARVIS del servidor (voz/servidor_remoto.py) o, si toca tus archivos,
+   proyectos o pantalla, a scripts/jarvis.sh dentro de WSL (Claude Code + habilidades).
 4. Siempre contesta en voz alta con un TTS local (voces de Windows o Piper).
 
 Uso:  python jarvis_voz.py            (ver opciones con --help)
@@ -109,7 +110,12 @@ def separar_pedido(texto):
     return True, texto[m.end():].strip(" ,.;:!?¿¡")
 
 
-# ---------- Cerebro: JARVIS en WSL ----------
+# ---------- Cerebro: JARVIS en el servidor o en WSL ----------
+
+import servidor_remoto  # noqa: E402  (voz/servidor_remoto.py)
+
+SERVIDOR = "servidor"   # "conversación" que sigue en el servidor (él recuerda el "¿Lo envío?")
+
 
 def copiloto_a_jarvis(texto, distro, repo):
     """Pregunta del copiloto: solo puede mirar (Read), nada de escribir, correo ni calendario."""
@@ -634,7 +640,7 @@ class Jarvis:
                               "mira qué estoy haciendo y dime en pocas frases qué hacer.)")
                 except Exception as e:
                     log("No pude capturar la pantalla:", repr(e))
-            respuesta, sesion = preguntar_a_jarvis(texto, self.args.distro, self.args.repo, reanudar, confirmado)
+            respuesta, sesion = self.preguntar(pedido, texto, origen, reanudar, confirmado)
             try:
                 abrir_lo_encontrado()   # "pon música de..." : abre en Spotify lo que JARVIS encontró
             except Exception as e:
@@ -651,6 +657,22 @@ class Jarvis:
                 self.seguimiento = (self.seguimiento[0], time.monotonic() + 20)  # cuenta desde que calla
             estado_audio("ESCUCHANDO" if self.seguimiento else "EN ESPERA")
             self.ocupado.clear()
+
+    def preguntar(self, pedido, texto, origen, reanudar, confirmado):
+        """El servidor atiende lo general (una sola memoria con el celular); el PC, lo que toca sus
+        archivos, proyectos o pantalla. Si el servidor no responde, lo hace el PC."""
+        al_servidor = reanudar == SERVIDOR or (
+            reanudar is None and origen != "analisis" and texto == pedido and servidor_remoto.va_al_servidor(pedido))
+        if al_servidor:
+            try:
+                respuesta, abrir = servidor_remoto.preguntar(pedido)
+                if abrir:
+                    REPRODUCIR.write_text(abrir, encoding="utf-8")   # suena en el Spotify de este PC
+                return respuesta, SERVIDOR
+            except ConnectionError as e:
+                log("Servidor:", e, "- lo hago en el PC.")
+                reanudar = confirmado = None
+        return preguntar_a_jarvis(texto, self.args.distro, self.args.repo, reanudar, confirmado)
 
     def abrir_analizar(self):
         """Abre la ventana de análisis del HUD y espera lo que David agregue allí."""

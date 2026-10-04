@@ -149,6 +149,36 @@ class PruebaApi(unittest.TestCase):
         self.assertEqual(self.spotify.llamadas, [("reproducir", "spotify:playlist:37i9dQZF1DX", "Smartphone")])
         self.assertFalse((self.dir / "reproducir.txt").exists())
 
+    def test_pc_pone_la_musica_en_su_spotify(self):
+        self.pedir("/api/pedir", {"texto": "pon algo de queen", "origen": "pc"})
+        m = self.esperar()
+        self.assertEqual(m[0]["origen"], "pc")
+        self.assertEqual(m[-1]["abrir"], "spotify:playlist:37i9dQZF1DX")
+        self.assertEqual(self.spotify.llamadas, [])   # el servidor no la pone en el celular
+
+    def test_largo_negativo_no_cuelga(self):
+        import socket
+        with socket.create_connection(self.srv.server_address, timeout=5) as s:
+            s.sendall(b"POST /api/pedir HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer " + b"t" * 30 +
+                      b"\r\nContent-Length: -1\r\n\r\n")
+            self.assertIn(b" 413 ", s.recv(200))
+
+    def test_el_pc_pregunta_al_servidor(self):
+        sys.path.insert(0, str(api.RAIZ / "voz"))
+        import servidor_remoto
+        os.environ.update(JARVIS_SERVIDOR=self.base + "/app/", JARVIS_API_TOKEN="t" * 30)
+        try:
+            self.assertTrue(servidor_remoto.va_al_servidor("prueba la seguridad del servidor"))
+            self.assertFalse(servidor_remoto.va_al_servidor("busca el PDF en Descargas"))
+            self.assertEqual(servidor_remoto.preguntar("plan de hoy"), ("Hecho: plan de hoy", None))
+            self.assertEqual(servidor_remoto.preguntar("pon algo de queen")[1], "spotify:playlist:37i9dQZF1DX")
+            os.environ["JARVIS_API_TOKEN"] = "x" * 30
+            with self.assertRaises(ConnectionError):
+                servidor_remoto.preguntar("plan de hoy")
+        finally:
+            for k in ("JARVIS_SERVIDOR", "JARVIS_API_TOKEN"):
+                os.environ.pop(k, None)
+
     def voz(self, audio):
         req = urllib.request.Request(self.base + "/api/voz", data=audio,
                                      headers={"Authorization": "Bearer " + "t" * 30, "Content-Type": "audio/wav"})

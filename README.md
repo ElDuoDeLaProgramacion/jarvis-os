@@ -100,6 +100,8 @@ JARVIS se vincula a tu WhatsApp con un QR, como WhatsApp Web. Le das órdenes en
 ## Servidor y app del celular
 JARVIS puede vivir en un servidor (Oracle Cloud gratis, Clouding u otro Ubuntu), con la bóveda dentro. Así WhatsApp, las rutinas y la app del celular siguen funcionando con el PC apagado. La bóveda se sincroniza con el PC. Guía paso a paso en [servidor/README.md](servidor/README.md).
 
+El PC también puede pasarle los pedidos al servidor, para que haya un solo JARVIS con una sola memoria: lo que toca tus archivos, proyectos o pantalla se sigue haciendo en el PC. Ver "El PC conectado al servidor" en [servidor/README.md](servidor/README.md).
+
 En el celular hay dos opciones: la app web (chat con micrófono) y la **app de Android**, que escucha "Jarvis" todo el tiempo, también con la pantalla apagada. El APK está en [Releases](https://github.com/ElDuoDeLaProgramacion/jarvis-os/releases/latest).
 
 ## Actualizar
