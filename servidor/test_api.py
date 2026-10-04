@@ -161,9 +161,17 @@ class PruebaApi(unittest.TestCase):
         self.assertEqual(m[0]["texto"], "qué tengo hoy")
         self.assertEqual(m[1]["texto"], "Hecho: qué tengo hoy")
         self.assertEqual(list((self.dir / "voz").iterdir()), [])   # el audio no se queda guardado
-        # Lo que no se entiende no se pide.
+        # Lo que no se entiende no se pide, ni las frases que Whisper inventa con ruido.
         self.assertEqual(self.voz(b"ruido"), (200, {"texto": ""}))
+        self.assertEqual(self.voz("¡Gracias por ver!".encode()), (200, {"texto": ""}))
+        self.assertEqual(self.voz("Subtítulos realizados por la comunidad de Amara.org".encode()), (200, {"texto": ""}))
         self.assertEqual(len(self.esperar()), 2)
+
+    def test_es_pedido(self):
+        self.assertTrue(api.es_pedido("pon música de Queen"))
+        self.assertTrue(api.es_pedido("gracias, apaga la música"))
+        self.assertFalse(api.es_pedido("Gracias."))
+        self.assertFalse(api.es_pedido("..."))
 
     def test_spotify_prefiere_el_celular(self):
         real = api.cargar_modulo("spotify_real", api.RAIZ / "voz" / "spotify.py")
