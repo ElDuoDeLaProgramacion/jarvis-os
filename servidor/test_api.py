@@ -22,6 +22,7 @@ case "$pedido" in
   *correo*) echo "Listo el borrador para Ana. ¿Lo envío?" ;;
   *falla*) echo "se rompió" >&2; exit 1 ;;
   *queen*) echo "spotify:playlist:37i9dQZF1DX" > "$REPRO"; echo "Pongo Queen." ;;
+  *tarda*) sleep 1; echo "Por fin: $pedido" ;;
   *) echo "Hecho: $pedido" ;;
 esac
 """
@@ -172,6 +173,9 @@ class PruebaApi(unittest.TestCase):
             self.assertFalse(servidor_remoto.va_al_servidor("busca el PDF en Descargas"))
             self.assertEqual(servidor_remoto.preguntar("plan de hoy"), ("Hecho: plan de hoy", None))
             self.assertEqual(servidor_remoto.preguntar("pon algo de queen")[1], "spotify:playlist:37i9dQZF1DX")
+            # Un pedido del celular que termina mientras tanto no se mezcla con la respuesta del PC.
+            self.pedir("/api/pedir", {"texto": "esto tarda"})
+            self.assertEqual(servidor_remoto.preguntar("plan de hoy"), ("Hecho: plan de hoy", None))
             os.environ["JARVIS_API_TOKEN"] = "x" * 30
             with self.assertRaises(ConnectionError):
                 servidor_remoto.preguntar("plan de hoy")
@@ -186,7 +190,7 @@ class PruebaApi(unittest.TestCase):
             return r.status, json.loads(r.read())
 
     def test_voz_transcribe_y_pide(self):
-        self.assertEqual(self.voz("qué tengo hoy".encode()), (202, {"texto": "qué tengo hoy"}))
+        self.assertEqual(self.voz("qué tengo hoy".encode()), (202, {"texto": "qué tengo hoy", "n": 1}))
         m = self.esperar()
         self.assertEqual(m[0]["texto"], "qué tengo hoy")
         self.assertEqual(m[1]["texto"], "Hecho: qué tengo hoy")

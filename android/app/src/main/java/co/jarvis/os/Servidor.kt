@@ -31,6 +31,9 @@ class Servidor(direccion: String, private val token: String) {
         return if (mensajes.length() == 0) 0 else mensajes.getJSONObject(mensajes.length() - 1).getInt("n")
     }
 
+    /** Número del último pedido hecho por voz: su respuesta llega con "para" igual a este número. */
+    private var miPedido = 0
+
     /** Devuelve lo que el servidor entendió ("" si nada). Si entendió algo, ya quedó pedido. */
     fun voz(wav: ByteArray): String {
         val c = abrir("/api/voz", 180_000)
@@ -39,7 +42,9 @@ class Servidor(direccion: String, private val token: String) {
         c.setRequestProperty("Content-Type", "audio/wav")
         c.setFixedLengthStreamingMode(wav.size)
         c.outputStream.use { it.write(wav) }
-        return leer(c).optString("texto", "")
+        val datos = leer(c)
+        miPedido = datos.optInt("n", 0)
+        return datos.optString("texto", "")
     }
 
     /** Espera a que JARVIS termine y devuelve sus respuestas posteriores a [desde]. */
@@ -48,10 +53,12 @@ class Servidor(direccion: String, private val token: String) {
         while (sigue() && System.currentTimeMillis() < limite) {
             Thread.sleep(1500)
             val datos = leer(abrir("/api/conversacion?desde=$desde", 20_000))
-            if (datos.getBoolean("ocupado")) continue
+            if (miPedido == 0 && datos.getBoolean("ocupado")) continue
             val mensajes = datos.getJSONArray("mensajes")
+            // Solo la respuesta a este pedido: otro (del PC o de WhatsApp) puede terminar mientras tanto.
             val textos = (0 until mensajes.length()).map { mensajes.getJSONObject(it) }
-                .filter { it.getString("de") == "jarvis" }.map { it.getString("texto") }
+                .filter { it.getString("de") == "jarvis" && (miPedido == 0 || it.optInt("para") == miPedido) }
+                .map { it.getString("texto") }
             if (textos.isNotEmpty()) return textos.joinToString(" ")
         }
         return ""
