@@ -22,6 +22,7 @@ Solo usa la biblioteca estándar.
 
 import argparse
 import concurrent.futures
+import http.client
 import json
 import os
 import sys
@@ -86,6 +87,8 @@ def llamar(proveedor, ruta, cuerpo=None, timeout=120):
         raise error from None
     except urllib.error.URLError as e:
         raise RuntimeError(f"No pude conectar con {proveedor}: {e.reason}") from None
+    except (OSError, http.client.HTTPException, ValueError) as e:   # se cortó, tardó demasiado o no es JSON
+        raise RuntimeError(f"{proveedor} no respondió bien: {e!r}") from None
 
 
 def modelos(proveedor):
@@ -129,7 +132,8 @@ def preguntar(proveedor, pregunta, modelo=None, sistema=SISTEMA, lista=None):
                 "messages": [{"role": "system", "content": sistema}, {"role": "user", "content": pregunta}],
             })
         except RuntimeError as e:
-            if getattr(e, "codigo", None) in (404, 429):
+            # 404: ya no existe; 429: sin cuota; 400/413: la pregunta no le cabe (modelos de contexto corto).
+            if getattr(e, "codigo", None) in (400, 404, 413, 429):
                 ultimo = e
                 continue
             raise
@@ -253,7 +257,7 @@ def armar_panel(preferidos, n):
     return miembros[:n]
 
 
-def panel(nombre, pregunta, n, guardar=None):
+def panel(nombre, pregunta, n, guardar=None, resumen=None):
     rol, instrucciones, preferidos = rol_de(nombre)
     miembros = armar_panel(preferidos, n)
     if not miembros:
@@ -275,7 +279,7 @@ def panel(nombre, pregunta, n, guardar=None):
         carpeta.mkdir(parents=True, exist_ok=True)
         destino = carpeta / ("panel-" + "".join(c if c.isalnum() else "-" for c in rol).strip("-") + ".json")
         destino.write_text(json.dumps({
-            "fecha": time.strftime("%Y-%m-%d %H:%M"), "rol": rol, "pregunta": pregunta[:2000],
+            "fecha": time.strftime("%Y-%m-%d %H:%M"), "rol": rol, "pregunta": (resumen or pregunta)[:2000],
             "respuestas": respuestas}, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"# Panel de {rol}: {len(miembros)} IAs\n")
     for r in respuestas:
@@ -296,6 +300,8 @@ def main():
     a.add_argument("--rol", help="panel: cualquier tema; con instrucciones propias: " + ", ".join(ROLES))
     a.add_argument("--guardar", help="panel: carpeta donde guardar las respuestas para la ventana de propuestas")
     a.add_argument("--n", type=int, default=3, help="panel: cuántas IAs (máximo 6)")
+    a.add_argument("--sin-cerebro", action="store_true",
+                   help="no añadir la memoria de JARVIS (scripts/cerebro.py) a la pregunta")
     args = a.parse_intermixed_args()
 
     listas = configuradas()
@@ -321,16 +327,27 @@ def main():
     if es_panel:
         args.pregunta = args.pregunta[1:]
     pregunta = " ".join(args.pregunta).strip()
+    if not pregunta and not args.archivo:
+        a.error("falta la pregunta")
+    texto = ""
     if args.archivo:
         texto = Path(args.archivo).read_text(encoding="utf-8", errors="replace")[:60000]
-        pregunta = f"{pregunta}\n\n--- {Path(args.archivo).name} ---\n{texto}"
-    if not pregunta:
-        a.error("falta la pregunta")
+    pedido = pregunta
+    if args.archivo:
+        pedido = f"{pedido}\n\n--- {Path(args.archivo).name} ---\n{texto}"
+    if not args.sin_cerebro:
+        # Todas las IAs ven la misma memoria que Claude (sin lo privado), en lo que quepa junto al archivo.
+        import cerebro
+        memoria = cerebro.armar(f"{pregunta} {Path(args.archivo).stem if args.archivo else ''}",
+                                max(15000, 75000 - len(texto)))
+        if memoria:
+            pedido = f"{memoria}\n\n## Lo que te piden\n{pedido}"
+    original, pregunta = pregunta, pedido
 
     if es_panel:
         if not args.rol:
             a.error("falta --rol (un tema: auditoria, marketing, nutricion...)")
-        return panel(args.rol, pregunta, max(1, min(args.n, 6)), args.guardar)
+        return panel(args.rol, pregunta, max(1, min(args.n, 6)), args.guardar, original)
 
     if args.todas:
         elegidas = listas

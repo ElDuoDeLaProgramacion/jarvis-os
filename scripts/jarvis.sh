@@ -55,6 +55,7 @@ permitidas=(
   "Bash(scripts/seguridad.sh:*)" "Bash(./scripts/seguridad.sh:*)"
   # IAs externas (Gemini, OpenRouter) para una segunda opinión; ya entra en python3, se nombra por claridad.
   "Bash(python3 scripts/ia_externa.py:*)"
+  "Bash(python3 scripts/cerebro.py:*)"
 )
 # Agentes especializados (.claude/agents/: programador, revisor, auditor, diseñador, juez, investigador).
 # Heredan estas mismas herramientas; en la cola (rutinas y botones) no se usan, por el gasto.

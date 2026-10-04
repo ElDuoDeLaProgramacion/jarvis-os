@@ -38,6 +38,7 @@ tags: [jarvis, ayuda]
 - Agentes: programador, revisor de código, auditor de seguridad, diseñador, juez de ideas, investigador. Gastan más uso: JARVIS los llama solo cuando vale la pena.
 - **IAs externas:** "pregúntale a Gemini...", "¿qué opina GPT de...?", "segunda opinión de otras IAs sobre...". Necesitan las claves `GEMINI_API_KEY` u `OPENROUTER_API_KEY` en `.env`.
 - **Panel de IAs:** "audita y evalúa el proyecto X con todas las IAs", "que varias IAs propongan la landing de mi canal", "panel de marketing y diseño para...". De cualquier tema, varias IAs por especialidad más los agentes de Claude; JARVIS verifica y te da la conclusión en `outputs/panel/`. Lo que proponen lo ves en la ventana de propuestas (botón del HUD o de la app).
+- En todo trabajo grande (crear o revisar código, diseñar, planes grandes, marketing, evaluar ideas) JARVIS arma el panel solo. Di "sin panel" o "solo tú" para que lo haga solo Claude. Todas las IAs ven la memoria de la bóveda, sin chats, correos, personas, dinero, diario ni seguridad.
 
 ## Seguridad (solo tus sistemas, sin cambiar nada)
 - "prueba la seguridad del servidor" / "audita este equipo": SSH, puertos, cortafuegos, actualizaciones, usuarios, intentos de entrada y lynis.

@@ -34,7 +34,7 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | "recomiéndame...", "¿qué me sugieres...?", "¿qué debería aprender/usar?" | `recomendar` |
 | evaluar una idea, "¿vale la pena...?", abogado del diablo | `evaluar-idea` |
 | "pregúntale a Gemini/GPT/...", "¿qué opinan otras IAs?", segunda opinión | `segunda-opinion` |
-| "con todas las IAs", "que varias IAs opinen/auditen/propongan", panel o consejo de IAs, "qué tan bueno es el proyecto X" | `panel` |
+| "con todas las IAs", "que varias IAs opinen/auditen/propongan", panel o consejo de IAs, "qué tan bueno es el proyecto X" (y como apoyo en todo trabajo grande, ver abajo) | `panel` |
 | nombra un agente (auditor, revisor, programador, diseñador, juez, investigador), "junta al equipo", diseño, crear un programa grande | `equipo` |
 | empieza con "Modo copiloto" (recomendación que nadie pidió) | `copiloto` |
 
@@ -61,6 +61,11 @@ JARVIS mejora con cada conversación. Antes de responder, lee `boveda/wiki/apren
 Una línea por aprendizaje, sin repetir lo que ya está. Si no hubo nada nuevo, no escribas nada. En rutinas automáticas y en modo copiloto no se aprende (salvo el paso de evolución de `cierre-dia`).
 
 Aparte de los gustos de David, JARVIS aprende del mundo con la habilidad `aprender` (también en su rutina diaria): eso va solo a `boveda/wiki/conocimiento/`.
+
+## Paneles de IAs en trabajo grande
+David lo decidió: el trabajo grande no lo hace Claude solo. Cuando el pedido es crear o revisar un proyecto o una función grande de código, diseñar (pantallas, apps, landings, marcas), planear algo grande (un proyecto, una estrategia, un lanzamiento; no el plan del día), marketing o contenido (campañas, guiones, presentaciones), evaluar una idea o un negocio, o cualquier tema pesado parecido, usa también la habilidad `panel` con 2 o 3 especialidades del tema. Tú sigues al mando: repartes, verificas, decides y haces el trabajo con lo mejor de cada una.
+
+No armes panel para lo rápido o personal (música, abrir apps, correo, WhatsApp, agenda, tareas, archivos, resumen o plan del día, noticias), en rutinas automáticas, en modo copiloto, ni si David dice "sin panel" o "solo tú". Si no hay IAs externas configuradas, sigue solo.
 
 ## Agentes especializados
 En `.claude/agents/` hay agentes para programar, revisar código, auditar seguridad, diseñar, juzgar ideas e investigar. La habilidad `equipo` dice cuándo y cómo usarlos. Cuestan uso de Claude como una petición entera: úsalos cuando el pedido lo merece, nunca en rutinas.
