@@ -24,6 +24,7 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | canales, redes, seguidores, vistas, métricas | `canales` |
 | música, Spotify, "pon...", "reproduce...", qué está sonando | `musica` |
 | WhatsApp, chats, "qué me escribieron", "qué dijo X", "respóndele a X por WhatsApp" | `whatsapp` |
+| seguridad, auditoría, pruebas de seguridad, puertos abiertos, vulnerabilidades, certificados, "prueba la seguridad del servidor" | `seguridad` |
 | suscripciones, cobros recurrentes, renovaciones, pruebas gratis, "cuánto pago al mes", cancelar un servicio | `suscripciones` |
 | analizar archivos, PDFs, enlaces, videos o texto ("analiza las fuentes de...") | `analizar` |
 | recordar, guardar, "¿qué sé de...?", "¿qué decidí...?", limpieza de bóveda | `boveda` |

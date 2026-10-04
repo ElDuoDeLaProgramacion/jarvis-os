@@ -42,6 +42,9 @@ class EscuchaService : Service() {
         const val DETENER = "co.jarvis.os.DETENER"
         private const val CANAL = "escucha"
         private const val AVISO = 1
+        // Confianza mínima de la palabra "jarvis" en el resultado final. Más alto = menos activaciones
+        // falsas, pero hay que decirlo más claro. android/probar_oido.py lo prueba con este mismo valor.
+        private const val UMBRAL = 0.9f
 
         @Volatile var estado = "Apagado"
             private set
@@ -117,11 +120,12 @@ class EscuchaService : Service() {
         try {
             val gramatica = resources.openRawResource(R.raw.gramatica).bufferedReader().readText()
             val r = Recognizer(modelo, 16000f, gramatica)
+            r.setWords(true)
             reconocedor = r
             oido = SpeechService(r, 16000f).also {
                 it.startListening(object : RecognitionListener {
-                    override fun onPartialResult(json: String?) = revisar(json, "partial")
-                    override fun onResult(json: String?) = revisar(json, "text")
+                    override fun onPartialResult(json: String?) {}
+                    override fun onResult(json: String?) = revisar(json)
                     override fun onFinalResult(json: String?) {}
                     override fun onError(e: Exception?) = mostrar("Error del micrófono: ${e?.message}")
                     override fun onTimeout() {}
@@ -133,9 +137,12 @@ class EscuchaService : Service() {
         }
     }
 
-    private fun revisar(json: String?, campo: String) {
-        val texto = runCatching { JSONObject(json ?: "{}").optString(campo) }.getOrDefault("")
-        if (Regex("\\bjarvis\\b").containsMatchIn(texto)) detectado()
+    /** Solo el resultado final de cada frase cuenta, y solo si "jarvis" se oyó con confianza. */
+    private fun revisar(json: String?) {
+        val palabras = runCatching { JSONObject(json ?: "{}").optJSONArray("result") }.getOrNull() ?: return
+        val seguro = (0 until palabras.length()).map { palabras.getJSONObject(it) }
+            .any { it.optString("word") == "jarvis" && it.optDouble("conf") >= UMBRAL }
+        if (seguro) detectado()
     }
 
     private fun soltarMicrofono() {
@@ -161,10 +168,7 @@ class EscuchaService : Service() {
                 mostrar("Pensando…")
                 val desde = s.ultimo()
                 val pedido = s.voz(wav)
-                if (pedido.isBlank()) {
-                    hablar("No te entendí.")
-                    break
-                }
+                if (pedido.isBlank()) break   // nadie habló de verdad: se vuelve a escuchar sin decir nada
                 mostrar("Pensando: $pedido")
                 val respuesta = s.respuesta(desde) { encendido }
                 if (respuesta.isBlank()) break

@@ -239,6 +239,15 @@ class Conversacion:
 
 # ---------- Audio de la app de Android ----------
 
+# Lo que Whisper "oye" en ruido o silencio (lo aprendió de subtítulos de videos): no es un pedido.
+FANTASMAS = re.compile(r"^(gracias( por ver( el video)?)?|muchas gracias|subt[ií]tulos.*|suscr[ií]bete.*|"
+                       r"amara\.org.*|chao|adi[oó]s|\[.*\]|\(.*\)|\W*)$", re.I)
+
+
+def es_pedido(texto):
+    """Descarta lo que no es una orden: vacío, ruido y las frases fantasma de Whisper."""
+    return bool(texto) and not FANTASMAS.match(texto.strip().strip(".,¡!¿? ").strip())
+
 class Transcriptor:
     """Mantiene vivo whatsapp/transcribir.py (cargar el modelo tarda) y le pasa un audio a la vez."""
 
@@ -377,9 +386,10 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"error": str(e)}, 500)
         finally:
             archivo.unlink(missing_ok=True)
-        if texto:
-            self.conversacion.pedir(texto)
-        self._json({"texto": texto}, 202 if texto else 200)
+        if not es_pedido(texto):
+            return self._json({"texto": ""}, 200)
+        self.conversacion.pedir(texto)
+        self._json({"texto": texto}, 202)
 
     def log_message(self, formato, *args):
         pass

@@ -13,7 +13,7 @@ import kotlin.math.sqrt
 object Grabadora {
     private const val TASA = 16_000
     private const val BLOQUE = TASA / 10          // 100 ms
-    private const val ESPERA_VOZ = 6_000          // ms sin que empiece a hablar: nada
+    private const val ESPERA_VOZ = 4_000          // ms sin que empiece a hablar: nada
     private const val SILENCIO_FIN = 1_300        // ms de silencio que cierran la orden
     private const val MAXIMO = 15_000             // ms de orden como mucho
 
