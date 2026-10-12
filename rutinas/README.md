@@ -50,3 +50,14 @@ powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\instalar-inicio.ps
 - Si tu distribución de WSL no se llama `Ubuntu`, añade `-Distro "NombreExacto"`.
 - También crea la tarea **Actualizar**: al iniciar sesión y cada 2 horas trae lo nuevo de GitHub, sin `git pull` a mano (registro en `logs\actualizar.log`). Si no la quieres, añade `-SinActualizar`.
 - Para quitarlo: `powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\desinstalar-inicio.ps1`
+
+## Pausar JARVIS (por ejemplo, para cuidar la batería)
+
+Desactiva el arranque automático y la actualización cada 2 horas sin borrar nada, y cierra el HUD y la voz (que usa la cámara para los gestos):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\pausar.ps1
+```
+
+- Añade `-Rutinas` para pausar también las rutinas del día, y `-ApagarWSL` para apagar WSL (el proceso `vmmem`).
+- Para volver a encenderlo: `powershell -ExecutionPolicy Bypass -File P:\jarvis-os\rutinas\reanudar.ps1` (con `-Rutinas` si también las pausaste).
