@@ -2,7 +2,8 @@
 JARVIS por voz y gestos (Windows).
 
 Di "Jarvis" seguido de lo que quieras ("Jarvis, plan de hoy"), o solo "Jarvis"
-y espera el "¿Sí?". Con la cámara, la mano maneja el ratón (voz/gestos.py).
+y espera el "¿Sí?". "Jarvis, activa los gestos" enciende la cámara y la mano maneja
+el ratón (voz/gestos.py); "Jarvis, apaga los gestos" la apaga.
 1. Escucha el micrófono todo el tiempo y corta cada frase por los silencios.
 2. Transcribe en local con faster-whisper (el audio no sale de la máquina) y
    solo atiende las frases que empiezan por "Jarvis".
@@ -85,7 +86,8 @@ def opciones():
     p.add_argument("--repo", default="/mnt/p/jarvis-os", help="ruta del repo dentro de WSL")
     p.add_argument("--piper", default=None,
                    help="ruta a un modelo .onnx de Piper; si no se da, usa las voces de Windows")
-    p.add_argument("--sin-gestos", action="store_true", help="no usar la cámara")
+    p.add_argument("--sin-gestos", action="store_true",
+                   help="no usar la cámara nunca, ni aunque se pida por voz")
     p.add_argument("--sin-copiloto", action="store_true",
                    help="arrancar sin recomendaciones automáticas (se activan con 'Jarvis, activa el copiloto')")
     p.add_argument("--camara", type=int, default=0, help="número de cámara para los gestos")
@@ -594,6 +596,7 @@ class Jarvis:
         self.modelo = None                     # Whisper, para transcribir audio y video al analizar
         self.copiloto = None                   # recomendaciones sin que se las pidas (Copiloto)
         self.ultima_orden = 0.0                # el copiloto no interrumpe justo después de una orden
+        self.gestos = None                     # hilo de la cámara, solo mientras se pidió (gestos.Ojos)
 
     def hablar(self, texto):
         self.ocupado.set()
@@ -623,6 +626,11 @@ class Jarvis:
             self.copiloto.activo = copiloto
             log(f"\nTú ({origen}): {pedido}")
             self.hablar("Copiloto activo. Te aviso si veo algo útil." if copiloto else "Copiloto apagado.")
+            return
+        gestos_on = accion_gestos(pedido) if rapida else None
+        if gestos_on is not None:
+            log(f"\nTú ({origen}): {pedido}")
+            self.hablar(encender_gestos(self) if gestos_on else apagar_gestos(self))
             return
         musica = accion_musica(pedido) if rapida else None
         if musica:
@@ -1008,21 +1016,52 @@ def lienzo_quiere_camara():
         return False
 
 
-def arrancar_gestos(jarvis, args):
-    """Ratón y teclado con la mano (gestos básicos de Hands-Free Navigator)."""
+def accion_gestos(pedido):
+    """'activa los gestos' / 'enciende la cámara' -> True, 'apaga los gestos' -> False, otra cosa -> None.
+    La cámara del lienzo 3D ("abre la cámara 3D") es otra cosa y la maneja accion_musica."""
+    plano = normalizar(pedido).strip(" .,!¡¿?")
+    if not re.search(r"\bgestos?\b|\bcamara\b", plano) or re.search(r"\blienzo\b|\b3d\b|\bdibuj", plano):
+        return None
+    if re.search(r"\b(apaga|desactiva|quita|para|deten|cierra|suelta)\w*\b|\bsin\b|\bno\b", plano):
+        return False
+    if re.search(r"\b(activa|enciende|prende|pon|usa|abre|quiero|vuelve)\w*\b", plano):
+        return True
+    return None
+
+
+def encender_gestos(jarvis):
+    """Ratón y teclado con la mano (gestos básicos de Hands-Free Navigator). La cámara solo se
+    enciende aquí, cuando David lo pide, y se apaga con apagar_gestos()."""
+    if jarvis.args.sin_gestos:
+        return "Los gestos están desactivados en esta instalación."
+    if jarvis.gestos is not None and jarvis.gestos.is_alive():
+        return "Los gestos ya están activos."
     try:
         import cv2, mediapipe, pyautogui  # noqa: F401  (solo comprobar que están)
         import gestos
     except ImportError:
-        log("Gestos: no están instalados (mira voz/README.md). Sigo solo con voz.")
-        return
+        log("Gestos: no están instalados (mira voz/README.md).")
+        return "Los gestos no están instalados. Mira el README de la voz."
 
     def al_cambiar_pausa(pausado):
         log("Gestos:", "en pausa" if pausado else "activos")
         if not jarvis.ocupado.is_set():
             jarvis.hablar("Gestos en pausa." if pausado else "Gestos activos.")
 
-    gestos.Ojos(args.camara, args.ver_camara, al_cambiar_pausa, lienzo_quiere_camara).start()
+    jarvis.gestos = gestos.Ojos(jarvis.args.camara, jarvis.args.ver_camara, al_cambiar_pausa, lienzo_quiere_camara)
+    jarvis.gestos.start()
+    log("Gestos: cámara encendida por orden de voz")
+    return "Gestos activos. Cuando acabes, dime que los apague."
+
+
+def apagar_gestos(jarvis):
+    if jarvis.gestos is None or not jarvis.gestos.is_alive():
+        jarvis.gestos = None
+        return "Los gestos ya estaban apagados."
+    jarvis.gestos.apagar()
+    jarvis.gestos = None
+    log("Gestos: cámara apagada por orden de voz")
+    return "Gestos apagados. La cámara queda libre."
 
 
 def main():
@@ -1045,8 +1084,6 @@ def main():
     threading.Thread(target=atender_escritos, args=(jarvis,), daemon=True).start()
     jarvis.copiloto = Copiloto(jarvis, activo=not args.sin_copiloto)
     jarvis.copiloto.start()
-    if not args.sin_gestos:
-        arrancar_gestos(jarvis, args)
     jarvis.hablar("JARVIS en línea.")
 
     if args.tecla:
