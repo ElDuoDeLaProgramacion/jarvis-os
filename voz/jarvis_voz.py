@@ -864,8 +864,8 @@ class Jarvis:
                 if servidor_remoto.nombra_el_servidor(pedido):
                     # Hacerlo en el PC respondería sobre otra máquina.
                     log("Servidor:", e)
-                    return ("No llego al servidor. Revisa que Tailscale esté conectado en este PC "
-                            "y vuelve a pedírmelo."), None
+                    return ("No llego al servidor. Revisa que haya internet y que el servidor esté "
+                            "encendido, y vuelve a pedírmelo."), None
                 log("Servidor:", e, "- lo hago en el PC.")
                 reanudar = confirmado = None
         return preguntar_a_jarvis(texto, self.args.distro, self.args.repo, reanudar, confirmado)

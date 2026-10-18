@@ -68,7 +68,7 @@ class MainActivity : Activity() {
                 "Funciona con la pantalla apagada y con otras apps abiertas."
         })
         etiqueta("Dirección del servidor (la misma de la app web)")
-        servidor = campo("servidor", "https://servidor.tu-red.ts.net", false)
+        servidor = campo("servidor", "https://1-2-3-4.sslip.io", false)
         etiqueta("Clave de la app (JARVIS_API_TOKEN)")
         token = campo("token", "La misma que pegaste en la app web", true)
 

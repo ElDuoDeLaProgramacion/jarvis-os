@@ -83,8 +83,8 @@ def _llamar(ruta, cuerpo=None, espera=20):
 
 def preguntar(texto, limite_min=20):
     """Pide al servidor y espera su respuesta. Devuelve (texto, spotify:... o None).
-    Lanza ConnectionError si el servidor no responde (apagado, sin Tailscale, clave mala)."""
-    # Al iniciar sesión, Tailscale tarda unos segundos en conectarse: se reintenta antes de rendirse.
+    Lanza ConnectionError si el servidor no responde (apagado, sin internet, clave mala)."""
+    # Al iniciar sesión, la red tarda unos segundos en conectarse: se reintenta antes de rendirse.
     for intento in range(3):
         try:
             mensajes = _llamar("/api/conversacion?desde=0")["mensajes"]
