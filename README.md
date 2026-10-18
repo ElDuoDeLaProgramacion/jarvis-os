@@ -106,7 +106,7 @@ El PC también puede pasarle los pedidos al servidor, para que haya un solo Ori�
 En el celular hay dos opciones: la app web (chat con micrófono) y la **app de Android**, que escucha "Orión" todo el tiempo, también con la pantalla apagada. El APK está en [Releases](https://github.com/ElDuoDeLaProgramacion/jarvis-os/releases/latest).
 
 ## Actualizar
-Es automático: el servidor trae lo nuevo de GitHub cada 15 minutos y el PC al iniciar sesión y cada 2 horas (`scripts/actualizar.sh`). Nunca pisa cambios locales: si una nota de la bóveda cambió aquí y en GitHub, mezcla las dos, y si chocan se queda tu versión. Todo queda en `logs/actualizar.log`. Para forzarlo ya: `./scripts/actualizar.sh`. La app de Android se actualiza instalando el `jarvis.apk` nuevo encima.
+Es automático: el servidor trae lo nuevo de GitHub cada 15 minutos y el PC al iniciar sesión y cada 2 horas (`scripts/actualizar.sh`). Nunca pisa cambios locales: si una nota de la bóveda cambió aquí y en GitHub, mezcla las dos, y si chocan se queda tu versión. Todo queda en `logs/actualizar.log`. Para forzarlo ya: `./scripts/actualizar.sh`. Las skills de documentos y diseño (Word, Excel, PowerPoint, PDF, carteles y pruebas de páginas) necesitan programas extra: córrelo una vez en el PC (dentro de WSL) y otra en el servidor con `./scripts/instalar-skills.sh`. La app de Android se actualiza instalando el `jarvis.apk` nuevo encima.
 
 ## Arranque automático
 

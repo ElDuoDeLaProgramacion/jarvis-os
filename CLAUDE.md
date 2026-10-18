@@ -37,6 +37,9 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | "pregúntale a Gemini/GPT/...", "¿qué opinan otras IAs?", segunda opinión | `segunda-opinion` |
 | "con todas las IAs", "que varias IAs opinen/auditen/propongan", panel o consejo de IAs, "qué tan bueno es el proyecto X" (y en todo pedido de trabajo, ver abajo) | `panel` |
 | páginas web, apps, interfaces, pantallas, colores, tipografía, "hazme una página", "está fea", rediseñar (siempre junto con el panel y el equipo) | `ui-ux-pro-max` |
+| crear o editar un Word, Excel, PowerPoint o PDF (presentaciones, informes, hojas con fórmulas, llenar o unir PDFs) | `document-skills:docx`, `document-skills:xlsx`, `document-skills:pptx`, `document-skills:pdf` (junto con `archivos`) |
+| póster, cartel, portada, arte o pieza visual en PNG o PDF | `canvas-design` |
+| probar una página o app web, ver si funciona, capturas de una página local | `webapp-testing` |
 | nombra un agente (auditor, revisor, programador, diseñador, juez, investigador), "junta al equipo", diseño, crear un programa grande | `equipo` |
 | empieza con "Modo copiloto" (recomendación que nadie pidió) | `copiloto` |
 
