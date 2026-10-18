@@ -23,7 +23,7 @@ Doble clic en `jarvis.bat` (o se abre solo al iniciar sesión, ver [rutinas](../
 - "Jarvis, plan de hoy" → suena un pitido corto, trabaja y te lee la respuesta. Por voz usa un modelo más rápido (Sonnet); para cambiarlo pon `JARVIS_MODELO_VOZ=opus` (o `haiku`) en `.env`.
 - "Jarvis" a secas → "¿Sí?" → dices la orden en los 8 segundos siguientes.
 - Lo que digas sin "Jarvis" al principio se ignora (aparece como "(oído)" en la ventana).
-- **Si JARVIS te pregunta algo** ("¿Lo agendo?"), contesta sin decir "Jarvis" en los 20 segundos siguientes: sigue la misma conversación. Ahí también valen las órdenes al instante ("abre Spotify", "pausa", "cierra la pestaña"), así que si te entendió mal, repítela sin "Jarvis".
+- **Conversación seguida:** después de cada respuesta tienes 8 segundos para seguir hablando sin decir "Jarvis" ("¿y mañana?", "hazlo más corto"), en la misma conversación. Si JARVIS te pregunta algo ("¿Lo agendo?"), tienes 20 segundos. Cambia los 8 con `--conversacion 5` (0 = siempre con "Jarvis"). Ahí también valen las órdenes al instante ("abre Spotify", "pausa", "cierra la pestaña"), así que si te entendió mal, repítela sin "Jarvis".
 - **Cerrar pestañas por nombre** (al instante): "Jarvis, cierra las pestañas de búsqueda de Google", "cierra las pestañas de YouTube". Recorre las pestañas del navegador que está al frente y cierra las que tienen eso en el título.
 - **Copiloto** (sin que lo pidas): si estás jugando ajedrez (chess.com, lichess) o programando (VS Code, Cursor, PyCharm...), JARVIS mira la pantalla de vez en cuando (ajedrez cada 45 s, código cada 3 min, y solo si cambió) y habla solo si ve algo útil. En partidas en vivo contra personas no sugiere jugadas: va contra las reglas de esas páginas; te da un consejo al terminar. Cada mirada usa tu cuenta de Claude. "Jarvis, apaga el copiloto" / "activa el copiloto"; para arrancar apagado usa `--sin-copiloto`.
 - **Abrir programas** (al instante): "Jarvis, abre Chrome / Word / Excel / Spotify / WhatsApp / la calculadora / VS Code...". La lista está en `ABRIBLES` en `jarvis_voz.py`. Entiende también lo que la voz oye un poco mal ("abri, Spotify", "abre y Spotify", "abrace putify", "spotifai").
@@ -35,7 +35,8 @@ Doble clic en `jarvis.bat` (o se abre solo al iniciar sesión, ver [rutinas](../
 - **Cerrar al navegar** (lo hace al instante, sin pasar por Claude): "Jarvis, cierra esta pestaña" (Ctrl+W), "Jarvis, cierra la ventana" o "cierra esto" (Alt+F4 en la ventana activa) y "Jarvis, cierra Spotify / Chrome / Word..." (le pide al programa que se cierre, así que si hay algo sin guardar te pregunta). Nunca cierra el propio JARVIS, la consola ni el escritorio de Windows.
 - **"Jarvis, lee mi pantalla"** (o cualquier pedido con la palabra "pantalla"): hace una captura, JARVIS la mira y te dice qué hacer. Las últimas 10 capturas quedan en `cola\pantalla\` y no se suben a git.
 - **"Jarvis, analiza este archivo"** (o PDF, enlace, video...): se abre la ventana de análisis en el HUD. Agrega archivos, enlaces o texto, pulsa Analizar y JARVIS te responde en voz. El audio y el video se transcriben aquí mismo con Whisper.
-- Mientras JARVIS piensa o habla no escucha, para no oírse a sí mismo.
+- **Interrumpir:** mientras JARVIS piensa o habla sigue escuchando. "Jarvis, para" (o "ya", "cállate", "olvídalo") lo calla al instante, y si aún pensaba no te dice la respuesta. "Jarvis, <otra cosa>" lo calla y te atiende. Mientras habla solo hace caso a frases que empiezan por "Jarvis", para no confundirse con su propia voz.
+- **Voz natural:** habla con una voz neural de Microsoft (`es-MX-JorgeNeural`), frase a frase: mientras dice una ya prepara la siguiente. Necesita internet; sin conexión usa Piper o la voz de Windows sola. Otras voces: `--voz-neural es-ES-AlvaroNeural` (España), `es-CO-GonzaloNeural` (Colombia), `es-MX-DaliaNeural` (mujer); `--voz-neural no` para no usarla. Solo el texto de la respuesta sale a ese servicio, nunca tu audio.
 - Si tienes el HUD abierto, "Audio E/S" muestra ESCUCHANDO, PENSANDO o HABLANDO, y cada conversación aparece en "Actividad".
 
 ## Gestos
@@ -69,7 +70,9 @@ Se añaden al final, por ejemplo `jarvis.bat --modelo base`:
 | `--ver-camara` | Ver la cámara con el gesto que detecta (para ajustar) |
 | `--camara 1` | Otra cámara |
 | `--distro Ubuntu-22.04` | Si tu distribución de WSL tiene otro nombre (míralo con `wsl -l`) |
-| `--piper ruta\voz.onnx` | Voz más natural con Piper (ver abajo) |
+| `--voz-neural es-ES-AlvaroNeural` | Otra voz neural (`no` para usar la de Windows o Piper) |
+| `--conversacion 5` | Segundos para seguir hablando sin "Jarvis" tras cada respuesta (0 = nunca) |
+| `--piper ruta\voz.onnx` | Voz local con Piper, sin internet (ver abajo) |
 | `--solo-texto` | Escribir en vez de hablar, para probar sin micrófono |
 
 ## Spotify que obedece de verdad (opcional, requiere Premium)
