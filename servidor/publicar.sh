@@ -28,12 +28,15 @@ if ! command -v caddy >/dev/null; then
   sudo apt-get install -y caddy
 fi
 
+# "tailscale serve" (como se instalaba antes) ocupa el 443 y Caddy no arranca: se suelta primero.
+if command -v tailscale >/dev/null; then sudo tailscale serve reset >/dev/null 2>&1 || true; fi
+
 sudo tee /etc/caddy/Caddyfile >/dev/null <<EOF
 # Lo escribe servidor/publicar.sh. La API de Orión, publicada con HTTPS.
 $dominio {
 	encode gzip
 	request_body {
-		max_size 30MB
+		max_size 10MB
 	}
 	header {
 		Strict-Transport-Security "max-age=31536000"
@@ -45,7 +48,12 @@ $dominio {
 }
 EOF
 sudo systemctl enable caddy >/dev/null 2>&1 || true
-sudo systemctl reload caddy 2>/dev/null || sudo systemctl restart caddy
+sudo systemctl reload caddy 2>/dev/null || sudo systemctl restart caddy || true
+if ! systemctl is-active --quiet caddy; then
+  echo "Caddy no arrancó. Lo que dice:"
+  sudo journalctl -u caddy -n 5 --no-pager | grep -E 'error|bind' || true
+  echo "Si dice 'address already in use', otro programa usa el 80 o el 443:  sudo ss -ltnp | grep -E ':(80|443) '"
+fi
 
 paso "Cortafuegos"
 if command -v ufw >/dev/null && sudo ufw status | grep -q "Status: active"; then
