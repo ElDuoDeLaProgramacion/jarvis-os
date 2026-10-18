@@ -70,18 +70,29 @@ def confianza(modelo, ruta):
     return max((p["conf"] for f in finales for p in f.get("result", []) if p["word"] in ("orión", "orion")), default=0)
 
 
+def avisar(texto):
+    """Además de imprimirlo, lo deja como anotación del CI (se ve sin abrir el registro)."""
+    print(texto)
+    print(f"::notice::{texto.strip()}")
+
+
 def main():
+    palabras = Path(sys.argv[1]) / "graph" / "words.txt"
+    if palabras.exists():
+        conocidas = {l.split()[0] for l in palabras.read_text(encoding="utf-8").splitlines() if l.strip()}
+        faltan = [w for w in json.loads(GRAMATICA) if w != "[unk]" and w not in conocidas]
+        avisar(f"Palabras de la gramática que el modelo no conoce: {', '.join(faltan) or 'ninguna'}")
     modelo = Model(sys.argv[1])
     with tempfile.TemporaryDirectory() as d:
         carpeta = Path(d)
         con = [(confianza(modelo, audio(v, t, carpeta)), v, t) for v, t in CON]
         sin = [(confianza(modelo, audio(v, t, carpeta)), v, t) for v, t in SIN]
     for c, v, t in con:
-        print(f"  {'oye   ' if c >= UMBRAL else 'NO oye'}  {c:.2f}  [{v}] {t}")
+        (print if c >= UMBRAL else avisar)(f"  {'oye   ' if c >= UMBRAL else 'NO oye'}  {c:.2f}  [{v}] {t}")
     for c, v, t in sin:
-        print(f"  {'FALSO ' if c >= UMBRAL else 'bien  '}  {c:.2f}  [{v}] {t}")
+        (avisar if c >= UMBRAL else print)(f"  {'FALSO ' if c >= UMBRAL else 'bien  '}  {c:.2f}  [{v}] {t}")
     for u in (0.5, 0.7, 0.8, 0.9, 0.95, 0.99):
-        print(f"  umbral {u}: oye {sum(c >= u for c, *_ in con)}/{len(con)}, falsos {sum(c >= u for c, *_ in sin)}/{len(sin)}")
+        avisar(f"  umbral {u}: oye {sum(c >= u for c, *_ in con)}/{len(con)}, falsos {sum(c >= u for c, *_ in sin)}/{len(sin)}")
     aciertos, falsos = sum(c >= UMBRAL for c, *_ in con), sum(c >= UMBRAL for c, *_ in sin)
     print(f"Con el umbral {UMBRAL}: oyó Orión en {aciertos}/{len(con)} y se confundió en {falsos}/{len(sin)}.")
     if aciertos < len(con) - 2 or falsos > 0:

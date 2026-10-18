@@ -44,7 +44,7 @@ jobs:
           unzip -q modelo.zip
 
       # Prueba el oído con voces sintéticas: tiene que oír "Jarvis" y no confundirse con otras frases.
-      - name: Probar que el modelo oye "Jarvis"
+      - name: Probar que el modelo oye "Orión"
         run: |
           sudo apt-get install -y -qq espeak-ng ffmpeg >/dev/null
           python3 -m venv /tmp/vosk && /tmp/vosk/bin/pip install -q vosk
