@@ -55,3 +55,18 @@ test('opciones de respuesta', () => {
   assert.equal(eleccion('4', 3), -1)
   assert.equal(eleccion('dile que 2 horas', 3), -1)
 })
+
+test('pedir opciones', async () => {
+  const { pideOpciones } = await import('./util.mjs')
+  for (const t of ['opciones', 'Dame opciones', '¿Qué le respondo?', 'qué le digo', 'propón respuestas']) assert.ok(pideOpciones(t), t)
+  for (const t of ['dile que llego a las 8', 'qué opciones hay de vuelos a Bogotá mañana', 'hola']) assert.ok(!pideOpciones(t), t)
+})
+
+test('tipos de archivo', async () => {
+  const { tipoDe, extensionDe, nombreSeguro } = await import('./util.mjs')
+  assert.equal(tipoDe('tabla.XLSX'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  assert.equal(tipoDe('raro.xyz'), 'application/octet-stream')
+  assert.equal(extensionDe('image/jpeg'), 'jpg')
+  assert.equal(extensionDe('application/pdf', 'Factura Enero.pdf'), 'pdf')
+  assert.equal(nombreSeguro('../../etc/passwd'), 'passwd')
+})

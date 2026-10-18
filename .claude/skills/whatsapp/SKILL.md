@@ -30,5 +30,9 @@ Tú no envías nada. Dejas un borrador y el puente se lo muestra a David, que lo
 3. Responde en una frase, por ejemplo "Listo el mensaje para Ana.". No preguntes "¿lo envío?": el puente muestra el texto y pregunta.
 4. Un solo destinatario y nunca grupos. Si David pide escribirle a mucha gente a la vez, dile que no lo haces, porque WhatsApp puede bloquear el número.
 
+## Archivos por WhatsApp
+- Si el pedido dice que David mandó archivos, ábrelos con Read (fotos y PDF se ven directo; Excel y Word con python3 o la habilidad `document-skills` que toque) y haz lo que pide con ellos.
+- Si David pide un archivo, el pedido trae la carpeta donde dejarlo: créalo ahí con la habilidad del formato (`document-skills:xlsx`, `docx`, `pptx`, `pdf`; CSV o imagen como corresponda) y el puente se lo manda. Una tabla sin formato dicho va en `.xlsx`. En tu respuesta di en una frase qué le mandas; no pegues la tabla entera en el chat.
+
 ## Si el puente no está encendido
 Si `boveda/raw/whatsapp/chats/` está vacío o no tiene nada reciente, dile a David que el WhatsApp de Orión no está vinculado o está apagado. Se arranca con `./whatsapp/iniciar.sh` (ver `whatsapp/README.md`).
