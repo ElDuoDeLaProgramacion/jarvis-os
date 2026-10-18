@@ -36,6 +36,7 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | evaluar una idea, "¿vale la pena...?", abogado del diablo | `evaluar-idea` |
 | "pregúntale a Gemini/GPT/...", "¿qué opinan otras IAs?", segunda opinión | `segunda-opinion` |
 | "con todas las IAs", "que varias IAs opinen/auditen/propongan", panel o consejo de IAs, "qué tan bueno es el proyecto X" (y en todo pedido de trabajo, ver abajo) | `panel` |
+| páginas web, apps, interfaces, pantallas, colores, tipografía, "hazme una página", "está fea", rediseñar (siempre junto con el panel y el equipo) | `ui-ux-pro-max` |
 | nombra un agente (auditor, revisor, programador, diseñador, juez, investigador), "junta al equipo", diseño, crear un programa grande | `equipo` |
 | empieza con "Modo copiloto" (recomendación que nadie pidió) | `copiloto` |
 
