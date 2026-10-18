@@ -513,6 +513,102 @@ def correr(tareas):
     return salida
 
 
+def trabajo_del_flujo(carpeta, nombres):
+    """[(etapa, respuesta)] de todas las etapas ya hechas, solo las que traen texto."""
+    salida = []
+    for i, nombre in enumerate(nombres, 1):
+        f = carpeta / f"panel-{i}-{_nombre_json(nombre)}.json"
+        if f.exists():
+            for r in json.loads(f.read_text(encoding="utf-8")).get("respuestas", []):
+                if r.get("texto") and "ia" in r:
+                    salida.append((nombre, r))
+    return salida
+
+
+def escribir_hojas(carpeta, tipo, asunto, nombres, miembros, trabajo, respuestas):
+    """Las hojas que pidió David: resumen general, una por IA y una por equipo. Todas empiezan con los
+    nombres de todas las IAs usadas. La conclusión de Orión se añade al final del resumen general."""
+    hojas = carpeta / "hojas"
+    hojas.mkdir(parents=True, exist_ok=True)
+    for viejo in hojas.glob("*.md"):
+        if viejo.name != "00-resumen-general.md":
+            viejo.unlink()
+    usadas = [m[1][0] for m in miembros]
+    # Los agentes de Claude que entraron en alguna etapa (panel-claude.json) también cuentan, y Orión dirige.
+    agentes = []
+    try:
+        agentes = [r for r in json.loads((carpeta / "panel-claude.json").read_text(encoding="utf-8")).get("respuestas", [])
+                   if r.get("texto")]
+    except (OSError, ValueError):
+        pass
+    todas = usadas + [r.get("modelo", "agente de Claude") for r in agentes] + ["Orión (Claude, dirige)"]
+    fecha = time.strftime("%Y-%m-%d %H:%M")
+    cabecera = (f"**IAs usadas ({len(todas)}):** " + ", ".join(todas) +
+                f"\n\n**Pedido:** {asunto.splitlines()[0][:300] if asunto else ''}\n**Tipo:** {tipo} · **Fecha:** {fecha}\n")
+    # Frontmatter de la bóveda y, justo debajo del título, los nombres de todas las IAs.
+    frente = (f"---\nfecha: {fecha[:10]}\ntipo: panel-hoja\ntags: [panel, {_nombre_json(tipo).lower()}]\n"
+              f"modelos: {json.dumps(todas, ensure_ascii=False)}\n---\n")
+    por_ia = {r["ia"]: r for r in respuestas if "ia" in r and "equipo" not in r}
+    por_equipo = {r["equipo"]: r for r in respuestas if "equipo" in r}
+
+    def texto_de(r, abajo=""):
+        return (r or {}).get("texto") or f"(no respondió: {(r or {}).get('error', 'no tuvo trabajo')}){abajo}"
+
+    def primera(t):
+        return next((l.strip(" -*#") for l in t.splitlines() if l.strip(" -*#")), "")
+
+    # Una hoja por IA
+    lineas_ia = []
+    for i, nombre in enumerate(usadas):
+        papeles = [f"- **{etapa}:** {r.get('rol', '')}" for etapa, r in trabajo if r["ia"] == i]
+        entregas = [f"### {etapa} · {r.get('rol', '')}\n\n{r['texto']}" for etapa, r in trabajo if r["ia"] == i]
+        suyo = texto_de(por_ia.get(i), "; abajo está todo lo que entregó" if entregas else "")
+        archivo = hojas / f"ia-{i + 1:02d}-{_nombre_json(nombre)[:60]}.md"
+        archivo.write_text(f"{frente}# {nombre}\n\n{cabecera}\n## Su papel\n" + ("\n".join(papeles) or "- (no trabajó)") +
+                           f"\n\n## Qué hizo (en sus palabras)\n{suyo}\n\n## Lo que entregó\n\n" +
+                           ("\n\n".join(entregas) or "(nada)") + "\n", encoding="utf-8")
+        lineas_ia.append(f"- **{nombre}** ({', '.join(sorted({r.get('rol', '') for _, r in trabajo if r['ia'] == i})) or 'sin trabajo'}): "
+                         f"{primera(suyo)} → [[{archivo.stem}]]")
+
+    for j, r in enumerate(agentes, len(usadas) + 1):
+        nombre = r.get("modelo", "agente de Claude")
+        papel = r.get("etapa") or r.get("rol") or "agente de Claude"
+        archivo = hojas / f"ia-{j:02d}-{_nombre_json(nombre)[:60]}.md"
+        archivo.write_text(f"{frente}# {nombre}\n\n{cabecera}\n## Su papel\n- {papel} (agente de Claude, mira los archivos de verdad)"
+                           f"\n\n## Qué hizo\n{r['texto']}\n", encoding="utf-8")
+        lineas_ia.append(f"- **{nombre}** ({papel}): {primera(r['texto'])} → [[{archivo.stem}]]")
+
+    # Una hoja por equipo (etapa + rol con dos o más IAs)
+    lineas_equipo = []
+    grupos = {}
+    for etapa, r in trabajo:
+        grupos.setdefault((etapa, r.get("rol", "")), []).append(r["ia"])
+    for (etapa, rol), ias in grupos.items():
+        nombres_eq = [usadas[i] for i in ias]
+        if len(ias) < 2:
+            lineas_equipo.append(f"- **{etapa} · {rol}:** {nombres_eq[0]} (sola)")
+            continue
+        r = por_equipo.get(f"{etapa} · {rol}")
+        archivo = hojas / f"equipo-{nombres.index(etapa) + 1}-{_nombre_json(etapa)}-{_nombre_json(rol)}.md"
+        archivo.write_text(f"{frente}# Equipo «{rol}» · etapa {etapa}\n\n{cabecera}\n## Integrantes ({len(ias)})\n" +
+                           "\n".join(f"- {n}" for n in nombres_eq) + f"\n\n## Qué hizo el equipo\n{texto_de(r)}\n",
+                           encoding="utf-8")
+        lineas_equipo.append(f"- **{etapa} · {rol}:** {', '.join(nombres_eq)} → [[{archivo.stem}]]")
+
+    # Resumen general (la conclusión de Orión, si ya estaba, se conserva)
+    general = hojas / "00-resumen-general.md"
+    conclusion = ""
+    if general.exists():
+        previo = general.read_text(encoding="utf-8")
+        if "## Conclusión de Orión" in previo:
+            conclusion = previo[previo.index("## Conclusión de Orión"):]
+    general.write_text(f"{frente}# Resumen general\n\n{cabecera}\n## Etapas\n" + " → ".join(nombres) +
+                       f"\n\n## Equipos\n" + ("\n".join(lineas_equipo) or "- (ninguno)") +
+                       f"\n\n## Cada IA\n" + "\n".join(lineas_ia) + "\n\n" +
+                       (conclusion or "## Conclusión de Orión\n(la escribe Orión al cerrar)\n"), encoding="utf-8")
+    return hojas
+
+
 def flujo(tipo, etapa, pedido, carpeta, resumen, a_medida=None):
     # Las etapas a medida se guardan en la carpeta, así las demás llamadas no tienen que repetirlas.
     guardadas = Path(carpeta) / "etapas.ias" if carpeta else None
@@ -535,14 +631,14 @@ def flujo(tipo, etapa, pedido, carpeta, resumen, a_medida=None):
         print("No hay IAs externas disponibles.")
         return 1
     if etapa == "resumen":
-        # Cada IA resume lo suyo de todas las etapas: qué hizo, qué encontró, qué recomienda, qué no pudo.
-        todo = {}
-        for i, nombre in enumerate(nombres, 1):
-            f = carpeta / f"panel-{i}-{_nombre_json(nombre)}.json"
-            if f.exists():
-                for r in json.loads(f.read_text(encoding="utf-8")).get("respuestas", []):
-                    if r.get("texto") and "ia" in r:
-                        todo.setdefault(r["ia"], []).append(f"### {nombre} ({r.get('rol', '')})\n{r['texto']}")
+        # Cada IA resume lo suyo de todas las etapas, y cada equipo (las IAs de una etapa con el mismo rol)
+        # cuenta qué hizo junto. Luego quedan las hojas: resumen general, una por IA y una por equipo.
+        trabajo = trabajo_del_flujo(carpeta, nombres)
+        todo, equipos = {}, {}
+        for nombre, r in trabajo:
+            todo.setdefault(r["ia"], []).append(f"### {nombre} ({r.get('rol', '')})\n{r['texto']}")
+            equipos.setdefault((nombre, r.get("rol", "")), []).append(r)
+        asunto = (resumen or pedido)[:1500]
         tareas = []
         for i, m in enumerate(miembros):
             suyo = todo.get(i)
@@ -550,9 +646,19 @@ def flujo(tipo, etapa, pedido, carpeta, resumen, a_medida=None):
                 tareas.append((m, "Eres una de las IAs del equipo de JARVIS. Responde en español. " + HONESTO,
                                "Resume en 5 a 8 líneas tu trabajo en este pedido: qué hiciste, lo más importante que "
                                "encontraste o propusiste, qué recomiendas y qué no pudiste hacer.\n\nPedido: "
-                               f"{(resumen or pedido)[:1500]}\n\nLo tuyo:\n" + "\n\n".join(suyo)[-30000:], {"ia": i}))
+                               f"{asunto}\n\nLo tuyo:\n" + "\n\n".join(suyo)[-30000:], {"ia": i}))
+        for (nombre, rol_equipo), rs in equipos.items():
+            if len(rs) < 2:
+                continue   # una IA sola en su rol no es equipo: su hoja ya lo cuenta
+            juntos = "\n\n".join(f"### {miembros[r['ia']][1][0]}\n{r['texto']}" for r in rs)
+            tareas.append((miembros[rs[0]["ia"]], "Hablas por un equipo de IAs de JARVIS. Responde en español. " + HONESTO,
+                           f"Ustedes fueron el equipo «{rol_equipo}» en la etapa «{nombre}». Resume en 5 a 10 líneas "
+                           "qué hizo el equipo junto, cómo se repartieron el trabajo, qué aportó cada una (por nombre) "
+                           f"y qué quedó pendiente.\n\nPedido: {asunto}\n\nLo del equipo:\n" + juntos[-30000:],
+                           {"equipo": f"{nombre} · {rol_equipo}", "etapa": nombre, "rol": rol_equipo}))
         respuestas = correr(tareas)
-        nombre_json, rol = "panel-9-resumen-por-ia.json", "resumen por IA"
+        nombre_json, rol = "panel-9-resumen-por-ia.json", "resumen por IA y por equipo"
+        hojas = escribir_hojas(carpeta, tipo, asunto, nombres, miembros, trabajo, respuestas)
     else:
         if etapa not in nombres:
             print(f"La etapa {etapa} no existe en {tipo}: " + ", ".join(nombres + ["resumen"]))
@@ -584,6 +690,8 @@ def flujo(tipo, etapa, pedido, carpeta, resumen, a_medida=None):
         print(f"## {r['modelo']}{' · ' + r['rol'] if r.get('rol') else ''}\n"
               f"{r.get('texto') or 'Error: ' + r.get('error', '')}\n")
     print(f"(guardado en {destino})")
+    if etapa == "resumen":
+        print(f"(hojas: {hojas}: 00-resumen-general.md, una por IA y una por equipo)")
     return 0 if any(r.get("texto") for r in respuestas) else 1
 
 
