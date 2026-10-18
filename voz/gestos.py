@@ -30,12 +30,12 @@ BASICOS = {
 }
 
 
-def configuracion(camara=0):
+def configuracion(camara=0, pausado=False):
     cfg = Config()
     cfg.camera_index = camara
     cfg.two_hand_mode = False   # sin zoom con dos manos
     cfg.drag_enabled = False    # sin arrastrar
-    cfg.start_paused = True
+    cfg.start_paused = pausado
     return cfg
 
 
@@ -67,11 +67,15 @@ class Ojos(threading.Thread):
     def __init__(self, camara=0, ver=False, al_cambiar_pausa=None, ceder=None):
         super().__init__(daemon=True)
         self.cfg = configuracion(camara)
+        self.parar = threading.Event()  # apagar() lo marca y el hilo suelta la cámara
         self.ver = ver
         self.filtro = Filtro(self.cfg, al_cambiar_pausa)
         # ceder() es True mientras otra ventana (el lienzo 3D) necesita la cámara:
         # Windows solo deja usarla a un programa a la vez.
         self.ceder = ceder or (lambda: False)
+
+    def apagar(self):
+        self.parar.set()
 
     def _abrir(self):
         import cv2
@@ -85,7 +89,7 @@ class Ojos(threading.Thread):
         acciones.release_all()
         cap.release()
         print("Gestos: suelto la cámara para el lienzo 3D.", flush=True)
-        while self.ceder():
+        while self.ceder() and not self.parar.is_set():
             time.sleep(1)
         print("Gestos: vuelvo a usar la cámara.", flush=True)
         return self._abrir()
@@ -96,8 +100,10 @@ class Ojos(threading.Thread):
         from manos.actions import ActionExecutor
 
         cfg = self.cfg
-        while self.ceder():
+        while self.ceder() and not self.parar.is_set():
             time.sleep(1)
+        if self.parar.is_set():
+            return
         cap = self._abrir()
         if not cap.isOpened():
             print("Gestos: no pude abrir la cámara. Sigo solo con voz.", flush=True)
@@ -107,10 +113,9 @@ class Ojos(threading.Thread):
                                          min_tracking_confidence=cfg.tracking_confidence)
         detector, acciones = GestureDetector(cfg), ActionExecutor(cfg)
         ultima, visto, revisado = None, -1e9, 0.0
-        print("Gestos: cámara lista, en pausa. Haz los cuernos (índice y meñique) 1 s para activarlos.",
-              flush=True)
+        print("Gestos: cámara encendida. Los cuernos (índice y meñique) 1 s los pausan.", flush=True)
         try:
-            while True:
+            while not self.parar.is_set():
                 if time.monotonic() - revisado > 1:
                     revisado = time.monotonic()
                     if self.ceder():
@@ -145,3 +150,7 @@ class Ojos(threading.Thread):
         finally:
             acciones.close()  # nunca dejar Alt ni el botón del ratón pulsados
             cap.release()
+            manos.close()
+            if self.ver:
+                cv2.destroyAllWindows()
+            print("Gestos: cámara apagada.", flush=True)
