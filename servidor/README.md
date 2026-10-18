@@ -7,7 +7,7 @@ Con esto Orión vive en un servidor que nunca se apaga, con la bóveda dentro. A
 El PC sigue funcionando igual: la voz, el HUD y el copiloto trabajan con la misma bóveda, que se sincroniza sola en los dos sentidos.
 
 ```
-celular (app + WhatsApp) ──Tailscale──► servidor Oracle ◄──Syncthing──► PC (boveda/)
+celular (app + WhatsApp) ──HTTPS──► servidor Oracle ◄──Syncthing──► PC (boveda/)
                                           ├─ servidor/api.py      app del celular
                                           ├─ whatsapp/puente.mjs  WhatsApp
                                           ├─ cron                 actualizar desde GitHub
@@ -16,7 +16,7 @@ celular (app + WhatsApp) ──Tailscale──► servidor Oracle ◄──Synct
 
 ## Qué se necesita
 - Una cuenta de Oracle Cloud (gratis; pide tarjeta para verificar identidad, pero el nivel "Always Free" no cobra).
-- Una cuenta de Tailscale (gratis), con la app en el celular. Crea una red privada entre el celular y el servidor: la app de Orión **no queda abierta a internet**.
+- Nada más: la API se publica con HTTPS gratis (Caddy y una dirección `sslip.io`, o tu propio dominio). No hace falta Tailscale ni otra app.
 - Tu cuenta de Claude: en el servidor entras una vez, igual que en el PC. No hace falta ninguna API de Claude.
 
 ## 1. Crear el servidor en Oracle
@@ -27,7 +27,7 @@ celular (app + WhatsApp) ──Tailscale──► servidor Oracle ◄──Synct
 5. *Create*. Si sale "Out of capacity", prueba otro *Availability domain* o vuelve a intentarlo más tarde: pasa seguido con las máquinas gratis.
 6. Copia la *Public IP address* de la instancia.
 
-No hay que abrir ningún puerto: solo se usa SSH (22), que ya viene abierto.
+Abre los puertos **80 y 443** (TCP) en el cortafuegos del proveedor: en Oracle, *Virtual cloud network* → *Security List* → *Add Ingress Rules*; en Clouding, *Firewall* del servidor. SSH (22) ya viene abierto.
 
 ## 2. Conectarse e instalar
 En PowerShell del PC:
@@ -40,7 +40,7 @@ git clone https://github.com/ElDuoDeLaProgramacion/jarvis-os.git
 cd jarvis-os
 ./servidor/instalar.sh
 ```
-El instalador pone todo lo necesario: Node, Claude Code, la app como servicio, la actualización automática en cron, Syncthing y Tailscale. También ajusta la hora del servidor a Colombia (para otra zona: `JARVIS_ZONA=America/Mexico_City ./servidor/instalar.sh`). Cuando Tailscale muestre un enlace, ábrelo y entra con tu cuenta. Si después pide activar HTTPS en tu red, abre ese enlace también y actívalo.
+El instalador pone todo lo necesario: Node, Claude Code, la app como servicio, la actualización automática en cron, Syncthing y Caddy (HTTPS). También ajusta la hora del servidor a Colombia (para otra zona: `JARVIS_ZONA=America/Mexico_City ./servidor/instalar.sh`). Cuando Tailscale muestre un enlace, ábrelo y entra con tu cuenta. Si después pide activar HTTPS en tu red, abre ese enlace también y actívalo.
 
 ## 3. Entrar a Claude
 ```
@@ -51,10 +51,9 @@ Elige tu cuenta y sigue el enlace. Luego escribe `/mcp` y revisa que aparezcan G
 Si usas la clave de YouTube u otras opciones, cópialas tú a mano en el `.env` del servidor (`nano .env`). No las pegues en ningún chat.
 
 ## 4. La app en el celular
-1. Instala **Tailscale** en el celular y entra con la misma cuenta.
-2. Abre en Chrome la dirección que mostró el instalador (`https://<servidor>.<tu-red>.ts.net/app/`).
-3. Pega la clave de la app. Está en el `.env` del servidor: `grep JARVIS_API_TOKEN .env`.
-4. Menú de Chrome → **Instalar app** (o *Agregar a la pantalla principal*). En iPhone: Safari → Compartir → *Agregar a inicio*.
+1. Abre en Chrome la dirección que mostró el instalador (`https://<ip-con-guiones>.sslip.io/app/`).
+2. Pega la clave de la app. Está en el `.env` del servidor: `grep JARVIS_API_TOKEN .env`.
+3. Menú de Chrome → **Instalar app** (o *Agregar a la pantalla principal*). En iPhone: Safari → Compartir → *Agregar a inicio*.
 
 En la app:
 - Escribes o tocas 🎙 y hablas. El dictado usa el reconocimiento de voz del propio celular.
@@ -80,22 +79,27 @@ La app web solo escucha con la pantalla encendida. La app de Android (`android/`
 2. Abre Orión y llena la dirección del servidor (la misma de la app web, sin `/app/`) y la clave de la app (`JARVIS_API_TOKEN`).
 3. **Activar la escucha**. Acepta el micrófono, las notificaciones y "sin restricciones de batería".
 
-Uso: di "Orión", espera el pitido y di tu pedido. Si Orión te pregunta algo ("¿Lo envío?"), suena otro pitido y contestas sin decir "Orión". Queda una notificación fija "Orión" mientras escucha; desde ella se apaga. Tailscale tiene que estar conectado en el celular. Tras reiniciar el celular, abre la app y actívala otra vez. La primera vez tarda unos segundos en "Preparando el oído".
+Uso: di "Orión", espera el pitido y di tu pedido. Si Orión te pregunta algo ("¿Lo envío?"), suena otro pitido y contestas sin decir "Orión". Queda una notificación fija "Orión" mientras escucha; desde ella se apaga. Tras reiniciar el celular, abre la app y actívala otra vez. La primera vez tarda unos segundos en "Preparando el oído".
 
 Para actualizar, instala el `jarvis.apk` nuevo encima. Si Android dice que la firma no coincide, desinstala la app y vuelve a instalarla (los datos se llenan de nuevo).
 
 ### El PC conectado al servidor (un solo Orión)
 Con esto, lo que le dices a la voz del PC o escribes en el HUD lo atiende el Orión del servidor: la misma memoria, el mismo `.env` y la misma conversación que el celular (por ejemplo, "prueba la seguridad del servidor" se hace en el servidor). Lo que necesita el PC se sigue haciendo en el PC: tus archivos y carpetas, tus proyectos y código, la pantalla, el copiloto, abrir y cerrar programas y el volumen. Si dices "en el PC" o "en el servidor", Orión va donde le digas. Si el servidor no responde, lo hace el PC.
 
-1. Instala Tailscale en Windows ([tailscale.com/download](https://tailscale.com/download)) y entra con la misma cuenta.
-2. En el `.env` del PC (`P:\jarvis-os\.env`) agrega dos líneas, copiando tú la clave del `.env` del servidor:
+1. En el `.env` del PC (`P:\jarvis-os\.env`) agrega dos líneas, copiando tú la clave del `.env` del servidor:
    ```
-   JARVIS_SERVIDOR=https://jarvis.<tu-red>.ts.net
+   JARVIS_SERVIDOR=https://<ip-con-guiones>.sslip.io
    JARVIS_API_TOKEN=<la misma clave del servidor>
    ```
-3. Cierra la voz y ábrela otra vez (o reinicia sesión).
+2. Cierra la voz y ábrela otra vez (o reinicia sesión).
 
 En `logs/voz.log` queda anotado si algún pedido se hizo en el PC porque el servidor no respondió.
+
+### Si ya tenías el servidor con Tailscale
+1. En el servidor: `cd ~/jarvis-os && git pull && ./servidor/publicar.sh` (o `./servidor/publicar.sh orion.tudominio.com` si tienes dominio). Al final muestra la dirección.
+2. Abre los puertos 80 y 443 en el panel del proveedor (ver paso 1) si el script dice que aún no responde, y córrelo otra vez.
+3. Cambia la dirección en el `.env` del PC (`JARVIS_SERVIDOR=`), en la app de Android y en la app web del celular.
+4. Ya puedes quitar Tailscale: en el servidor `sudo tailscale serve reset && sudo tailscale down`, y desinstalarlo del PC y del celular.
 
 ## 5. La bóveda sincronizada (Syncthing)
 La bóveda vive en el servidor y en el PC a la vez. Syncthing copia los cambios en los dos sentidos.
@@ -135,7 +139,9 @@ WhatsApp debe correr en un solo lugar.
 - Los archivos y proyectos de `P:\` y `C:\Users\Usuario`, que solo están en el PC.
 
 ## Seguridad
-- La app escucha solo dentro del servidor (`127.0.0.1:7788`). Al celular llega por Tailscale con HTTPS. Desde internet no se ve.
+- La API escucha solo dentro del servidor (`127.0.0.1:7788`). De internet llega por Caddy con HTTPS (`servidor/publicar.sh`), con certificado de Let's Encrypt que se renueva solo.
+- Sin la clave no se entra, y una IP que prueba 5 claves malas en 10 minutos queda bloqueada 15 minutos.
+- La dirección es pública: la clave es lo único que protege tu correo y tu WhatsApp. No la pegues en chats ni la subas a GitHub.
 - Cada pedido exige la clave `JARVIS_API_TOKEN`. Si la pierdes o crees que alguien la vio, bórrala del `.env`, ejecuta `./servidor/instalar.sh` (crea otra) y pégala de nuevo en la app.
 - Las mismas reglas que en el PC: los correos solo salen con tu "sí", y WhatsApp solo envía con tu "sí".
 

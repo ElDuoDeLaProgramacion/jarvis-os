@@ -25,7 +25,7 @@ permitido() {
   done
   echo "Objetivo no permitido: $1"
   echo "Solo se prueban los sistemas de David. Para añadir uno, David lo pone a mano en .env:"
-  echo "  JARVIS_OBJETIVOS_SEGURIDAD=servidor.tu-red.ts.net,79.143.88.182"
+  echo "  JARVIS_OBJETIVOS_SEGURIDAD=1-2-3-4.sslip.io,79.143.88.182"
   exit 2
 }
 
@@ -83,7 +83,7 @@ local_() {
   done
 
   titulo "Servicios de JARVIS"
-  for s in jarvis-app jarvis-whatsapp tailscaled syncthing@"${USER:-$(id -un)}"; do
+  for s in jarvis-app jarvis-whatsapp caddy syncthing@"${USER:-$(id -un)}"; do
     printf '%s: %s\n' "$s" "$(systemctl is-active "$s" 2>/dev/null)"
   done
 

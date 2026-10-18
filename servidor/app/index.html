@@ -178,7 +178,7 @@ async function actualizar() {
     if (abajo || d.mensajes.length) chat.scrollTop = chat.scrollHeight
     $('estado').textContent = ''
   } catch (e) {
-    if (e.message !== 'token') $('estado').textContent = 'Sin conexión con el servidor. ¿Tailscale está encendido?'
+    if (e.message !== 'token') $('estado').textContent = 'Sin conexión con el servidor. ¿Tienes internet y el servidor está encendido?'
   }
 }
 

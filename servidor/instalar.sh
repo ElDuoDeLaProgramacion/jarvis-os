@@ -84,16 +84,10 @@ paso "Actualización automática (cron)"
 paso "Syncthing (bóveda sincronizada con el PC)"
 sudo systemctl enable --now "syncthing@$YO"
 
-paso "Tailscale (red privada entre el servidor y tu celular)"
-if ! command -v tailscale >/dev/null; then curl -fsSL https://tailscale.com/install.sh | sh; fi
-if ! tailscale status >/dev/null 2>&1; then
-  echo "Abre el enlace que sale abajo y entra con la misma cuenta que usarás en el celular."
-  sudo tailscale up
-fi
-# La primera vez Tailscale puede pedir activar HTTPS en tu red con un enlace: ábrelo y espera aquí.
-echo "Si sale un enlace para activar HTTPS (Serve), ábrelo y actívalo."
-sudo tailscale serve --bg 7788
-direccion=$(tailscale status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')
+paso "API publicada con HTTPS (Caddy)"
+# Sin Tailscale: Caddy pone HTTPS y la API se protege con la clave. Para usar tu dominio: JARVIS_DOMINIO=orion.tudominio.com
+./servidor/publicar.sh ${JARVIS_DOMINIO:-} | tee /tmp/orion-publicar.log
+direccion=$(grep -oE 'https://[^ /]+' /tmp/orion-publicar.log | head -1 | sed 's#https://##')
 
 echo
 echo "Listo."
