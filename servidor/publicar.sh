@@ -31,12 +31,19 @@ fi
 # "tailscale serve" (como se instalaba antes) ocupa el 443 y Caddy no arranca: se suelta primero.
 if command -v tailscale >/dev/null; then sudo tailscale serve reset >/dev/null 2>&1 || true; fi
 
+# Las páginas que Orión publica ("publícalo"): las escribe la API (servidor/sitios.py) y Caddy las sirve
+# en sitios.<dominio>, otro origen, así una página no puede leer la clave que guarda la app.
+sitios_dir=${JARVIS_SITIOS:-/srv/orion-sitios}
+sudo install -d -o "$(id -un)" -g "$(id -gn)" -m 755 "$sitios_dir"
+touch .env
+if ! grep -q '^JARVIS_SITIOS_URL=' .env; then echo "JARVIS_SITIOS_URL=https://sitios.$dominio" >> .env; fi
+
 sudo tee /etc/caddy/Caddyfile >/dev/null <<EOF
 # Lo escribe servidor/publicar.sh. La API de Orión, publicada con HTTPS.
 $dominio {
 	encode gzip
 	request_body {
-		max_size 10MB
+		max_size 45MB
 	}
 	header {
 		Strict-Transport-Security "max-age=31536000"
@@ -46,7 +53,20 @@ $dominio {
 	}
 	reverse_proxy 127.0.0.1:7788
 }
+
+sitios.$dominio {
+	encode gzip
+	root * $sitios_dir
+	file_server
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
 EOF
+sudo systemctl restart jarvis-app 2>/dev/null || true   # para que la API lea JARVIS_SITIOS_URL
 sudo systemctl enable caddy >/dev/null 2>&1 || true
 sudo systemctl reload caddy 2>/dev/null || sudo systemctl restart caddy || true
 if ! systemctl is-active --quiet caddy; then
@@ -80,6 +100,7 @@ else
   echo "Detalle: sudo journalctl -u caddy -n 30"
 fi
 echo "  App del celular: https://$dominio/app/"
+echo "  Páginas que publique Orión: https://sitios.$dominio/<nombre>/"
 echo "  En el PC, en .env:  JARVIS_SERVIDOR=https://$dominio"
 echo "  En la app de Android, campo Servidor:  https://$dominio"
 if command -v tailscale >/dev/null; then

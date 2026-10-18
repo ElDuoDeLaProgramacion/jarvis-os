@@ -36,6 +36,7 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | evaluar una idea, "¿vale la pena...?", abogado del diablo | `evaluar-idea` |
 | "pregúntale a Gemini/GPT/...", "¿qué opinan otras IAs?", segunda opinión | `segunda-opinion` |
 | "con todas las IAs", "que varias IAs opinen/auditen/propongan", panel o consejo de IAs, "qué tan bueno es el proyecto X" (y en todo pedido de trabajo, ver abajo) | `panel` |
+| "publícalo", "súbelo al servidor", "ponlo en internet", "dame el link" de una página o app web; quitar o listar lo publicado | `publicar` |
 | nombra un agente (auditor, revisor, programador, diseñador, juez, investigador), "junta al equipo", diseño, crear un programa grande | `equipo` |
 | empieza con "Modo copiloto" (recomendación que nadie pidió) | `copiloto` |
 
@@ -72,6 +73,6 @@ Lo único que no va al equipo: órdenes al instante o personales (música, abrir
 En `.claude/agents/` hay agentes para programar, revisar código, auditar seguridad, diseñar, juzgar ideas e investigar. La habilidad `equipo` dice cuándo y cómo usarlos. Cuestan uso de Claude como una petición entera: úsalos cuando el pedido lo merece, nunca en rutinas.
 
 ## Seguridad
-- No envíes correos, publiques, hagas push, despliegues ni borres nada sin confirmación explícita.
+- No envíes correos, publiques, hagas push, despliegues ni borres nada sin confirmación explícita. Que David diga "publícalo" es esa confirmación para publicar una página (habilidad `publicar`).
 - Fuera de la bóveda, trabaja solo en las carpetas listadas en `boveda/wiki/perfil.md` o en rutas que David dé.
 - No escribas secretos ni contraseñas en la bóveda.

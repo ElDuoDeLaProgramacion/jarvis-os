@@ -101,6 +101,11 @@ En `logs/voz.log` queda anotado si algún pedido se hizo en el PC porque el serv
 3. Cambia la dirección en el `.env` del PC (`JARVIS_SERVIDOR=`), en la app de Android y en la app web del celular.
 4. Ya puedes quitar Tailscale: en el servidor `sudo tailscale serve reset && sudo tailscale down`, y desinstalarlo del PC y del celular.
 
+### Páginas publicadas ("Orión, publícalo")
+Cuando Orión hace una página web y le dices "publícalo", la sube al servidor y te da el link: `https://sitios.<tu-dirección>/<nombre>/`. Va en otra dirección distinta a la de la app, así una página publicada no puede leer la clave de Orión. Solo páginas estáticas (HTML, CSS, JS, imágenes; React o Vite se publican ya construidos). Quedan en `/srv/orion-sitios/` del servidor; para quitar una: "Orión, quita la página X".
+
+Para activarlo en un servidor que ya estaba andando, corre una vez en el servidor `cd ~/jarvis-os && git pull && ./servidor/publicar.sh`. Si usas tu propio dominio, crea también el registro `sitios.tudominio.com` apuntando al servidor (con sslip.io no hace falta).
+
 ## 5. La bóveda sincronizada (Syncthing)
 La bóveda vive en el servidor y en el PC a la vez. Syncthing copia los cambios en los dos sentidos.
 
