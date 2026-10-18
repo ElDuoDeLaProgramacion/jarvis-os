@@ -31,6 +31,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sitios  # noqa: E402
+
 RAIZ = Path(__file__).resolve().parent.parent
 REPRODUCIR = RAIZ / "cola" / "reproducir.txt"   # la habilidad musica deja aquí el spotify:... que eligió
 APP = Path(__file__).resolve().parent / "app"
@@ -415,7 +418,8 @@ class Manejador(BaseHTTPRequestHandler):
 
     def do_POST(self):
         ruta = urlparse(self.path).path
-        if ruta not in ("/api/pedir", "/api/voz", "/api/ia", "/api/propuestas/borrar"):
+        if ruta not in ("/api/pedir", "/api/voz", "/api/ia", "/api/propuestas/borrar",
+                        "/api/sitios/publicar", "/api/sitios/quitar"):
             return self._json({"error": "no existe"}, 404)
         if not self._autorizado():
             return
@@ -423,6 +427,8 @@ class Manejador(BaseHTTPRequestHandler):
             return self._voz()
         if ruta == "/api/ia":
             return self._ia()
+        if ruta.startswith("/api/sitios/"):
+            return self._sitios(ruta)
         if ruta == "/api/propuestas/borrar":
             try:
                 largo = int(self.headers.get("Content-Length", 0))
@@ -470,6 +476,24 @@ class Manejador(BaseHTTPRequestHandler):
             self._json(ia.llamar(proveedor, ruta, cuerpo))
         except RuntimeError as e:
             self._json({"error": str(e)}, getattr(e, "codigo", 502))
+
+    def _sitios(self, ruta):
+        """El PC publica una página en el servidor (scripts/publicar_sitio.py): un zip en el cuerpo."""
+        nombre = parse_qs(urlparse(self.path).query).get("nombre", [""])[0]
+        try:
+            largo = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            largo = -1
+        if not 0 <= largo <= sitios.MAX_ZIP:
+            return self._json({"error": "largo inválido"}, 413)
+        datos = self.rfile.read(largo)
+        try:
+            if ruta == "/api/sitios/quitar":
+                return self._json({"ok": sitios.quitar(nombre)})
+            n = sitios.instalar(datos, nombre)
+        except sitios.Error as e:
+            return self._json({"error": str(e)}, 400)
+        self._json({"ok": True, "archivos": n, "url": sitios.url(nombre)})
 
     def _voz(self):
         """Audio WAV de la app de Android: lo transcribe y lo pide como texto. Devuelve lo que entendió."""

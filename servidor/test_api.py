@@ -59,7 +59,7 @@ class SpotifyFalso:
         return True
 
 
-class PruebaApi(unittest.TestCase):
+class Base(unittest.TestCase):
     def setUp(self):
         api.FALLOS = api.Fallos()
         self.dir = Path(tempfile.mkdtemp())
@@ -100,6 +100,8 @@ class PruebaApi(unittest.TestCase):
             time.sleep(0.05)
         self.fail("no terminó")
 
+
+class PruebaApi(Base):
     def test_sin_token_401(self):
         with self.assertRaises(urllib.error.HTTPError) as e:
             self.pedir("/api/conversacion", token="otro")
@@ -341,3 +343,56 @@ class PruebaApi(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PruebaSitios(Base):
+    """Publicar páginas: el PC manda un zip y el servidor lo sirve en sitios.<dominio>/<nombre>/."""
+
+    def setUp(self):
+        super().setUp()
+        os.environ["JARVIS_SITIOS"] = str(self.dir / "sitios")
+        os.environ["JARVIS_SITIOS_URL"] = "https://sitios.ejemplo.sslip.io"
+
+    def subir(self, nombre, archivos, token="t" * 30):
+        import io
+        import zipfile
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as z:
+            for ruta, texto in archivos.items():
+                z.writestr(ruta, texto)
+        req = urllib.request.Request(f"{self.base}/api/sitios/publicar?nombre={nombre}", data=buffer.getvalue(),
+                                     headers={"Authorization": f"Bearer {token}"})
+        with urllib.request.urlopen(req) as r:
+            return json.loads(r.read())
+
+    def test_publica_y_reemplaza(self):
+        r = self.subir("angele", {"angele/index.html": "<h1>v1</h1>", "angele/css/estilo.css": "h1{}"})
+        self.assertEqual(r["url"], "https://sitios.ejemplo.sslip.io/angele/")
+        sitio = self.dir / "sitios" / "angele"
+        self.assertEqual((sitio / "index.html").read_text(), "<h1>v1</h1>")   # la carpeta de arriba se quita
+        self.subir("angele", {"index.html": "<h1>v2</h1>"})
+        self.assertEqual((sitio / "index.html").read_text(), "<h1>v2</h1>")
+        self.assertFalse((sitio / "css").exists())
+        self.assertEqual(sorted(p.name for p in (self.dir / "sitios").iterdir()), ["angele"])
+
+    def test_rechaza_rutas_raras_y_sin_index(self):
+        for nombre, archivos in [("x", {"index.html": "a", "../fuera.html": "b"}), ("x", {"pagina.html": "a"}),
+                                 ("../x", {"index.html": "a"}), ("x", {"index.html": "a", ".env": "CLAVE=1"})]:
+            with self.assertRaises(urllib.error.HTTPError) as e:
+                self.subir(nombre, archivos)
+            self.assertEqual(e.exception.code, 400)
+        self.assertFalse((self.dir / "fuera.html").exists())
+
+    def test_sin_token_no_publica(self):
+        with self.assertRaises(urllib.error.HTTPError) as e:
+            self.subir("angele", {"index.html": "a"}, token="otro")
+        self.assertEqual(e.exception.code, 401)
+        self.assertFalse((self.dir / "sitios" / "angele").exists())
+
+    def test_quitar(self):
+        self.subir("angele", {"index.html": "a"})
+        req = urllib.request.Request(f"{self.base}/api/sitios/quitar?nombre=angele", data=b"",
+                                     headers={"Authorization": "Bearer " + "t" * 30})
+        with urllib.request.urlopen(req) as r:
+            self.assertTrue(json.loads(r.read())["ok"])
+        self.assertFalse((self.dir / "sitios" / "angele").exists())

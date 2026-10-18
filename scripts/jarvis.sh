@@ -50,7 +50,7 @@ permitidas=(
   Read Write Edit Glob Grep WebSearch WebFetch
   "Bash(date:*)" "Bash(mkdir:*)" "Bash(ls:*)" "Bash(mv:*)"
   "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git init:*)" "Bash(git checkout -b:*)"
-  "Bash(git add:*)" "Bash(git commit:*)" "Bash(npm test:*)" "Bash(python3:*)" "Bash(pdftotext:*)"
+  "Bash(git add:*)" "Bash(git commit:*)" "Bash(npm test:*)" "Bash(npm ci:*)" "Bash(npm run build:*)" "Bash(python3:*)" "Bash(pdftotext:*)"
   # Pruebas de seguridad: el script solo revisa (no cambia nada) y solo los sistemas de David.
   "Bash(scripts/seguridad.sh:*)" "Bash(./scripts/seguridad.sh:*)"
   # IAs externas (Gemini, OpenRouter) para una segunda opinión; ya entra en python3, se nombra por claridad.
