@@ -5,7 +5,7 @@ Cada petición que no necesita respuesta inmediata (los botones del HUD) se escr
 ```
 pendientes/  esperando turno
 en-curso/    la que se está ejecutando ahora
-hechas/      terminadas, con la respuesta de JARVIS al final
+hechas/      terminadas, con la respuesta de Orión al final
 fallidas/    con error, con el mensaje al final
 ```
 
@@ -14,7 +14,7 @@ fallidas/    con error, con el mensaje al final
 
 El contenido de estas carpetas no se sube a git; lo que importa queda en la bóveda.
 
-Si JARVIS se cierra a mitad de una intención, esta queda en `en-curso/`. El HUD lo nota y relanza el corredor:
+Si Orión se cierra a mitad de una intención, esta queda en `en-curso/`. El HUD lo nota y relanza el corredor:
 - Si la intención tiene menos de 3 horas, se vuelve a ejecutar.
 - Si es más vieja, pasa a `fallidas/` marcada como interrumpida.
 

@@ -190,7 +190,7 @@ def _paneles(limite):
 
 
 def _informes(limite):
-    """Lo demás que JARVIS escribió en outputs/: auditorías, código, planes, páginas HTML..."""
+    """Lo demás que Orión escribió en outputs/: auditorías, código, planes, páginas HTML..."""
     if not SALIDAS.is_dir():
         return []
     con_carpeta = {c.name for c in PANELES.iterdir() if c.is_dir()} if PANELES.is_dir() else set()
@@ -338,7 +338,7 @@ _ultimo_rescate = 0.0
 
 
 def rescatar_cola(en_curso, pendientes):
-    """Si quedó algo "ejecutando" o pendiente sin corredor (JARVIS se cerró a mitad), lo retoma."""
+    """Si quedó algo "ejecutando" o pendiente sin corredor (Orión se cerró a mitad), lo retoma."""
     global _ultimo_rescate
     if not (en_curso or pendientes) or time.time() - _ultimo_rescate < 60 or corredor_vivo():
         return
@@ -420,7 +420,7 @@ def encolar(pedido):
 
 # ---------- Analizar fuentes (ventana tipo "agregar fuentes") ----------
 
-ABRIR_ANALIZAR = COLA / "analizar-abrir"        # lo deja la voz al oír "Jarvis, analiza..."
+ABRIR_ANALIZAR = COLA / "analizar-abrir"        # lo deja la voz al oír "Orión, analiza..."
 PEDIDO_ANALIZAR = COLA / "analizar-pedido.json"  # lo recoge la voz para responder hablando
 MAX_ANALIZAR = 300 * 1024 * 1024                 # 300 MB por análisis
 MEDIOS = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".opus", ".mp4", ".mkv", ".mov", ".webm", ".avi"}
@@ -658,7 +658,7 @@ def esperar_cierre():
 
 
 def main():
-    p = argparse.ArgumentParser(description="HUD de JARVIS")
+    p = argparse.ArgumentParser(description="HUD de Orión")
     p.add_argument("--puerto", type=int, default=7777)
     p.add_argument("--con-programa", action="store_true",
                    help="se apaga solo cuando se cierra el programa del HUD en Windows")
@@ -667,7 +667,7 @@ def main():
         threading.Thread(target=esperar_cierre, daemon=True).start()
     uso_cpu()  # primera lectura para tener referencia
     servidor = ThreadingHTTPServer(("127.0.0.1", args.puerto), Manejador)
-    print(f"HUD de JARVIS en http://localhost:{args.puerto}  (Ctrl+C para salir)")
+    print(f"HUD de Orión en http://localhost:{args.puerto}  (Ctrl+C para salir)")
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:

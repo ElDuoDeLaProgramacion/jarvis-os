@@ -1,8 +1,8 @@
 # JARVIS OS
 
-Asistente de trabajo por voz. Tú hablas, JARVIS ejecuta el trabajo: correos, archivos, programación, búsquedas, tareas, canales y más.
+Asistente de trabajo por voz. Tú hablas, Orión ejecuta el trabajo: correos, archivos, programación, búsquedas, tareas, canales y más.
 
-**Ciclo:** voz → JARVIS → Claude Code → habilidad → respuesta hablada.
+**Ciclo:** voz → Orión → Claude Code → habilidad → respuesta hablada.
 
 | Parte | Rol | Dónde vive |
 |---|---|---|
@@ -23,15 +23,15 @@ CLAUDE.md         reglas del enrutador
 boveda/           vault de Obsidian
   raw/            todo lo capturado (sin procesar)
   wiki/           conocimiento depurado
-  outputs/        todo lo que JARVIS entrega (reportes, planes, resúmenes)
+  outputs/        todo lo que Orión entrega (reportes, planes, resúmenes)
 scripts/          jarvis.sh (petición directa), encolar.sh, corredor.sh, actualizar.sh
 cola/             intenciones pendientes, en curso, hechas y fallidas
 rutinas/          arranque automático en Windows (HUD, voz, WhatsApp, actualizar)
-hud/              la pantalla de JARVIS (programa de Windows + servidor local)
-voz/              voz del PC: "Jarvis", gestos y Spotify
+hud/              la pantalla de Orión (programa de Windows + servidor local)
+voz/              voz del PC: "Orión", gestos y Spotify
 whatsapp/         puente de WhatsApp por QR
 servidor/         API y app del celular para el servidor
-android/          app de Android que escucha "Jarvis" siempre
+android/          app de Android que escucha "Orión" siempre
 ```
 
 ## Requisitos (Windows + WSL)
@@ -74,9 +74,9 @@ cd /mnt/p/jarvis-os
 
 O abre `claude` en la carpeta y habla con él normalmente: las habilidades se cargan solas.
 
-## Hablar con JARVIS
+## Hablar con Orión
 
-Instala la voz siguiendo [voz/README.md](voz/README.md). Luego abre `P:\jarvis-os\voz\jarvis.bat` y di "Jarvis" seguido de lo que necesitas, o maneja el ratón con la mano frente a la cámara.
+Instala la voz siguiendo [voz/README.md](voz/README.md). Luego abre `P:\jarvis-os\voz\jarvis.bat` y di "Orión" seguido de lo que necesitas, o maneja el ratón con la mano frente a la cámara.
 
 No hay comandos fijos: le hablas normal. Ejemplos:
 
@@ -96,14 +96,14 @@ No hay comandos fijos: le hablas normal. Ejemplos:
 La lista completa de lo que entiende está en la bóveda: `boveda/wiki/comandos.md`.
 
 ## WhatsApp
-JARVIS se vincula a tu WhatsApp con un QR, como WhatsApp Web. Le das órdenes en tu chat contigo mismo y te contesta ahí. También anota tus chats en la bóveda para leerlos y resumirlos, y te prepara respuestas que solo envía si dices "sí". Instalación y límites en [whatsapp/README.md](whatsapp/README.md).
+Orión se vincula a tu WhatsApp con un QR, como WhatsApp Web. Le das órdenes en tu chat contigo mismo y te contesta ahí. También anota tus chats en la bóveda para leerlos y resumirlos, y te prepara respuestas que solo envía si dices "sí". Instalación y límites en [whatsapp/README.md](whatsapp/README.md).
 
 ## Servidor y app del celular
-JARVIS puede vivir en un servidor (Oracle Cloud gratis, Clouding u otro Ubuntu), con la bóveda dentro. Así WhatsApp y la app del celular siguen funcionando con el PC apagado. La bóveda se sincroniza con el PC. Guía paso a paso en [servidor/README.md](servidor/README.md).
+Orión puede vivir en un servidor (Oracle Cloud gratis, Clouding u otro Ubuntu), con la bóveda dentro. Así WhatsApp y la app del celular siguen funcionando con el PC apagado. La bóveda se sincroniza con el PC. Guía paso a paso en [servidor/README.md](servidor/README.md).
 
-El PC también puede pasarle los pedidos al servidor, para que haya un solo JARVIS con una sola memoria: lo que toca tus archivos, proyectos o pantalla se sigue haciendo en el PC. Ver "El PC conectado al servidor" en [servidor/README.md](servidor/README.md).
+El PC también puede pasarle los pedidos al servidor, para que haya un solo Orión con una sola memoria: lo que toca tus archivos, proyectos o pantalla se sigue haciendo en el PC. Ver "El PC conectado al servidor" en [servidor/README.md](servidor/README.md).
 
-En el celular hay dos opciones: la app web (chat con micrófono) y la **app de Android**, que escucha "Jarvis" todo el tiempo, también con la pantalla apagada. El APK está en [Releases](https://github.com/ElDuoDeLaProgramacion/jarvis-os/releases/latest).
+En el celular hay dos opciones: la app web (chat con micrófono) y la **app de Android**, que escucha "Orión" todo el tiempo, también con la pantalla apagada. El APK está en [Releases](https://github.com/ElDuoDeLaProgramacion/jarvis-os/releases/latest).
 
 ## Actualizar
 Es automático: el servidor trae lo nuevo de GitHub cada 15 minutos y el PC al iniciar sesión y cada 2 horas (`scripts/actualizar.sh`). Nunca pisa cambios locales: si una nota de la bóveda cambió aquí y en GitHub, mezcla las dos, y si chocan se queda tu versión. Todo queda en `logs/actualizar.log`. Para forzarlo ya: `./scripts/actualizar.sh`. La app de Android se actualiza instalando el `jarvis.apk` nuevo encima.
@@ -116,14 +116,14 @@ Detalles en [rutinas/README.md](rutinas/README.md).
 
 ## HUD
 
-Instala una vez con `P:\jarvis-os\hud\instalar.bat` y luego abre `hud\abrir-hud.bat`: la pantalla de JARVIS sale en su propia ventana, sin navegador, con vitales, panel de comandos, agenda, pendientes, actividad de la cola y la bóveda en vivo. Detalles en [hud/README.md](hud/README.md).
+Instala una vez con `P:\jarvis-os\hud\instalar.bat` y luego abre `hud\abrir-hud.bat`: la pantalla de Orión sale en su propia ventana, sin navegador, con vitales, panel de comandos, agenda, pendientes, actividad de la cola y la bóveda en vivo. Detalles en [hud/README.md](hud/README.md).
 
 ## Fuentes reales
 
-| Fuente | Cómo se conecta | Qué puede hacer JARVIS |
+| Fuente | Cómo se conecta | Qué puede hacer Orión |
 |---|---|---|
 | Gmail | Conector **Gmail** en claude.ai (Configuración → Conectores). Claude Code lo recibe solo si iniciaste sesión con la misma cuenta | Leer, buscar y crear borradores. Nunca envía, reenvía ni borra sin tu "sí" |
-| Google Calendar | Conector **Google Calendar** en claude.ai | Ver la agenda del día para el resumen y el plan, y crear o cambiar eventos cuando se lo pides ("Jarvis, agéndame..."). Borrar eventos solo tras tu "sí" |
+| Google Calendar | Conector **Google Calendar** en claude.ai | Ver la agenda del día para el resumen y el plan, y crear o cambiar eventos cuando se lo pides ("Orión, agéndame..."). Borrar eventos solo tras tu "sí" |
 | GitHub | API pública, sin configurar nada | Seguidores, repos y estrellas |
 | YouTube | Clave gratis de YouTube Data API en `.env` (copia `.env.example`) | Suscriptores, vistas y videos |
 | TikTok / Instagram | Página pública del perfil | Seguidores (puede fallar si la plataforma lo bloquea; entonces dice "sin dato") |
@@ -150,12 +150,12 @@ Para probar los canales: `python3 scripts/canales.py`.
 | `analizar` | Analiza archivos, PDFs, enlaces, YouTube, audio, video y texto desde la ventana de análisis | `outputs/analisis/` |
 | `seguridad` | Pruebas de seguridad de uno o varios sistemas (SSH, puertos, cortafuegos, actualizaciones, web, TLS, dependencias, código y secretos) sin cambiar nada. Objetivos extra en `JARVIS_OBJETIVOS_SEGURIDAD` (.env) | `outputs/seguridad/` |
 | `noticias` | Noticias del día de tus temas, con ⚠ en lo que te toca actuar | `outputs/noticias/` |
-| `aprender` | JARVIS aprende solo de noticias, tendencias e investigaciones y guarda conocimiento estable | `wiki/conocimiento/` |
+| `aprender` | Orión aprende solo de noticias, tendencias e investigaciones y guarda conocimiento estable | `wiki/conocimiento/` |
 | `recomendar` | Recomendaciones según tu perfil, gustos y proyectos | `outputs/recomendaciones/` |
 | `evaluar-idea` | El agente juez puntúa una idea, con riesgos y cómo probarla barato | `outputs/ideas/` |
 | `equipo` | Reparte un pedido entre los agentes especializados y junta sus respuestas | `outputs/equipo/` |
 | `segunda-opinion` | Pregunta a IAs externas a Claude (Gemini, y por OpenRouter GPT, Llama, DeepSeek...) y compara | `outputs/ia-externa/` |
-| `panel` | Varias IAs por especialidad, de cualquier tema (auditoría, programación, marketing, diseño, finanzas, contenido, presentaciones...), revisan o proponen lo mismo en paralelo con los agentes de Claude; JARVIS verifica y concluye. Lo que proponen se ve en la ventana de propuestas | `outputs/panel/` |
+| `panel` | Varias IAs por especialidad, de cualquier tema (auditoría, programación, marketing, diseño, finanzas, contenido, presentaciones...), revisan o proponen lo mismo en paralelo con los agentes de Claude; Orión verifica y concluye. Lo que proponen se ve en la ventana de propuestas | `outputs/panel/` |
 | `suscripciones` | Cobros recurrentes desde los recibos de Gmail: total al mes, renovaciones próximas y cómo cancelar | `wiki/suscripciones.md`, `outputs/suscripciones/` |
 | `boveda` | Lee y escribe memoria; mantiene el grafo enlazado | `raw/`, `wiki/` |
 | `cierre-dia` | Reflexión del día y cola de mañana | `outputs/diario/` |
@@ -164,15 +164,15 @@ Regla: habilidades pequeñas de un solo propósito superan a un prompt gigante.
 
 ### Agentes especializados
 
-En `.claude/agents/` hay seis agentes que JARVIS puede llamar (directamente o con la habilidad `equipo`): `programador`, `revisor-codigo`, `auditor-seguridad`, `disenador`, `juez-ideas` e `investigador`. Cada uno tiene sus propias instrucciones y herramientas, y trabajan en paralelo cuando el pedido lo permite ("audita todos mis servidores" lanza un auditor por servidor). Cada agente gasta uso de Claude como una petición entera, así que los botones del HUD (que corren sin conversación) no los usan.
+En `.claude/agents/` hay seis agentes que Orión puede llamar (directamente o con la habilidad `equipo`): `programador`, `revisor-codigo`, `auditor-seguridad`, `disenador`, `juez-ideas` e `investigador`. Cada uno tiene sus propias instrucciones y herramientas, y trabajan en paralelo cuando el pedido lo permite ("audita todos mis servidores" lanza un auditor por servidor). Cada agente gasta uso de Claude como una petición entera, así que los botones del HUD (que corren sin conversación) no los usan.
 
-**IAs externas.** Para que JARVIS consulte otras IAs, pon en `.env` `GEMINI_API_KEY` (gratis en https://aistudio.google.com/apikey) y/o `OPENROUTER_API_KEY` (https://openrouter.ai/settings/keys: una clave para GPT, Llama, DeepSeek, Mistral, Grok y más; sin saldo usa sus modelos gratis, con límite diario, y con saldo prepago cualquier modelo). Ponlas solo en el `.env` del servidor: el PC (con `JARVIS_SERVIDOR` y `JARVIS_API_TOKEN`) las usa a través de él. Prueba con `python3 scripts/ia_externa.py --todas "hola"`. Para un panel por especialidad: `python3 scripts/ia_externa.py panel --rol auditoria --n 3 "..."` (`--rol` acepta cualquier tema).
+**IAs externas.** Para que Orión consulte otras IAs, pon en `.env` `GEMINI_API_KEY` (gratis en https://aistudio.google.com/apikey) y/o `OPENROUTER_API_KEY` (https://openrouter.ai/settings/keys: una clave para GPT, Llama, DeepSeek, Mistral, Grok y más; sin saldo usa sus modelos gratis, con límite diario, y con saldo prepago cualquier modelo). Ponlas solo en el `.env` del servidor: el PC (con `JARVIS_SERVIDOR` y `JARVIS_API_TOKEN`) las usa a través de él. Prueba con `python3 scripts/ia_externa.py --todas "hola"`. Para un panel por especialidad: `python3 scripts/ia_externa.py panel --rol auditoria --n 3 "..."` (`--rol` acepta cualquier tema).
 
-**Ventana de propuestas.** El código, las maquetas, los diagramas y las presentaciones que proponen los paneles, y también las auditorías, informes y páginas que JARVIS deja en `outputs/`, se ven en `http://localhost:7777/propuestas` (botón **Propuestas** del HUD o "Jarvis, abre las propuestas") y en el celular con el botón **Propuestas** de la app. Las maquetas corren aisladas en la página, sin acceso a JARVIS. Cada IA recibe la memoria de la bóveda (`scripts/cerebro.py`: perfil, proyectos, decisiones, aprendizajes, conocimiento y entregables), sin chats, correos, personas, dinero, diario ni seguridad, y con correos, teléfonos, IPs y claves tapados; mira qué les llega con `python3 scripts/cerebro.py --notas "pregunta"`. En todo pedido de trabajo (auditorías, código, diseño, planes, marketing, contenido, ideas, investigación) JARVIS pone a **todas** las IAs disponibles en equipo por etapas: por ejemplo, en programación unas planean, otras programan, otras auditan y otras hacen QA; en marketing unas planifican, otras desarrollan, otras preparan los videos y diseños y otras editan. Deja un resumen general y uno por cada IA. A mano: `python3 scripts/ia_externa.py flujo --tipo programacion` lista las etapas. Las IAs solo devuelven texto: si algo pide un video o una imagen, lo dicen y entregan guion, storyboard y prompts. Di "sin panel" para evitarlo.
+**Ventana de propuestas.** El código, las maquetas, los diagramas y las presentaciones que proponen los paneles, y también las auditorías, informes y páginas que Orión deja en `outputs/`, se ven en `http://localhost:7777/propuestas` (botón **Propuestas** del HUD o "Orión, abre las propuestas") y en el celular con el botón **Propuestas** de la app. Las maquetas corren aisladas en la página, sin acceso a Orión. Cada IA recibe la memoria de la bóveda (`scripts/cerebro.py`: perfil, proyectos, decisiones, aprendizajes, conocimiento y entregables), sin chats, correos, personas, dinero, diario ni seguridad, y con correos, teléfonos, IPs y claves tapados; mira qué les llega con `python3 scripts/cerebro.py --notas "pregunta"`. En todo pedido de trabajo (auditorías, código, diseño, planes, marketing, contenido, ideas, investigación) Orión pone a **todas** las IAs disponibles en equipo por etapas: por ejemplo, en programación unas planean, otras programan, otras auditan y otras hacen QA; en marketing unas planifican, otras desarrollan, otras preparan los videos y diseños y otras editan. Deja un resumen general y uno por cada IA. A mano: `python3 scripts/ia_externa.py flujo --tipo programacion` lista las etapas. Las IAs solo devuelven texto: si algo pide un video o una imagen, lo dicen y entregan guion, storyboard y prompts. Di "sin panel" para evitarlo.
 
 ## Día real (cuando se lo pides)
 
-JARVIS ya no corre rutinas a horas fijas: casi nunca servían y gastaban uso. Pídeselo cuando lo necesites: "Jarvis, noticias", "resumen matutino", "plan de hoy", "revisa mis pendientes", "cierra el día" o "aprende de lo nuevo en la bóveda". Al actualizarse, el PC borra solo sus tareas viejas de rutinas y el servidor las quita de su cron.
+Orión ya no corre rutinas a horas fijas: casi nunca servían y gastaban uso. Pídeselo cuando lo necesites: "Orión, noticias", "resumen matutino", "plan de hoy", "revisa mis pendientes", "cierra el día" o "aprende de lo nuevo en la bóveda". Al actualizarse, el PC borra solo sus tareas viejas de rutinas y el servidor las quita de su cron.
 
 Para dejar algo en cola tú mismo: `./scripts/encolar.sh "investiga X"` y luego `./scripts/corredor.sh`.
 
@@ -181,7 +181,7 @@ Para dejar algo en cola tú mismo: `./scripts/encolar.sh "investiga X"` y luego 
 1. **Cerebro + memoria** (hecha): habilidades, bóveda, enrutador.
 2. **Corredor** (hecha): cola de intenciones (las rutinas de horario se quitaron en octubre de 2026).
 3. **HUD** (hecha): panel oscuro de una sola pantalla servido en local.
-4. **Voz** (hecha): palabra de activación "Jarvis" y gestos con la cámara en Windows, STT local (faster-whisper) y TTS local (voces de Windows o Piper).
+4. **Voz** (hecha): palabra de activación "Orión" y gestos con la cámara en Windows, STT local (faster-whisper) y TTS local (voces de Windows o Piper).
 5. **Fuentes reales** (hecha): Gmail y Google Calendar por conectores de claude.ai; GitHub, YouTube, TikTok e Instagram con `scripts/canales.py`.
 6. **Fuera del PC** (hecha): WhatsApp, servidor con la bóveda sincronizada, app web y app de Android.
 7. **Seguridad y mantenimiento** (hecha): pruebas de seguridad de tus sistemas y actualización automática.

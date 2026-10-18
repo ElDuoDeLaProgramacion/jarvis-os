@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JARVIS · Lienzo 3D</title>
+<title>Orión · Lienzo 3D</title>
 <style>
   :root { --fondo: #05080d; --acento: #3fd0ff; --texto: #cfe8f5; --tenue: #5b7686; }
   html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--texto);
@@ -266,7 +266,7 @@ function procesar(resultado) {
     : 'Pon la mano frente a la cámara'
 }
 
-// La voz de JARVIS usa la misma cámara para los gestos. Mientras el lienzo esté abierto le
+// La voz de Orión usa la misma cámara para los gestos. Mientras el lienzo esté abierto le
 // avisamos cada 2 s para que la suelte, y si aún la tiene ocupada reintentamos unos segundos.
 const pedirCamara = () => fetch('/api/lienzo/camara', { method: 'POST' }).catch(() => {})
 pedirCamara()

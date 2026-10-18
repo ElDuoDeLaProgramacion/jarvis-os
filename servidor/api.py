@@ -87,7 +87,7 @@ def orden_musica(texto):
     """Órdenes de música que no necesitan a Claude: ("pausar",) ("seguir",) ("saltar", n, atras). None si no es."""
     plano = unicodedata.normalize("NFD", texto.lower())
     plano = re.sub(r"[\u0300-\u036f.,!¡¿?]", "", plano).strip()
-    plano = re.sub(r"^jarvis\s+", "", plano)
+    plano = re.sub(r"^(jarvis|orion)\s+", "", plano)
     if re.fullmatch(r"(pausa|pon pausa|para la musica|deten la musica|pausa la musica)", plano):
         return ("pausar",)
     if re.fullmatch(r"(play|dale play|ponle play|sigue|reanuda|continua|sigue la musica)", plano):
@@ -464,7 +464,7 @@ class Manejador(BaseHTTPRequestHandler):
 
 
 def main():
-    p = argparse.ArgumentParser(description="API de JARVIS para la app del celular")
+    p = argparse.ArgumentParser(description="API de Orión para la app del celular")
     p.add_argument("--puerto", type=int, default=int(os.environ.get("JARVIS_API_PUERTO", 7788)))
     args = p.parse_args()
     cargar_env()
@@ -477,7 +477,7 @@ def main():
     Manejador.modulo_ia = ia_externa()
     Manejador.transcriptor = Transcriptor()
     servidor = ThreadingHTTPServer(("127.0.0.1", args.puerto), Manejador)
-    print(f"App de JARVIS en http://127.0.0.1:{args.puerto}/app/", flush=True)
+    print(f"App de Orión en http://127.0.0.1:{args.puerto}/app/", flush=True)
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:

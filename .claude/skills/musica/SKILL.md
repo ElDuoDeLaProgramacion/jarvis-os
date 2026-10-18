@@ -6,7 +6,7 @@ description: Pone música en Spotify. Busca canciones, artistas, álbumes, lista
 
 ## Fuente
 - El conector **claude.ai Spotify**. Sus herramientas aparecen como `mcp__claude_ai_Spotify__...`: `search`, `get_currently_playing`, `generate_playlist` y `save_to_library`.
-- El conector no puede darle play. Para que suene, la voz de JARVIS toma la dirección `spotify:...` que dejes en `cola/reproducir.txt` y la pone a sonar en el Spotify del PC (con la API de Spotify si David la conectó; si no, abre la página).
+- El conector no puede darle play. Para que suene, la voz de Orión toma la dirección `spotify:...` que dejes en `cola/reproducir.txt` y la pone a sonar en el Spotify del PC (con la API de Spotify si David la conectó; si no, abre la página).
 - Pausar, seguir, siguiente, anterior, "pasa 3 canciones", "retrocede 2 canciones", volumen y "abre Spotify" los hace la voz al instante, sin llegar aquí.
 
 ## Poner algo

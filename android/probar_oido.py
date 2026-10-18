@@ -22,8 +22,8 @@ from vosk import KaldiRecognizer, Model, SetLogLevel
 
 SetLogLevel(-1)
 
-FRASES = ["Jarvis", "Jarvis, qué tengo hoy", "Jarvis, pasa la canción", "Jarvis, apaga la música",
-          "Jarvis, cuántos correos tengo", "Oye Jarvis, pon algo de Queen"]
+FRASES = ["Orión", "Orión, qué tengo hoy", "Orión, pasa la canción", "Orión, apaga la música",
+          "Orión, cuántos correos tengo", "Orión, pon algo de Queen"]
 VOCES = ["es-419", "es", "es-419 -s 140", "es-419 -s 200 -p 30", "es-419+m3", "es-419+f2"]
 CON = [(v, f) for v in VOCES for f in FRASES]
 SIN = [("es-419", "Buenos días, cómo estás"), ("es-419", "Mañana tengo una reunión con Ana"),
@@ -33,7 +33,10 @@ SIN = [("es-419", "Buenos días, cómo estás"), ("es-419", "Mañana tengo una r
        ("es-419", "Garbanzos con arroz"), ("es", "Las variables del sistema"),
        ("es-419+m3", "Harvey es mi amigo"), ("es-419+f2", "La jarra está en el jardín"),
        ("es", "Qué hora es"), ("es-419", "Ponme un vaso de agua")]
-SIN += [("es-419", "Anoche vimos un partido muy bueno en la televisión"),
+SIN += [("es-419", "Vamos a hacer una oración"), ("es-419", "Esa es mi opinión"),
+        ("es-419+m3", "El avión salió tarde"), ("es", "El camión está en la vía"),
+        ("es-419", "Mario fue al río"), ("es-419", "Jarvis es el de Iron Man"),
+        ("es-419", "Anoche vimos un partido muy bueno en la televisión"),
         ("es-419", "Harvard es una universidad de Estados Unidos"), ("es-419+m3", "Marvin llegó tarde"),
         ("es", "Los jardines del parque están bonitos"), ("es-419", "Javier vino a la casa ayer"),
         ("es-419+f2", "Carlos y Marcos fueron al mercado"), ("es-419", "Ya revisé la lista de tareas"),
@@ -64,23 +67,34 @@ def confianza(modelo, ruta):
         if r.AcceptWaveform(datos[i:i + 3200]):
             finales.append(json.loads(r.Result()))
     finales.append(json.loads(r.FinalResult()))
-    return max((p["conf"] for f in finales for p in f.get("result", []) if p["word"] == "jarvis"), default=0)
+    return max((p["conf"] for f in finales for p in f.get("result", []) if p["word"] in ("orión", "orion")), default=0)
+
+
+def avisar(texto):
+    """Además de imprimirlo, lo deja como anotación del CI (se ve sin abrir el registro)."""
+    print(texto)
+    print(f"::notice::{texto.strip()}")
 
 
 def main():
+    palabras = Path(sys.argv[1]) / "graph" / "words.txt"
+    if palabras.exists():
+        conocidas = {l.split()[0] for l in palabras.read_text(encoding="utf-8").splitlines() if l.strip()}
+        faltan = [w for w in json.loads(GRAMATICA) if w != "[unk]" and w not in conocidas]
+        avisar(f"Palabras de la gramática que el modelo no conoce: {', '.join(faltan) or 'ninguna'}")
     modelo = Model(sys.argv[1])
     with tempfile.TemporaryDirectory() as d:
         carpeta = Path(d)
         con = [(confianza(modelo, audio(v, t, carpeta)), v, t) for v, t in CON]
         sin = [(confianza(modelo, audio(v, t, carpeta)), v, t) for v, t in SIN]
     for c, v, t in con:
-        print(f"  {'oye   ' if c >= UMBRAL else 'NO oye'}  {c:.2f}  [{v}] {t}")
+        (print if c >= UMBRAL else avisar)(f"  {'oye   ' if c >= UMBRAL else 'NO oye'}  {c:.2f}  [{v}] {t}")
     for c, v, t in sin:
-        print(f"  {'FALSO ' if c >= UMBRAL else 'bien  '}  {c:.2f}  [{v}] {t}")
+        (avisar if c >= UMBRAL else print)(f"  {'FALSO ' if c >= UMBRAL else 'bien  '}  {c:.2f}  [{v}] {t}")
     for u in (0.5, 0.7, 0.8, 0.9, 0.95, 0.99):
-        print(f"  umbral {u}: oye {sum(c >= u for c, *_ in con)}/{len(con)}, falsos {sum(c >= u for c, *_ in sin)}/{len(sin)}")
+        avisar(f"  umbral {u}: oye {sum(c >= u for c, *_ in con)}/{len(con)}, falsos {sum(c >= u for c, *_ in sin)}/{len(sin)}")
     aciertos, falsos = sum(c >= UMBRAL for c, *_ in con), sum(c >= UMBRAL for c, *_ in sin)
-    print(f"Con el umbral {UMBRAL}: oyó Jarvis en {aciertos}/{len(con)} y se confundió en {falsos}/{len(sin)}.")
+    print(f"Con el umbral {UMBRAL}: oyó Orión en {aciertos}/{len(con)} y se confundió en {falsos}/{len(sin)}.")
     if aciertos < len(con) - 2 or falsos > 0:
         sys.exit(1)
 

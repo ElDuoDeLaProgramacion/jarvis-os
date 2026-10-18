@@ -60,11 +60,11 @@ class MainActivity : Activity() {
         }
 
         raiz.addView(TextView(this).apply {
-            text = "JARVIS"
+            text = "ORIÓN"
             textSize = 28f
         })
         raiz.addView(TextView(this).apply {
-            text = "Con la escucha activa, di \"Jarvis\", espera el pitido y di tu pedido. " +
+            text = "Con la escucha activa, di \"Orión\", espera el pitido y di tu pedido. " +
                 "Funciona con la pantalla apagada y con otras apps abiertas."
         })
         etiqueta("Dirección del servidor (la misma de la app web)")

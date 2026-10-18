@@ -20,7 +20,7 @@ Sin `OPENROUTER_MODELO`, OpenRouter usa un modelo gratis (`:free`), que tiene l�
 Si dice que no hay claves, dile a David en una frase qué clave falta y dónde se crea (el script lo imprime).
 
 ## Privacidad (siempre)
-El script añade solo la memoria de JARVIS sin lo privado (`scripts/cerebro.py`); para una pregunta que no tiene nada que ver con David usa `--sin-cerebro`. Lo que mandas sale de Claude a otra empresa. Nunca envíes secretos (claves, tokens, contraseñas, el `.env`), ni correos, chats de WhatsApp, datos de otras personas o salidas de seguridad con IPs y usuarios, salvo que David lo pida explícitamente para eso. Resume o anonimiza antes de preguntar. En rutinas automáticas no la uses.
+El script añade solo la memoria de Orión sin lo privado (`scripts/cerebro.py`); para una pregunta que no tiene nada que ver con David usa `--sin-cerebro`. Lo que mandas sale de Claude a otra empresa. Nunca envíes secretos (claves, tokens, contraseñas, el `.env`), ni correos, chats de WhatsApp, datos de otras personas o salidas de seguridad con IPs y usuarios, salvo que David lo pida explícitamente para eso. Resume o anonimiza antes de preguntar. En rutinas automáticas no la uses.
 
 ## Cómo usar lo que responden
 - Compara con tu propia respuesta: di en qué coinciden, en qué no y a quién crees y por qué. No copies sin pensar: otra IA también se equivoca.

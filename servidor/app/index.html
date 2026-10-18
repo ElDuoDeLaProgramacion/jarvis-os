@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#05121c">
-<title>JARVIS</title>
+<title>Orión</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icono.svg">
 <link rel="apple-touch-icon" href="icono-192.png">
@@ -61,10 +61,10 @@
 </head>
 <body>
 <header>
-  <h1>JARVIS</h1>
+  <h1>ORIÓN</h1>
   <button id="btnPanel" type="button">Hoy</button>
   <button id="btnPropuestas" type="button" title="Lo que proponen los paneles de IAs: código, diseños, presentaciones">Propuestas</button>
-  <button id="btnEscucha" type="button" title="Escuchar siempre: di &quot;Jarvis&quot; y lo que quieras">Jarvis</button>
+  <button id="btnEscucha" type="button" title="Escuchar siempre: di &quot;Orión&quot; y lo que quieras">Orión</button>
   <button id="btnVoz" type="button" title="Leer las respuestas en voz alta">Voz</button>
 </header>
 <div id="panel"></div>
@@ -73,12 +73,12 @@
 <nav id="rapidos"></nav>
 <form id="form">
   <button id="mic" type="button" title="Hablar">🎙</button>
-  <textarea id="texto" rows="1" placeholder="Pídele algo a JARVIS" enterkeyhint="send"></textarea>
+  <textarea id="texto" rows="1" placeholder="Pídele algo a Orión" enterkeyhint="send"></textarea>
   <button type="submit" title="Enviar">➤</button>
 </form>
 
 <div id="entrar">
-  <h1 style="color:var(--acento);letter-spacing:.2em;margin:0">JARVIS</h1>
+  <h1 style="color:var(--acento);letter-spacing:.2em;margin:0">ORIÓN</h1>
   <p>Pega la clave de la app (JARVIS_API_TOKEN en el .env del servidor). Se guarda solo en este celular.</p>
   <input id="clave" type="password" autocomplete="off" placeholder="Clave">
   <button id="guardarClave" type="button">Entrar</button>
@@ -96,7 +96,7 @@ let ocupado = false
 let vozActiva = leer('jarvis-voz') === '1'
 let primeraCarga = true
 let hablando = false
-// "Manos libres" (botón Jarvis): se define más abajo; hasta entonces no hace nada.
+// "Manos libres" (botón Orión): se define más abajo; hasta entonces no hace nada.
 let escucha = { pausar() {}, reanudar() {} }
 
 async function api(ruta, opciones = {}) {
@@ -144,7 +144,7 @@ function pintarPensando() {
   if (ocupado && !p) {
     p = document.createElement('div')
     p.className = 'pensando'
-    p.textContent = 'JARVIS está trabajando'
+    p.textContent = 'Orión está trabajando'
     $('chat').appendChild(p)
   } else if (!ocupado && p) p.remove()
 }
@@ -153,7 +153,7 @@ function hablar(texto) {
   if (!vozActiva || !('speechSynthesis' in window)) return
   const u = new SpeechSynthesisUtterance(texto.replace(/[*_#`>]/g, ''))
   u.lang = 'es-ES'
-  // Mientras JARVIS habla no escuchamos, para que no se oiga a sí mismo.
+  // Mientras Orión habla no escuchamos, para que no se oiga a sí mismo.
   u.onend = u.onerror = () => { hablando = false; escucha.reanudar() }
   hablando = true
   escucha.pausar()
@@ -237,11 +237,11 @@ else {
   }
 }
 
-// Manos libres: con la app abierta, escucha todo el tiempo y atiende lo que digas después de "Jarvis".
-// "Jarvis, pon música" va directo; si solo dices "Jarvis", lo siguiente que digas es la orden.
+// Manos libres: con la app abierta, escucha todo el tiempo y atiende lo que digas después de "Orión".
+// "Orión, pon música" va directo; si solo dices "Orión", lo siguiente que digas es la orden.
 // La pantalla se mantiene encendida mientras está activo (el navegador no deja escuchar con ella apagada).
 if (Reconocer) {
-  const PALABRA = /\b(jarvis|jarvi|yarvis|harvis|jervis|yervis)\b[\s,.:]*/i
+  const PALABRA = /\b(ori[oó]n|orio|orian|oriol|jarvis|jarvi|yarvis|harvis|jervis|yervis)\b[\s,.:]*/i
   let activo = false, pausado = false, rec = null, esperaOrden = 0, bloqueo = null
   const estado = (t) => { $('estado').textContent = t }
   const pedirPantalla = async () => {
@@ -271,7 +271,7 @@ if (Reconocer) {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
         activo = false
         pintar()
-        estado('Dale permiso de micrófono a la página para usar "Jarvis".')
+        estado('Dale permiso de micrófono a la página para usar "Orión".')
       }
     }
     // Chrome corta la escucha tras unos segundos de silencio: la volvemos a abrir.
@@ -296,7 +296,7 @@ if (Reconocer) {
       pausado = false
       pedirPantalla()
       arrancar()
-      estado('Di "Jarvis" y lo que necesites.')
+      estado('Di "Orión" y lo que necesites.')
     } else {
       escucha.pausar()
       bloqueo?.release().catch(() => {})
@@ -356,7 +356,7 @@ function iniciar() {
   cargarResumen()
   programar()
 }
-// Mientras JARVIS trabaja se mira cada 2 s; si no, cada 10 s.
+// Mientras Orión trabaja se mira cada 2 s; si no, cada 10 s.
 function programar() {
   clearTimeout(reloj)
   reloj = setTimeout(async () => { if (!document.hidden) await actualizar(); programar() }, ocupado ? 2000 : 10000)

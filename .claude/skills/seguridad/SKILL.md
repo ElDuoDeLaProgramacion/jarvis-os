@@ -15,7 +15,7 @@ David es ingeniero de sistemas y de ciberseguridad: habla técnico, con nombres 
 ## Qué correr
 | Pedido | Comando |
 |---|---|
-| "la seguridad del servidor", "audita este equipo" (JARVIS corre en el servidor) | `scripts/seguridad.sh local` |
+| "la seguridad del servidor", "audita este equipo" (Orión corre en el servidor) | `scripts/seguridad.sh local` |
 | "qué puertos tiene abiertos X", "escanea X" | `scripts/seguridad.sh puertos <host>` |
 | una web o la app ("revisa https://...") | `scripts/seguridad.sh web <url>` |
 | un proyecto ("vulnerabilidades en las dependencias de X") | `scripts/seguridad.sh dependencias <carpeta>` |

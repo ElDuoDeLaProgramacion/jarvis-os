@@ -1,6 +1,6 @@
 ---
 name: aprender
-description: JARVIS aprende por su cuenta. Lee las noticias, tendencias, investigaciones y análisis recientes de la bóveda y guarda lo que vale la pena recordar como conocimiento estable. Úsala para "aprende de...", "estúdiate...", "ponte al día en...".
+description: Orión aprende por su cuenta. Lee las noticias, tendencias, investigaciones y análisis recientes de la bóveda y guarda lo que vale la pena recordar como conocimiento estable. Úsala para "aprende de...", "estúdiate...", "ponte al día en...".
 ---
 # Aprender
 

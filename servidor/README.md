@@ -1,7 +1,7 @@
-# JARVIS en un servidor (Oracle Cloud gratis) y la app del celular
+# Orión en un servidor (Oracle Cloud gratis) y la app del celular
 
-Con esto JARVIS vive en un servidor que nunca se apaga, con la bóveda dentro. Aunque el PC esté apagado, puedes:
-- usar WhatsApp con JARVIS (órdenes, avisos y respuestas con "sí"),
+Con esto Orión vive en un servidor que nunca se apaga, con la bóveda dentro. Aunque el PC esté apagado, puedes:
+- usar WhatsApp con Orión (órdenes, avisos y respuestas con "sí"),
 - y hablarle o escribirle desde la **app del celular** (un chat con micrófono que se instala en la pantalla de inicio).
 
 El PC sigue funcionando igual: la voz, el HUD y el copiloto trabajan con la misma bóveda, que se sincroniza sola en los dos sentidos.
@@ -16,7 +16,7 @@ celular (app + WhatsApp) ──Tailscale──► servidor Oracle ◄──Synct
 
 ## Qué se necesita
 - Una cuenta de Oracle Cloud (gratis; pide tarjeta para verificar identidad, pero el nivel "Always Free" no cobra).
-- Una cuenta de Tailscale (gratis), con la app en el celular. Crea una red privada entre el celular y el servidor: la app de JARVIS **no queda abierta a internet**.
+- Una cuenta de Tailscale (gratis), con la app en el celular. Crea una red privada entre el celular y el servidor: la app de Orión **no queda abierta a internet**.
 - Tu cuenta de Claude: en el servidor entras una vez, igual que en el PC. No hace falta ninguna API de Claude.
 
 ## 1. Crear el servidor en Oracle
@@ -58,11 +58,11 @@ Si usas la clave de YouTube u otras opciones, cópialas tú a mano en el `.env` 
 
 En la app:
 - Escribes o tocas 🎙 y hablas. El dictado usa el reconocimiento de voz del propio celular.
-- **Jarvis** (manos libres): mientras la app está abierta, escucha todo el tiempo. Di "Jarvis, qué tengo hoy" y lo envía solo; si dices solo "Jarvis", lo siguiente que digas es la orden. La pantalla se queda encendida mientras está activo, porque el navegador no deja escuchar con la pantalla apagada o con la app en segundo plano. En Android puede sonar un pitido cada vez que el micrófono se vuelve a abrir.
-- **Voz** hace que JARVIS lea en voz alta cada respuesta. Se enciende sola con "Jarvis".
+- **Orión** (manos libres): mientras la app está abierta, escucha todo el tiempo. Di "Orión, qué tengo hoy" y lo envía solo; si dices solo "Orión", lo siguiente que digas es la orden. La pantalla se queda encendida mientras está activo, porque el navegador no deja escuchar con la pantalla apagada o con la app en segundo plano. En Android puede sonar un pitido cada vez que el micrófono se vuelve a abrir.
+- **Voz** hace que Orión lea en voz alta cada respuesta. Se enciende sola con "Orión".
 - **Hoy** muestra las prioridades, la agenda y las tareas.
 - Los botones de abajo son los mismos del HUD.
-- Los pedidos seguidos (en 30 minutos) son una sola conversación. Si JARVIS pregunta "¿Lo envío?" por un correo y contestas "sí", lo envía, igual que por voz.
+- Los pedidos seguidos (en 30 minutos) son una sola conversación. Si Orión pregunta "¿Lo envío?" por un correo y contestas "sí", lo envía, igual que por voz.
 
 ### Música desde el celular (Spotify Premium)
 "Pon algo de Queen" suena en el Spotify que tengas activo (normalmente el del celular), y "pausa", "play", "siguiente" o "pasa 3 canciones" funcionan al instante, sin pasar por Claude. Debajo de la respuesta sale **▶ Abrir en Spotify** por si el celular no tenía Spotify activo. Una vez:
@@ -73,19 +73,19 @@ En la app:
 
 Si Spotify dice que no hay dispositivo, abre Spotify en el celular y dale play una vez.
 
-### App de Android: "Jarvis" siempre escuchando
-La app web solo escucha con la pantalla encendida. La app de Android (`android/`) escucha "Jarvis" todo el tiempo, también con la pantalla apagada o usando otras apps, y contesta en voz alta. Detecta la palabra en el propio celular con Vosk, sin cuentas ni claves extra (no manda nada al servidor hasta que dices "Jarvis"); la orden se transcribe en el servidor con el mismo modelo de las notas de voz de WhatsApp.
+### App de Android: "Orión" siempre escuchando
+La app web solo escucha con la pantalla encendida. La app de Android (`android/`) escucha "Orión" todo el tiempo, también con la pantalla apagada o usando otras apps, y contesta en voz alta. Detecta la palabra en el propio celular con Vosk, sin cuentas ni claves extra (no manda nada al servidor hasta que dices "Orión"); la orden se transcribe en el servidor con el mismo modelo de las notas de voz de WhatsApp.
 
 1. En el celular abre [Releases](https://github.com/ElDuoDeLaProgramacion/jarvis-os/releases/latest), descarga `jarvis.apk` e instálalo (Android pide permitir "instalar apps de origen desconocido" para Chrome).
-2. Abre JARVIS y llena la dirección del servidor (la misma de la app web, sin `/app/`) y la clave de la app (`JARVIS_API_TOKEN`).
+2. Abre Orión y llena la dirección del servidor (la misma de la app web, sin `/app/`) y la clave de la app (`JARVIS_API_TOKEN`).
 3. **Activar la escucha**. Acepta el micrófono, las notificaciones y "sin restricciones de batería".
 
-Uso: di "Jarvis", espera el pitido y di tu pedido. Si JARVIS te pregunta algo ("¿Lo envío?"), suena otro pitido y contestas sin decir "Jarvis". Queda una notificación fija "JARVIS" mientras escucha; desde ella se apaga. Tailscale tiene que estar conectado en el celular. Tras reiniciar el celular, abre la app y actívala otra vez. La primera vez tarda unos segundos en "Preparando el oído".
+Uso: di "Orión", espera el pitido y di tu pedido. Si Orión te pregunta algo ("¿Lo envío?"), suena otro pitido y contestas sin decir "Orión". Queda una notificación fija "Orión" mientras escucha; desde ella se apaga. Tailscale tiene que estar conectado en el celular. Tras reiniciar el celular, abre la app y actívala otra vez. La primera vez tarda unos segundos en "Preparando el oído".
 
 Para actualizar, instala el `jarvis.apk` nuevo encima. Si Android dice que la firma no coincide, desinstala la app y vuelve a instalarla (los datos se llenan de nuevo).
 
-### El PC conectado al servidor (un solo JARVIS)
-Con esto, lo que le dices a la voz del PC o escribes en el HUD lo atiende el JARVIS del servidor: la misma memoria, el mismo `.env` y la misma conversación que el celular (por ejemplo, "prueba la seguridad del servidor" se hace en el servidor). Lo que necesita el PC se sigue haciendo en el PC: tus archivos y carpetas, tus proyectos y código, la pantalla, el copiloto, abrir y cerrar programas y el volumen. Si dices "en el PC" o "en el servidor", JARVIS va donde le digas. Si el servidor no responde, lo hace el PC.
+### El PC conectado al servidor (un solo Orión)
+Con esto, lo que le dices a la voz del PC o escribes en el HUD lo atiende el Orión del servidor: la misma memoria, el mismo `.env` y la misma conversación que el celular (por ejemplo, "prueba la seguridad del servidor" se hace en el servidor). Lo que necesita el PC se sigue haciendo en el PC: tus archivos y carpetas, tus proyectos y código, la pantalla, el copiloto, abrir y cerrar programas y el volumen. Si dices "en el PC" o "en el servidor", Orión va donde le digas. Si el servidor no responde, lo hace el PC.
 
 1. Instala Tailscale en Windows ([tailscale.com/download](https://tailscale.com/download)) y entra con la misma cuenta.
 2. En el `.env` del PC (`P:\jarvis-os\.env`) agrega dos líneas, copiando tú la clave del `.env` del servidor:
@@ -110,13 +110,13 @@ La bóveda vive en el servidor y en el PC a la vez. Syncthing copia los cambios 
 4. En el PC: *Agregar carpeta* con la ruta `P:\jarvis-os\boveda` y compártela con el servidor.
 5. En el servidor, al aceptar la carpeta, pon la ruta `/home/ubuntu/jarvis-os/boveda` y, en *Avanzado*, el tipo **Solo recibir**. Cuando termine, pulsa **Revertir cambios locales**: así la bóveda del servidor queda igual a la del PC, que es la más nueva. Después cambia el tipo a **Enviar y recibir**.
 
-**Obsidian:** en el PC abre Obsidian → *Abrir carpeta como bóveda* → `P:\jarvis-os\boveda`. Es la copia que Syncthing mantiene igual a la del servidor, así que ves el cerebro completo de JARVIS, también lo que escribe desde el celular o WhatsApp. Obsidian no puede abrir una carpeta remota directamente, por eso se usa la copia sincronizada.
+**Obsidian:** en el PC abre Obsidian → *Abrir carpeta como bóveda* → `P:\jarvis-os\boveda`. Es la copia que Syncthing mantiene igual a la del servidor, así que ves el cerebro completo de Orión, también lo que escribe desde el celular o WhatsApp. Obsidian no puede abrir una carpeta remota directamente, por eso se usa la copia sincronizada.
 
-Si JARVIS escribe el mismo archivo en los dos lados a la vez, Syncthing guarda las dos versiones (`*.sync-conflict-*.md`) en vez de perder una.
+Si Orión escribe el mismo archivo en los dos lados a la vez, Syncthing guarda las dos versiones (`*.sync-conflict-*.md`) en vez de perder una.
 
 ## 6. Pasar WhatsApp al servidor
 WhatsApp debe correr en un solo lugar.
-1. En el PC, cierra la ventana "JARVIS WhatsApp" y desactiva su arranque (PowerShell):
+1. En el PC, cierra la ventana "Orión WhatsApp" y desactiva su arranque (PowerShell):
    ```
    Disable-ScheduledTask -TaskPath "\JARVIS\Inicio\" -TaskName "WhatsApp"
    ```
@@ -140,5 +140,5 @@ WhatsApp debe correr en un solo lugar.
 - Las mismas reglas que en el PC: los correos solo salen con tu "sí", y WhatsApp solo envía con tu "sí".
 
 ## Límites de Oracle gratis
-- Oracle puede **recuperar** máquinas gratis que pasan 7 días casi sin uso. JARVIS usa poco, así que puede pasar. Para evitarlo, pasa la cuenta a *Pay As You Go*: lo que está dentro del nivel gratis sigue sin costar.
+- Oracle puede **recuperar** máquinas gratis que pasan 7 días casi sin uso. Orión usa poco, así que puede pasar. Para evitarlo, pasa la cuenta a *Pay As You Go*: lo que está dentro del nivel gratis sigue sin costar.
 - Haz que Syncthing tenga siempre la bóveda también en el PC. Si el servidor desaparece, no pierdes nada.
