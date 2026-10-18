@@ -45,7 +45,8 @@ class EscuchaService : Service() {
         // Confianza mínima de la palabra "jarvis" en el resultado final. Más alto = menos activaciones
         // falsas, pero hay que decirlo más claro. android/probar_oido.py lo prueba con este mismo valor.
         private const val UMBRAL = 0.9f
-        // El nombre que despierta a la app (res/raw/gramatica.json). "jarvis" queda como señuelo.
+        // El nombre que despierta a la app (res/raw/gramatica.json). Solo "orión" va en la gramática: con
+        // "orion" también, las dos suenan igual y la confianza se reparte a la mitad. "jarvis" queda como señuelo.
         private val PALABRAS = setOf("orión", "orion")
 
         @Volatile var estado = "Apagado"
