@@ -23,7 +23,7 @@ from vosk import KaldiRecognizer, Model, SetLogLevel
 SetLogLevel(-1)
 
 FRASES = ["Orión", "Orión, qué tengo hoy", "Orión, pasa la canción", "Orión, apaga la música",
-          "Orión, cuántos correos tengo", "Oye Orión, pon algo de Queen"]
+          "Orión, cuántos correos tengo", "Orión, pon algo de Queen"]
 VOCES = ["es-419", "es", "es-419 -s 140", "es-419 -s 200 -p 30", "es-419+m3", "es-419+f2"]
 CON = [(v, f) for v in VOCES for f in FRASES]
 SIN = [("es-419", "Buenos días, cómo estás"), ("es-419", "Mañana tengo una reunión con Ana"),

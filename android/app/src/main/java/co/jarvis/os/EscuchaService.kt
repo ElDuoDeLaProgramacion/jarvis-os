@@ -42,9 +42,11 @@ class EscuchaService : Service() {
         const val DETENER = "co.jarvis.os.DETENER"
         private const val CANAL = "escucha"
         private const val AVISO = 1
-        // Confianza mínima de la palabra "jarvis" en el resultado final. Más alto = menos activaciones
+        // Confianza mínima de la palabra "orión" en el resultado final. Más alto = menos activaciones
         // falsas, pero hay que decirlo más claro. android/probar_oido.py lo prueba con este mismo valor.
-        private const val UMBRAL = 0.9f
+        // Con "orión" las voces graves llegan a 0,9 pero las agudas se quedan en 0,6-0,75, y ninguna
+        // frase sin el nombre pasó de 0,5: por eso 0,6.
+        private const val UMBRAL = 0.6f
         // El nombre que despierta a la app (res/raw/gramatica.json). Solo "orión" va en la gramática: con
         // "orion" también, las dos suenan igual y la confianza se reparte a la mitad. "jarvis" queda como señuelo.
         private val PALABRAS = setOf("orión", "orion")
