@@ -14,6 +14,17 @@ flock -n 8 || exit 0
 
 nota() { echo "$(date -Iseconds) $*"; }
 
+# Las rutinas de horario se quitaron. En el PC, borra una vez sus tareas viejas del Programador de
+# tareas de Windows (carpeta \JARVIS\; el arranque de \JARVIS\Inicio\ no se toca).
+if [ ! -f /etc/systemd/system/jarvis-app.service ] && [ ! -f logs/.rutinas-quitadas ] \
+   && command -v powershell.exe >/dev/null; then
+  if powershell.exe -NoProfile -NonInteractive -Command \
+     "Get-ScheduledTask -TaskPath '\\JARVIS\\' -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:\$false" \
+     >/dev/null 2>&1; then
+    touch logs/.rutinas-quitadas; nota "rutinas viejas de Windows borradas"
+  fi
+fi
+
 rama=$(git rev-parse --abbrev-ref HEAD)
 if [ "$rama" != main ]; then nota "estás en la rama $rama, no actualizo"; exit 0; fi
 git fetch -q origin main || { nota "no pude conectar con GitHub"; exit 1; }
@@ -53,7 +64,7 @@ echo "$cambios" | sed 's/^/  /'
 cambio() { echo "$cambios" | grep -qE "$1"; }
 # Lo que hay que hacer después en el servidor (allí existe el servicio jarvis-app).
 if [ -f /etc/systemd/system/jarvis-app.service ]; then
-  if cambio '^rutinas/rutinas\.csv$'; then ./servidor/rutinas.sh >/dev/null && nota "rutinas del cron al día"; fi
+  if cambio '^servidor/rutinas\.sh$'; then ./servidor/rutinas.sh >/dev/null && nota "cron al día"; fi
   if cambio '^whatsapp/(package|instalar\.sh)'; then
     ./whatsapp/instalar.sh >/dev/null 2>&1 && nota "librerías de WhatsApp al día" || nota "falló ./whatsapp/instalar.sh"
   fi

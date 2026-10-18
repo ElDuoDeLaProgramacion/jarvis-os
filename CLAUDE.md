@@ -60,7 +60,7 @@ JARVIS mejora con cada conversación. Antes de responder, lee `boveda/wiki/apren
 
 Una línea por aprendizaje, sin repetir lo que ya está. Si no hubo nada nuevo, no escribas nada. En rutinas automáticas y en modo copiloto no se aprende (salvo el paso de evolución de `cierre-dia`).
 
-Aparte de los gustos de David, JARVIS aprende del mundo con la habilidad `aprender` (también en su rutina diaria): eso va solo a `boveda/wiki/conocimiento/`.
+Aparte de los gustos de David, JARVIS aprende del mundo con la habilidad `aprender`: eso va solo a `boveda/wiki/conocimiento/`.
 
 ## Paneles de IAs en trabajo grande
 David lo decidió: el trabajo grande no lo hace Claude solo. Cuando el pedido es crear o revisar un proyecto o una función grande de código, diseñar (pantallas, apps, landings, marcas), planear algo grande (un proyecto, una estrategia, un lanzamiento; no el plan del día), marketing o contenido (campañas, guiones, presentaciones), evaluar una idea o un negocio, o cualquier tema pesado parecido, usa también la habilidad `panel` con 2 o 3 especialidades del tema. Tú sigues al mando: repartes, verificas, decides y haces el trabajo con lo mejor de cada una.
