@@ -15,6 +15,7 @@ Uso:  python jarvis_voz.py            (ver opciones con --help)
 """
 
 import argparse
+import concurrent.futures
 import difflib
 import json
 import queue
@@ -84,8 +85,13 @@ def opciones():
     p.add_argument("--dispositivo", default="cpu", help="cpu o cuda")
     p.add_argument("--distro", default="Ubuntu", help="distribución de WSL donde vive JARVIS")
     p.add_argument("--repo", default="/mnt/p/jarvis-os", help="ruta del repo dentro de WSL")
+    p.add_argument("--voz-neural", default="es-MX-JorgeNeural",
+                   help="voz neural de Microsoft (edge-tts, necesita internet), p. ej. es-ES-AlvaroNeural, "
+                        "es-CO-GonzaloNeural; 'no' para no usarla")
     p.add_argument("--piper", default=None,
-                   help="ruta a un modelo .onnx de Piper; si no se da, usa las voces de Windows")
+                   help="ruta a un modelo .onnx de Piper; sin internet o sin voz neural, se usa este o Windows")
+    p.add_argument("--conversacion", type=float, default=8,
+                   help="segundos tras cada respuesta en que puedes seguir hablando sin decir 'Jarvis' (0 = nunca)")
     p.add_argument("--sin-gestos", action="store_true",
                    help="no usar la cámara nunca, ni aunque se pida por voz")
     p.add_argument("--sin-copiloto", action="store_true",
@@ -152,6 +158,9 @@ def preguntar_a_jarvis(texto, distro, repo, reanudar=None, confirmado=False):
         return "Hubo un error al ejecutar la petición. Lo dejé anotado en el registro de la voz.", None
     return r.stdout.strip(), sesion
 
+
+# "Jarvis, para", "Jarvis, ya", "Jarvis, cállate": dejar de hablar ya.
+PARAR = re.compile(r"^(para|parale|ya|basta|callate|silencio|stop|detente|espera|olvidalo|cancela)\b")
 
 SI = re.compile(r"^(si|sip|dale|claro|confirmo|confirmado|hazlo|envialo|enviala|envialos|mandalo|mandala|"
                 r"de una|ok|okay|listo|adelante|por favor)\b")
@@ -538,6 +547,25 @@ def publicar_habla(niveles):
     except OSError:
         pass
 
+VOZ_NEURAL_HZ = 24000
+
+
+def partir_frases(texto, minimo=40):
+    """Frases para decir una tras otra; las muy cortas se juntan con la siguiente."""
+    frases, actual = [], ""
+    for trozo in re.split(r"(?<=[.!?;:])\s+", texto.strip()):
+        actual = f"{actual} {trozo}".strip()
+        if len(actual) >= minimo:
+            frases.append(actual)
+            actual = ""
+    if actual:
+        if frases and len(actual) < minimo // 2:
+            frases[-1] += " " + actual
+        else:
+            frases.append(actual)
+    return frases or [texto]
+
+
 class Voz:
     """Habla con Piper si se da un modelo; si no, con las voces de Windows (SAPI) directamente.
 
@@ -545,12 +573,19 @@ class Voz:
     frase. SAPI se crea en cada frase, en el hilo que habla, y se puede interrumpir.
     """
 
-    def __init__(self, modelo_piper=None):
+    def __init__(self, modelo_piper=None, neural=None):
         self.piper = None
+        self.neural = None
         self.callar = threading.Event()
         if modelo_piper:
             from piper import PiperVoice  # opcional: pip install piper-tts
             self.piper = PiperVoice.load(modelo_piper)
+        if neural and neural.lower() not in ("no", "ninguna", "off"):
+            try:
+                import edge_tts, miniaudio  # noqa: F401
+                self.neural = neural
+            except ImportError:
+                log("Voz neural: falta edge-tts o miniaudio (vuelve a correr instalar.bat). Uso la de Windows.")
 
     def tono(self):
         """Un pitido corto y suave en vez de decir "Enseguida"."""
@@ -566,6 +601,8 @@ class Voz:
             return
         self.callar.clear()
         try:
+            if self.neural and self._neural(texto):
+                return
             if self.piper:
                 self._piper(texto)
             else:
@@ -577,18 +614,65 @@ class Voz:
             except Exception as e2:
                 log("Tampoco con PowerShell:", repr(e2))
 
+    def _reproducir(self, audio, frecuencia):
+        """Suena el audio y el cerebro del HUD se mueve con él. False si te callaron a mitad."""
+        publicar_habla(niveles_de_audio(audio, frecuencia))
+        sd.play(audio, frecuencia)
+        while sd.get_stream().active:
+            if self.callar.is_set():
+                sd.stop()
+                return False
+            time.sleep(0.03)
+        return True
+
     def _piper(self, texto):
         audio = np.concatenate([
             np.frombuffer(trozo.audio_int16_bytes, dtype=np.int16)
             for trozo in self.piper.synthesize(texto)
         ])
-        publicar_habla(niveles_de_audio(audio, self.piper.config.sample_rate))
-        sd.play(audio, self.piper.config.sample_rate)
-        while sd.get_stream().active:
-            if self.callar.is_set():
-                sd.stop()
-                return
-            time.sleep(0.05)
+        self._reproducir(audio, self.piper.config.sample_rate)
+
+    def _sintetizar(self, frase):
+        """Una frase con la voz neural (edge-tts da MP3; miniaudio lo pasa a audio)."""
+        import asyncio
+        import edge_tts
+        import miniaudio
+
+        async def bajar():
+            datos = bytearray()
+            async for trozo in edge_tts.Communicate(frase, self.neural, rate="+6%").stream():
+                if trozo["type"] == "audio":
+                    datos += trozo["data"]
+            return bytes(datos)
+
+        sonido = miniaudio.decode(asyncio.run(bajar()), output_format=miniaudio.SampleFormat.SIGNED16,
+                                  nchannels=1, sample_rate=VOZ_NEURAL_HZ)
+        return np.array(sonido.samples, dtype=np.int16)
+
+    def _neural(self, texto):
+        """Voz neural frase a frase: mientras suena una, ya se prepara la siguiente, así no hay
+        silencios entre frases y la respuesta empieza a sonar antes. False si no hay conexión."""
+        frases = partir_frases(texto)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            futuro = ex.submit(self._sintetizar, frases[0])
+            for i in range(len(frases)):
+                try:
+                    audio = futuro.result(timeout=20)
+                except Exception as e:
+                    log("Voz neural sin respuesta:", repr(e))
+                    if i == 0:
+                        return False   # sin internet: lo dice todo la voz local
+                    resto = " ".join(frases[i:])
+                    if self.piper:
+                        self._piper(resto)
+                    else:
+                        self._sapi(resto)
+                    return True
+                if i + 1 < len(frases):
+                    futuro = ex.submit(self._sintetizar, frases[i + 1])
+                if not self._reproducir(audio, VOZ_NEURAL_HZ):
+                    return True
+        return True
 
     def _sapi(self, texto):
         import comtypes
@@ -626,7 +710,7 @@ class Voz:
 class Jarvis:
     def __init__(self, args):
         self.args = args
-        self.voz = Voz(args.piper)
+        self.voz = Voz(args.piper, args.voz_neural)
         self.turno = threading.Lock()          # una orden a la vez
         self.ocupado = threading.Event()       # mientras piensa o habla, el micro no escucha
         self.esperando_hasta = 0.0             # tras "Jarvis" a secas: la frase siguiente es la orden
@@ -635,6 +719,10 @@ class Jarvis:
         self.copiloto = None                   # recomendaciones sin que se las pidas (Copiloto)
         self.ultima_orden = 0.0                # el copiloto no interrumpe justo después de una orden
         self.gestos = None                     # hilo de la cámara, solo mientras se pidió (gestos.Ojos)
+        self.pregunto = False                  # la última respuesta fue una pregunta ("¿Lo envío?")
+        self.cancelado = False                 # "Jarvis, para" mientras pensaba: no decir la respuesta
+        self.pedidos = queue.Queue()           # lo que dices se atiende aquí, sin dejar de escuchar
+        threading.Thread(target=self._atender_en_orden, daemon=True).start()
 
     def hablar(self, texto):
         self.ocupado.set()
@@ -649,8 +737,24 @@ class Jarvis:
         self.esperando_hasta = time.monotonic() + 8
         estado_audio("ESCUCHANDO")
 
+    def _atender_en_orden(self):
+        """Los pedidos de voz se atienden en este hilo: el micrófono sigue escuchando mientras
+        JARVIS piensa o habla, así lo puedes interrumpir ("Jarvis, para") o pedirle otra cosa."""
+        while True:
+            pedido, reanudar = self.pedidos.get()
+            try:
+                self.atender(pedido, reanudar=reanudar)
+            except Exception as e:  # un pedido raro nunca tumba la voz
+                log("Error al atender:", repr(e))
+                estado_audio("EN ESPERA")
+                self.ocupado.clear()
+
+    def ocupado_ahora(self):
+        return self.ocupado.is_set() or not self.pedidos.empty()
+
     def atender(self, pedido, origen="voz", reanudar=None):
-        confirmado = bool(reanudar) and origen in ("voz", "texto") and es_si(pedido)
+        # "Sí" solo confirma (enviar un correo, borrar un evento) si lo último fue una pregunta de JARVIS.
+        confirmado = bool(reanudar) and self.pregunto and origen in ("voz", "texto") and es_si(pedido)
         # Las órdenes al instante (abrir, cerrar, música) valen también al responder sin "Jarvis".
         rapida = origen in ("voz", "texto")
         navegacion = accion_navegacion(pedido) if rapida else None
@@ -710,6 +814,7 @@ class Jarvis:
             self.ocupado.set()
             log(f"\nTú ({origen}): {pedido}")
             estado_audio("PENSANDO")
+            self.cancelado = False
             self.voz.tono()  # un toque corto: te oí y estoy en ello (sin decir "Enseguida")
             texto = pedido
             if pide_pantalla(pedido):
@@ -728,12 +833,18 @@ class Jarvis:
                 respuesta = "Listo, ya está hecho. Los detalles quedaron en la bóveda."
             log(f"JARVIS{' (servidor)' if sesion == SERVIDOR else ' (PC)'}: {respuesta}\n")
             registrar(pedido, respuesta, origen)
-            # Si JARVIS pregunta algo, la respuesta no necesita "Jarvis" durante 20 segundos.
-            self.seguimiento = (sesion, time.monotonic() + 20) if sesion and es_pregunta(respuesta) else None
-            estado_audio("HABLANDO")
-            self.voz.decir(respuesta)
+            # Como una conversación: tras responder, lo siguiente que digas no necesita "Jarvis"
+            # (20 s si preguntó algo, unos segundos si no) y sigue la misma conversación.
+            self.pregunto = es_pregunta(respuesta)
+            ventana = 20 if self.pregunto else self.args.conversacion
+            self.seguimiento = (sesion, time.monotonic() + 600) if sesion and ventana > 0 else None
+            if self.cancelado:
+                self.seguimiento = None
+            else:
+                estado_audio("HABLANDO")
+                self.voz.decir(respuesta)
             if self.seguimiento:
-                self.seguimiento = (self.seguimiento[0], time.monotonic() + 20)  # cuenta desde que calla
+                self.seguimiento = (self.seguimiento[0], time.monotonic() + ventana)  # cuenta desde que calla
             estado_audio("ESCUCHANDO" if self.seguimiento else "EN ESPERA")
             self.ocupado.clear()
 
@@ -806,27 +917,37 @@ class Jarvis:
                 log("No pude transcribir", rel, repr(e))
         return hechas
 
-    def frase(self, texto):
-        """Decide qué hacer con una frase transcrita."""
+    def frase(self, texto, durante=False):
+        """Decide qué hacer con una frase transcrita. durante = empezó mientras JARVIS pensaba o
+        hablaba: entonces solo cuenta si empieza por "Jarvis" (si no, puede ser su propia voz)."""
         if not texto:
             return
+        activada, pedido = separar_pedido(texto)
+        if durante or self.ocupado_ahora():
+            if not activada:
+                return
+            self.voz.callar.set()              # le hablas encima: deja de hablar ya
+            if not pedido or PARAR.match(normalizar(pedido)):
+                log("(interrumpido)")          # "Jarvis, para" / "Jarvis, ya"
+                self.cancelado = True          # si aún pensaba, su respuesta no se dice
+                return
+            self.seguimiento = None
+            self.pedidos.put((pedido, None))  # y te atiende en cuanto termine lo que estaba haciendo
+            return
         if self.seguimiento and time.monotonic() < self.seguimiento[1]:
-            # JARVIS acaba de preguntar algo ("¿Lo envío?"): la respuesta va sin "Jarvis".
+            # Seguimos conversando: la respuesta va sin "Jarvis" y en la misma conversación.
             sesion, self.seguimiento = self.seguimiento[0], None
-            activada, pedido = separar_pedido(texto)
-            self.atender(pedido if activada and pedido else texto, reanudar=sesion)
+            self.pedidos.put((pedido if activada and pedido else texto, sesion))
             return
         self.seguimiento = None
         if time.monotonic() < self.esperando_hasta:
             self.esperando_hasta = 0.0
-            activada, pedido = separar_pedido(texto)
-            self.atender(pedido if activada and pedido else texto)
+            self.pedidos.put((pedido if activada and pedido else texto, None))
             return
-        activada, pedido = separar_pedido(texto)
         if not activada:
             return  # conversación que no es para JARVIS
         if pedido:
-            self.atender(pedido)
+            self.pedidos.put((pedido, None))
         else:
             self.escuchar_orden()
 
@@ -850,7 +971,7 @@ def escuchar_siempre(jarvis, modelo, sensibilidad):
         bloques.put(datos[:, 0].copy())
 
     previo = deque(maxlen=int(0.4 / BLOQUE_S))  # 0,4 s antes de que empiece la voz
-    frase, en_voz, voz_seguida, silencio, con_voz = [], False, 0, 0, 0
+    frase, en_voz, voz_seguida, silencio, con_voz, durante = [], False, 0, 0, 0, False
     piso = 0.01  # ruido de fondo, se ajusta solo
 
     with sd.InputStream(samplerate=FRECUENCIA, channels=1, dtype="float32",
@@ -859,22 +980,22 @@ def escuchar_siempre(jarvis, modelo, sensibilidad):
         log('Listo. Di "Jarvis" y lo que necesitas. Ctrl+C para salir.')
         while True:
             bloque = bloques.get()
-            if jarvis.ocupado.is_set():
-                # Mientras piensa o habla no escuchamos (si no, se oiría a sí mismo).
-                frase, en_voz, voz_seguida, silencio = [], False, 0, 0
-                previo.clear()
-                continue
+            # Mientras piensa o habla seguimos escuchando, para poder interrumpirlo. Mientras habla,
+            # el umbral sube: su propia voz por los parlantes no debe parecer la tuya.
+            hablando = jarvis.ocupado.is_set()
             nivel = float(np.sqrt(np.mean(bloque ** 2)))
-            umbral = max(piso * sensibilidad, 0.006)
+            umbral = max(piso * sensibilidad, 0.006) * (2.5 if hablando else 1)
             if not en_voz:
                 previo.append(bloque)
                 if nivel > umbral:
                     voz_seguida += 1
                 else:
                     voz_seguida = 0
-                    piso = 0.97 * piso + 0.03 * nivel
+                    if not hablando:
+                        piso = 0.97 * piso + 0.03 * nivel
                 if voz_seguida >= 3:
                     en_voz, frase, silencio, con_voz = True, list(previo), 0, voz_seguida
+                    durante = jarvis.ocupado_ahora()
                 continue
             frase.append(bloque)
             silencio = silencio + 1 if nivel < umbral * 0.7 else 0
@@ -889,10 +1010,7 @@ def escuchar_siempre(jarvis, modelo, sensibilidad):
                 texto = transcribir(modelo, audio)
                 if texto:
                     print(f"(oído) {texto}", flush=True)
-                jarvis.frase(texto)
-                # Lo que se grabó mientras JARVIS pensaba o hablaba no cuenta.
-                while not bloques.empty():
-                    bloques.get_nowait()
+                jarvis.frase(texto, durante or jarvis.ocupado_ahora())
 
 
 def escuchar_con_tecla(jarvis, modelo, tecla):
@@ -989,7 +1107,8 @@ class Copiloto(threading.Thread):
     def paso(self):
         j = self.jarvis
         ahora = time.monotonic()
-        if not self.activo or j.ocupado.is_set() or j.seguimiento or ahora - j.ultima_orden < 30:
+        conversando = j.seguimiento and time.monotonic() < j.seguimiento[1]
+        if not self.activo or j.ocupado_ahora() or conversando or ahora - j.ultima_orden < 30:
             return
         titulo = ventana_activa()
         contexto = detectar_contexto(titulo)
