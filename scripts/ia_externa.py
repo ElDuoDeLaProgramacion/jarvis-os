@@ -83,11 +83,20 @@ def servidor():
 
 
 _remotas = None
+_error_servidor = None   # por qué no se pudo preguntar al servidor, para decirlo bien
+
+
+def sin_ias():
+    """Por qué no hay IAs: en el PC casi siempre es que no llega al servidor, que es donde están las claves."""
+    if _error_servidor:
+        return (f"No hay IAs externas porque no llego al servidor ({servidor()[0]}): {_error_servidor}. "
+                "Las claves están allí. Revisa JARVIS_SERVIDOR en el .env del PC y que el servidor esté encendido.")
+    return "No hay ninguna IA externa conectada. David debe poner en .env al menos una clave:"
 
 
 def configuradas():
     """Las IAs con clave aquí. En el PC sin claves propias, las del servidor: las claves viven solo allí."""
-    global _remotas
+    global _remotas, _error_servidor
     locales = [n for n, p in PROVEEDORES.items() if os.environ.get(p["clave"])]
     if locales or not servidor():
         return locales
@@ -97,7 +106,7 @@ def configuradas():
                         if n in PROVEEDORES]
         except RuntimeError as e:
             print(f"(no pude preguntarle al servidor qué IAs tiene: {e})", file=sys.stderr)
-            _remotas = []
+            _remotas, _error_servidor = [], str(e)
     return _remotas
 
 
@@ -331,7 +340,7 @@ def panel(nombre, pregunta, n, guardar=None, resumen=None):
     rol, instrucciones, preferidos = rol_de(nombre)
     miembros = armar_panel(preferidos, n)
     if not miembros:
-        print("No pude armar el panel: no hay IAs externas disponibles.")
+        print("No pude armar el panel. " + sin_ias())
         return 1
     sistema = f"{instrucciones} Responde en español, directo y con argumentos. {FORMATO} {HONESTO}"
     respuestas = []
@@ -532,7 +541,7 @@ def flujo(tipo, etapa, pedido, carpeta, resumen, a_medida=None):
     carpeta = Path(carpeta)
     miembros = equipo_completo(carpeta)
     if not miembros:
-        print("No hay IAs externas disponibles.")
+        print(sin_ias())
         return 1
     if etapa == "resumen":
         # Cada IA resume lo suyo de todas las etapas: qué hizo, qué encontró, qué recomienda, qué no pudo.
@@ -609,9 +618,10 @@ def main():
         return flujo(args.tipo, None, "", None, None, args.etapas)
     listas = configuradas()
     if not listas:
-        print("No hay ninguna IA externa conectada. David debe poner en .env al menos una clave:")
-        for n, p in PROVEEDORES.items():
-            print(f"  {p['clave']}=...   (se crea en {p['alta']})")
+        print(sin_ias())
+        if not _error_servidor:
+            for n, p in PROVEEDORES.items():
+                print(f"  {p['clave']}=...   (se crea en {p['alta']})")
         return 2
 
     if args.pregunta[:1] == ["modelos"]:
