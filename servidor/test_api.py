@@ -61,6 +61,7 @@ class SpotifyFalso:
 
 class PruebaApi(unittest.TestCase):
     def setUp(self):
+        api.FALLOS = api.Fallos()
         self.dir = Path(tempfile.mkdtemp())
         guion = self.dir / "jarvis.sh"
         guion.write_text(FALSO)
@@ -103,6 +104,21 @@ class PruebaApi(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as e:
             self.pedir("/api/conversacion", token="otro")
         self.assertEqual(e.exception.code, 401)
+
+    def test_muchas_claves_malas_bloquean_la_ip(self):
+        api.FALLOS = api.Fallos()
+        codigos = []
+        for _ in range(6):
+            try:
+                self.pedir("/api/conversacion", token="otro")
+            except urllib.error.HTTPError as e:
+                codigos.append(e.code)
+        self.assertEqual(codigos, [401] * 5 + [429])
+        with self.assertRaises(urllib.error.HTTPError) as e:
+            self.pedir("/api/conversacion")   # ni con la buena, hasta que pase el castigo
+        self.assertEqual(e.exception.code, 429)
+        api.FALLOS = api.Fallos()
+        self.assertEqual(self.pedir("/api/conversacion")[0], 200)
 
     def test_app_sin_token(self):
         with urllib.request.urlopen(self.base + "/app/") as r:

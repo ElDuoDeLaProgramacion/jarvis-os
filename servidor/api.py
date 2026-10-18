@@ -10,7 +10,8 @@ Solo usa la biblioteca estándar de Python.
     python3 servidor/api.py            ->  http://127.0.0.1:7788/app
 
 Todo /api/* exige la cabecera "Authorization: Bearer <JARVIS_API_TOKEN>" (.env).
-La escucha es solo local: al celular llega por Tailscale (tailscale serve), nunca por internet abierto.
+La escucha es solo local (127.0.0.1): de internet llega por Caddy con HTTPS (servidor/publicar.sh),
+que además frena a quien prueba claves (ver Fallos).
 """
 
 import argparse
@@ -300,6 +301,32 @@ class Transcriptor:
 
 # ---------- HTTP ----------
 
+class Fallos:
+    """La API está en internet: tras 5 claves malas en 10 minutos, esa IP espera 15 minutos."""
+    MAXIMO, VENTANA, CASTIGO = 5, 600, 900
+
+    def __init__(self):
+        self.intentos, self.hasta, self.cerrojo = {}, {}, threading.Lock()
+
+    def bloqueada(self, ip):
+        with self.cerrojo:
+            return self.hasta.get(ip, 0) > time.time()
+
+    def anotar(self, ip):
+        ahora = time.time()
+        with self.cerrojo:
+            recientes = [t for t in self.intentos.get(ip, []) if ahora - t < self.VENTANA] + [ahora]
+            self.intentos[ip] = recientes
+            if len(recientes) >= self.MAXIMO:
+                self.hasta[ip], self.intentos[ip] = ahora + self.CASTIGO, []
+            if len(self.intentos) > 10000:   # que nadie llene la memoria con IPs inventadas
+                self.intentos = {k: v for k, v in self.intentos.items() if v and ahora - v[-1] < self.VENTANA}
+                self.hasta = {k: v for k, v in self.hasta.items() if v > ahora}
+
+
+FALLOS = Fallos()
+
+
 class Manejador(BaseHTTPRequestHandler):
     timeout = 60          # una conexión que no manda nada no deja un hilo colgado para siempre
     conversacion = None
@@ -317,10 +344,19 @@ class Manejador(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(cuerpo)
 
+    def _ip(self):
+        # Solo escuchamos en 127.0.0.1: lo de afuera llega por Caddy, que pone la IP real en X-Forwarded-For.
+        return self.headers.get("X-Forwarded-For", "").split(",")[-1].strip() or self.client_address[0]
+
     def _autorizado(self):
+        ip = self._ip()
+        if FALLOS.bloqueada(ip):
+            self._json({"error": "demasiados intentos, espera unos minutos"}, 429)
+            return False
         dado = self.headers.get("Authorization", "")
         ok = dado.startswith("Bearer ") and hmac.compare_digest(dado[7:].strip().encode(), self.token.encode())
         if not ok:
+            FALLOS.anotar(ip)
             self._json({"error": "token"}, 401)
         return ok
 
