@@ -52,9 +52,9 @@ Los gestos básicos de [Hands-Free Navigator](https://github.com/ElDuoDeLaProgra
 | Palma abierta deslizada a izquierda / derecha | Pestaña anterior / siguiente |
 | Puño con el pulgar **arriba** / **abajo** (mantener) | Scroll arriba / abajo |
 | Puño | Reposo, no hace nada |
-| **Cuernos** (índice + meñique) 1 s | Activar / pausar los gestos (JARVIS te dice "Gestos activos" o "Gestos en pausa") |
+| **Cuernos** (índice + meñique) 1 s | Pausar / reanudar los gestos (JARVIS te dice "Gestos en pausa" o "Gestos activos") |
 
-Arrancan **en pausa** para no mover el ratón al encender el PC: haz los cuernos para activarlos. Arrastrar, zoom y grabar pantalla se quedan solo en Hands-Free Navigator. Los umbrales están en `voz\manos\config.py` (copia del de Hands-Free Navigator).
+La cámara **solo se enciende cuando se lo pides**: "Jarvis, activa los gestos" (o "enciende la cámara") la abre y los gestos quedan activos; "Jarvis, apaga los gestos" la cierra y deja de gastar CPU. Al encender el PC la cámara queda apagada. Arrastrar, zoom y grabar pantalla se quedan solo en Hands-Free Navigator. Los umbrales están en `voz\manos\config.py` (copia del de Hands-Free Navigator).
 
 ## Opciones
 
@@ -66,7 +66,7 @@ Se añaden al final, por ejemplo `jarvis.bat --modelo base`:
 | `--sensibilidad 2` | Si no detecta tu voz (más bajo = más sensible; por defecto 3) |
 | `--modelo base` | Modelo más rápido (menos preciso). `medium` es más preciso y más lento |
 | `--dispositivo cuda` | Usar la tarjeta gráfica NVIDIA si tienes |
-| `--sin-gestos` | No usar la cámara |
+| `--sin-gestos` | No usar la cámara nunca, ni aunque se pida por voz |
 | `--ver-camara` | Ver la cámara con el gesto que detecta (para ajustar) |
 | `--camara 1` | Otra cámara |
 | `--distro Ubuntu-22.04` | Si tu distribución de WSL tiene otro nombre (míralo con `wsl -l`) |
@@ -100,5 +100,5 @@ Para una voz más natural con Piper:
 - **No responde a "Jarvis"**: mira la ventana; si aparece "(oído) ..." con otra palabra, dilo más claro o usa `--modelo medium`. Si no aparece nada, prueba `--sensibilidad 2`.
 - **Hace la acción pero no habla**: revisa `P:\jarvis-os\logs\voz.log`; ahí queda el motivo. Si la voz sale en inglés, instala una voz española en Configuración → Hora e idioma → Voz.
 - **"Error de JARVIS"**: prueba `./scripts/jarvis.sh "hola"` en Ubuntu; si ahí falla, el problema es de Claude Code, no de la voz.
-- **Los gestos no hacen nada**: arrancan en pausa, haz los cuernos 1 s. Abre con `--ver-camara` para ver qué detecta. Si dice que no están instalados, mira "Instalar".
+- **Los gestos no hacen nada**: la cámara está apagada hasta que digas "Jarvis, activa los gestos"; si los pausaste con los cuernos, repítelos 1 s. Abre con `--ver-camara` para ver qué detecta. Si dice que no están instalados, mira "Instalar".
 - **Tarda en responder**: la mayor parte del tiempo es Claude trabajando. Para transcribir más rápido usa `--modelo base`.

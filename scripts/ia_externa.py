@@ -13,6 +13,10 @@ clave, los modelos de OpenRouter (GPT, Gemini, Llama, DeepSeek, Mistral, Grok...
         un panel de varias IAs a la vez, elegidas por especialidad, en paralelo. --rol acepta cualquier
         tema (ROLES trae instrucciones afinadas para los comunes); --guardar deja panel-<rol>.json para
         la ventana de propuestas del HUD
+    python3 scripts/ia_externa.py flujo --tipo programacion --etapa plan --guardar carpeta [--archivo resumen.md] "pedido"
+        un equipo con TODAS las IAs disponibles, por etapas (plan, programar, auditar, QA...). Cada
+        llamada hace una etapa y lee las anteriores de la carpeta; --etapa resumen deja un resumen por IA.
+        Sin --etapa, lista las etapas del tipo.
 
 Claves en .env (las pone David a mano): GEMINI_API_KEY y OPENROUTER_API_KEY.
 Modelos opcionales: GEMINI_MODELO y OPENROUTER_MODELO (si no, Gemini usa el flash más nuevo
@@ -48,8 +52,13 @@ PROVEEDORES = {
     },
 }
 
+# Por esta API cada IA solo devuelve texto: que no finja videos, imágenes ni escaneos que no hizo.
+HONESTO = ("Aquí solo puedes responder con texto: no puedes crear ni adjuntar videos, imágenes, audio ni archivos, "
+           "ni ejecutar código, navegar o escanear sistemas. Si te piden algo de eso, dilo claro en la primera línea "
+           "y entrega lo más útil que sí puedes (guion, storyboard, prompts listos para la herramienta adecuada, "
+           "código, pasos). Nunca finjas haberlo hecho ni inventes resultados.")
 SISTEMA = ("Eres una IA consultada por JARVIS, el asistente de David, como segunda opinión. "
-           "Responde en español, directo y con argumentos. Si no estás seguro de algo, dilo.")
+           "Responde en español, directo y con argumentos. Si no estás seguro de algo, dilo. " + HONESTO)
 
 
 def cargar_env():
@@ -239,6 +248,19 @@ ROLES = {
               "Aclara que no sustituye a un abogado y cuándo hace falta uno.", RAZONA),
     "redaccion": ("Eres editor y redactor. Mejora el texto: claridad, tono, estructura y errores; entrega la "
                   "versión reescrita completa.", CREATIVO),
+    "arquitectura": ("Eres arquitecto de software. Propón la estructura: módulos, archivos, datos, dependencias e "
+                     "interfaces entre partes, como diagrama, y las decisiones técnicas con su porqué.", CODIGO),
+    "revision": ("Eres revisor de código exigente. Busca errores, casos borde, nombres confusos y duplicación en "
+                 "el código propuesto; da cada problema con el arreglo en ```diff.", CODIGO),
+    "qa": ("Eres ingeniero de QA. Escribe el plan de pruebas, los casos (normales, borde y de error) y las pruebas "
+           "automáticas en código; señala qué fallaría con lo propuesto y cómo reproducirlo.", CODIGO),
+    "video": ("Eres productor y guionista de video. Entrega guion con tiempos, storyboard escena por escena, "
+              "textos en pantalla, música sugerida y prompts listos para herramientas de video (Veo, Sora, Runway, "
+              "Kling...). Si no puedes generar el video tú, dilo en la primera línea.", CREATIVO),
+    "edicion": ("Eres editor final. Toma lo producido, corrige, une y pule: entrega la versión final lista para "
+                "publicar y el plan de edición (cortes, ritmo, subtítulos, formatos por plataforma).", CREATIVO),
+    "critica": ("Eres el abogado del diablo. Busca lo que falla en lo propuesto: supuestos débiles, riesgos, "
+                "lo que falta y lo que sobra; luego di qué cambiarías.", RAZONA),
 }
 # Para temas sin rol propio: el mismo encargo, con el tema como especialidad.
 GENERICO = ("Eres experto sénior en {tema}. Analiza lo que te pasan desde tu especialidad: qué está bien, qué "
@@ -247,7 +269,8 @@ ALIAS = {"seguridad": "auditoria", "codigo": "programacion", "plan": "planeacion
          "ux": "diseno", "ui": "diseno", "negocios": "negocio", "ventas": "marketing", "redes": "contenido",
          "videos": "contenido", "presentacion": "presentaciones", "diapositivas": "presentaciones",
          "dinero": "finanzas", "analisis": "datos", "servidores": "devops", "infraestructura": "devops",
-         "aprender": "educacion", "textos": "redaccion"}
+         "aprender": "educacion", "textos": "redaccion", "pruebas": "qa", "testing": "qa",
+         "arquitecto": "arquitectura", "edicion de video": "edicion", "editar": "edicion"}
 
 # Cómo entregar lo que se puede ver: JARVIS lo muestra en la ventana de propuestas del HUD y de la app.
 FORMATO = ("Formato de lo visual: el código o los cambios van en bloques ``` con el lenguaje (```diff para "
@@ -310,7 +333,7 @@ def panel(nombre, pregunta, n, guardar=None, resumen=None):
     if not miembros:
         print("No pude armar el panel: no hay IAs externas disponibles.")
         return 1
-    sistema = f"{instrucciones} Responde en español, directo y con argumentos. {FORMATO}"
+    sistema = f"{instrucciones} Responde en español, directo y con argumentos. {FORMATO} {HONESTO}"
     respuestas = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(miembros)) as ex:
         futuros = [ex.submit(preguntar, prov, pregunta, None, sistema, lista) for prov, lista in miembros]
@@ -336,6 +359,234 @@ def panel(nombre, pregunta, n, guardar=None, resumen=None):
     return 1 if any("error" in r for r in respuestas) else 0
 
 
+# ---------- Flujo: todas las IAs disponibles, por etapas ----------
+# Cada etapa: (nombre, roles que se reparten las IAs, encargo). Todas las IAs del equipo trabajan en
+# cada etapa; los roles se reparten entre ellas y cada etapa ve lo que dejaron las anteriores.
+FLUJOS = {
+    "auditoria": [
+        ("escaneo", ["auditoria", "programacion", "devops"],
+         "Analiza lo que te pasan (código, configuración y salida de las herramientas de escaneo de JARVIS) y "
+         "lista cada hallazgo con gravedad, evidencia (archivo, línea o salida) y arreglo."),
+        ("verificacion", ["auditoria", "critica"],
+         "Revisa los hallazgos de la etapa anterior: confirma los que tienen evidencia, marca los falsos positivos "
+         "y añade lo que se les pasó. Termina con la lista final ordenada por gravedad."),
+    ],
+    "programacion": [
+        ("plan", ["planeacion", "arquitectura", "producto"],
+         "Haz el plan del trabajo: alcance, arquitectura, archivos, pasos en orden y riesgos. Reparte el trabajo "
+         "en partes numeradas que distintas personas puedan programar en paralelo."),
+        ("programar", ["programacion"],
+         "Programa siguiendo el plan de la etapa anterior. Eres el programador {parte} de {total}: encárgate sobre "
+         "todo de la parte {parte} del plan (si hay menos partes, de la que más falte) y entrega el código completo."),
+        ("auditar", ["auditoria", "revision"],
+         "Audita el código de la etapa anterior: seguridad, errores y calidad, cada problema con su arreglo."),
+        ("qa", ["qa"],
+         "Prueba lo construido: plan de pruebas, casos y pruebas automáticas; di qué falla y cómo arreglarlo."),
+    ],
+    "marketing": [
+        ("planificar", ["marketing", "negocio", "producto"],
+         "Planifica: objetivo, público, mensaje, canales, calendario y cómo medir."),
+        ("desarrollar", ["contenido", "redaccion"],
+         "Desarrolla la idea del plan: piezas concretas, textos, guiones y ganchos listos para usar."),
+        ("producir", ["video", "diseno"],
+         "Produce lo visual de lo desarrollado: videos (guion, storyboard y prompts) y diseños (maquetas en HTML, "
+         "piezas, paleta). Si algo no lo puedes generar tú, dilo y deja el prompt para la herramienta adecuada."),
+        ("editar", ["edicion", "critica"],
+         "Edita y pule todo lo anterior hasta la versión final; señala lo que no convence y cómo mejorarlo."),
+    ],
+    "diseno": [
+        ("investigar", ["producto", "diseno"], "Define usuarios, objetivos, flujo y referencias del diseño."),
+        ("disenar", ["diseno"], "Diseña las pantallas propuestas como maquetas HTML autocontenidas."),
+        ("revisar", ["critica", "qa"], "Revisa las maquetas: usabilidad, accesibilidad, coherencia y errores."),
+    ],
+    "investigacion": [
+        ("investigar", ["investigacion", "datos"],
+         "Explica el tema con lo que te pasan (la búsqueda web de JARVIS va en el contexto): lo seguro, lo dudoso "
+         "y las opciones comparadas."),
+        ("contrastar", ["critica", "investigacion"],
+         "Contrasta lo anterior: qué se contradice, qué falta y cuál es la conclusión mejor sustentada."),
+    ],
+    "ideas": [
+        ("analizar", ["ideas", "negocio", "finanzas"], "Evalúa la idea desde tu especialidad, con nota de 1 a 10."),
+        ("criticar", ["critica", "planeacion"],
+         "Cuestiona las evaluaciones anteriores y propone cómo probar la idea barato en una semana."),
+    ],
+}
+TIPO_ALIAS = {"seguridad": "auditoria", "codigo": "programacion", "proyecto": "programacion", "app": "programacion",
+              "software": "programacion", "contenido": "marketing", "busqueda": "investigacion",
+              "investigar": "investigacion", "aprender": "investigacion", "comparar": "investigacion",
+              "tendencias": "marketing", "canales": "marketing", "evaluar": "ideas", "campana": "marketing", "redes": "marketing",
+              "videos": "marketing", "diseño": "diseno", "ux": "diseno", "idea": "ideas", "negocio": "ideas"}
+
+
+def etapas_a_medida(texto):
+    """--etapas "investigar=investigacion,datos; proponer=nutricion; revisar=critica,qa" (y, si quieres,
+    ": encargo" tras los roles). Así cualquier tema tiene su propio flujo, no solo los de FLUJOS."""
+    trozos = [t.strip() for t in (texto or "").split(";") if t.strip()]
+    etapas = []
+    for i, trozo in enumerate(trozos):
+        nombre, _, resto = trozo.partition("=")
+        roles, _, encargo = resto.partition(":")
+        roles = [r.strip() for r in roles.split(",") if r.strip()] or [nombre.strip()]
+        if not encargo.strip():
+            encargo = ("Analiza el pedido desde tu especialidad y propone." if i == 0 else
+                       "Revisa todo lo anterior, corrige lo que falle y deja la versión final." if i == len(trozos) - 1
+                       else "Construye sobre lo que hicieron las etapas anteriores y entrega tu parte.")
+        etapas.append((nombre.strip().lower(), roles, encargo.strip()))
+    return etapas
+
+
+def etapas_de(tipo, a_medida=None):
+    """Las etapas del tipo. Con a_medida (--etapas), las que diga. Cualquier otro tema: expertos de
+    ese tema y luego una crítica."""
+    if a_medida:
+        return " ".join((tipo or "a medida").strip().lower().split()), a_medida
+    clave = " ".join((tipo or "").strip().lower().split())
+    clave = TIPO_ALIAS.get(clave, clave)
+    if clave in FLUJOS:
+        return clave, FLUJOS[clave]
+    tema = clave or "general"
+    return tema, [("analizar", [tema, "investigacion"], "Analiza el pedido desde tu especialidad y propone."),
+                  ("criticar", ["critica"], "Cuestiona lo anterior y deja la mejor versión combinada.")]
+
+
+def equipo_completo(carpeta):
+    """Todas las IAs disponibles (familias distintas), fijas para todo el flujo en <carpeta>/equipo.ias."""
+    archivo = carpeta / "equipo.ias"   # no es .json: la ventana de propuestas lee los .json como paneles
+    if archivo.exists():
+        try:
+            return [tuple(m) for m in json.loads(archivo.read_text(encoding="utf-8"))["equipo"]]
+        except (ValueError, KeyError, OSError):
+            pass
+    tope = int(os.environ.get("JARVIS_IAS_MAX", "8"))
+    miembros = armar_panel(GENERAL, max(1, tope))
+    if miembros:
+        carpeta.mkdir(parents=True, exist_ok=True)
+        archivo.write_text(json.dumps({"equipo": miembros}, ensure_ascii=False, indent=1), encoding="utf-8")
+    return miembros
+
+
+def repartir(roles, miembros):
+    """A cada IA, un rol. Cada rol recibe primero a la IA que mejor le va; luego se reparten las demás."""
+    libres, asignado = list(range(len(miembros))), {}
+    while libres:
+        for rol in roles:
+            if not libres:
+                break
+            _, _, preferidos = rol_de(rol)
+            mejor = ranking(preferidos, [miembros[i][1][0] for i in libres])[0]
+            i = next(i for i in libres if miembros[i][1][0] == mejor)
+            asignado[i] = rol
+            libres.remove(i)
+    return [asignado[i] for i in range(len(miembros))]
+
+
+def _nombre_json(texto):
+    return "".join(c if c.isalnum() else "-" for c in texto).strip("-")
+
+
+def anteriores(carpeta, nombres, tope=45000):
+    """Lo que dejaron las etapas anteriores, para pasárselo a la siguiente."""
+    partes = []
+    for i, nombre in enumerate(nombres, 1):
+        f = carpeta / f"panel-{i}-{_nombre_json(nombre)}.json"
+        if not f.exists():
+            continue
+        for r in json.loads(f.read_text(encoding="utf-8")).get("respuestas", []):
+            if r.get("texto"):
+                partes.append(f"### Etapa {nombre} · {r.get('rol', '')} · {r['modelo']}\n{r['texto']}")
+    texto = "\n\n".join(partes)
+    return texto[-tope:] if len(texto) > tope else texto
+
+
+def correr(tareas):
+    """[(miembro, sistema, pregunta, extra)] en paralelo -> respuestas con su modelo o su error."""
+    salida = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(tareas))) as ex:
+        futuros = [ex.submit(preguntar, prov, preg, None, sist, lista) for (prov, lista), sist, preg, _ in tareas]
+        for ((prov, lista), _, _, extra), f in zip(tareas, futuros):
+            try:
+                usado, texto = f.result()
+                salida.append({"modelo": usado, "proveedor": prov, "texto": texto, **extra})
+            except Exception as e:
+                salida.append({"modelo": lista[0], "proveedor": prov, "error": str(e), **extra})
+    return salida
+
+
+def flujo(tipo, etapa, pedido, carpeta, resumen, a_medida=None):
+    # Las etapas a medida se guardan en la carpeta, así las demás llamadas no tienen que repetirlas.
+    guardadas = Path(carpeta) / "etapas.ias" if carpeta else None
+    if a_medida and guardadas:
+        guardadas.parent.mkdir(parents=True, exist_ok=True)
+        guardadas.write_text(a_medida, encoding="utf-8")
+    elif guardadas and guardadas.exists():
+        a_medida = guardadas.read_text(encoding="utf-8")
+    tipo, etapas = etapas_de(tipo, etapas_a_medida(a_medida))
+    nombres = [e[0] for e in etapas]
+    if not etapa:
+        print(f"Flujo de {tipo}: " + " -> ".join(nombres) + " -> resumen")
+        return 0
+    if not carpeta:
+        print("Falta --guardar <carpeta del panel>.")
+        return 2
+    carpeta = Path(carpeta)
+    miembros = equipo_completo(carpeta)
+    if not miembros:
+        print("No hay IAs externas disponibles.")
+        return 1
+    if etapa == "resumen":
+        # Cada IA resume lo suyo de todas las etapas: qué hizo, qué encontró, qué recomienda, qué no pudo.
+        todo = {}
+        for i, nombre in enumerate(nombres, 1):
+            f = carpeta / f"panel-{i}-{_nombre_json(nombre)}.json"
+            if f.exists():
+                for r in json.loads(f.read_text(encoding="utf-8")).get("respuestas", []):
+                    if r.get("texto") and "ia" in r:
+                        todo.setdefault(r["ia"], []).append(f"### {nombre} ({r.get('rol', '')})\n{r['texto']}")
+        tareas = []
+        for i, m in enumerate(miembros):
+            suyo = todo.get(i)
+            if suyo:
+                tareas.append((m, "Eres una de las IAs del equipo de JARVIS. Responde en español. " + HONESTO,
+                               "Resume en 5 a 8 líneas tu trabajo en este pedido: qué hiciste, lo más importante que "
+                               "encontraste o propusiste, qué recomiendas y qué no pudiste hacer.\n\nPedido: "
+                               f"{(resumen or pedido)[:1500]}\n\nLo tuyo:\n" + "\n\n".join(suyo)[-30000:], {"ia": i}))
+        respuestas = correr(tareas)
+        nombre_json, rol = "panel-9-resumen-por-ia.json", "resumen por IA"
+    else:
+        if etapa not in nombres:
+            print(f"La etapa {etapa} no existe en {tipo}: " + ", ".join(nombres + ["resumen"]))
+            return 2
+        n = nombres.index(etapa)
+        _, roles, encargo = etapas[n]
+        previo = anteriores(carpeta, nombres[:n])
+        reparto = repartir(roles, miembros)
+        tareas = []
+        for i, (m, rol) in enumerate(zip(miembros, reparto)):
+            clave, instrucciones, _ = rol_de(rol)
+            mismos = [j for j, r in enumerate(reparto) if r == rol]
+            texto = encargo.format(parte=mismos.index(i) + 1, total=len(mismos))
+            sistema = (f"{instrucciones} Eres parte de un equipo de {len(miembros)} IAs que trabaja por etapas; "
+                       f"esta es la etapa «{etapa}». Responde en español, directo. {FORMATO} {HONESTO}")
+            pregunta = f"{pedido}\n\n## Tu encargo en esta etapa\n{texto}"
+            if previo:
+                pregunta += f"\n\n## Lo que hicieron las etapas anteriores\n{previo}"
+            tareas.append((m, sistema, pregunta, {"rol": clave, "ia": i}))
+        respuestas = correr(tareas)
+        nombre_json, rol = f"panel-{n + 1}-{_nombre_json(etapa)}.json", f"{n + 1}. {etapa}"
+    carpeta.mkdir(parents=True, exist_ok=True)
+    destino = carpeta / nombre_json
+    destino.write_text(json.dumps({"fecha": time.strftime("%Y-%m-%d %H:%M"), "rol": rol, "tipo": tipo,
+                                   "pregunta": (resumen or pedido)[:2000], "respuestas": respuestas},
+                                  ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"# {tipo} · {rol}: {len(respuestas)} IAs\n")
+    for r in respuestas:
+        print(f"## {r['modelo']}{' · ' + r['rol'] if r.get('rol') else ''}\n"
+              f"{r.get('texto') or 'Error: ' + r.get('error', '')}\n")
+    print(f"(guardado en {destino})")
+    return 0 if any(r.get("texto") for r in respuestas) else 1
+
+
 def main():
     cargar_env()
     a = argparse.ArgumentParser(description="IAs externas a Claude para JARVIS")
@@ -347,10 +598,15 @@ def main():
     a.add_argument("--rol", help="panel: cualquier tema; con instrucciones propias: " + ", ".join(ROLES))
     a.add_argument("--guardar", help="panel: carpeta donde guardar las respuestas para la ventana de propuestas")
     a.add_argument("--n", type=int, default=3, help="panel: cuántas IAs (máximo 6)")
+    a.add_argument("--tipo", help="flujo: auditoria, programacion, marketing, diseno, ideas o cualquier tema")
+    a.add_argument("--etapa", help="flujo: la etapa a correr (sin ella, lista las etapas) o 'resumen'")
+    a.add_argument("--etapas", help='flujo a medida: "nombre=rol,rol[: encargo]; nombre=rol..." (se guarda en la carpeta)')
     a.add_argument("--sin-cerebro", action="store_true",
                    help="no añadir la memoria de JARVIS (scripts/cerebro.py) a la pregunta")
     args = a.parse_intermixed_args()
 
+    if args.pregunta[:1] == ["flujo"] and not args.etapa:
+        return flujo(args.tipo, None, "", None, None, args.etapas)
     listas = configuradas()
     if not listas:
         print("No hay ninguna IA externa conectada. David debe poner en .env al menos una clave:")
@@ -371,7 +627,8 @@ def main():
         return 0
 
     es_panel = args.pregunta[:1] == ["panel"]
-    if es_panel:
+    es_flujo = args.pregunta[:1] == ["flujo"]
+    if es_panel or es_flujo:
         args.pregunta = args.pregunta[1:]
     pregunta = " ".join(args.pregunta).strip()
     if not pregunta and not args.archivo:
@@ -391,6 +648,8 @@ def main():
             pedido = f"{memoria}\n\n## Lo que te piden\n{pedido}"
     original, pregunta = pregunta, pedido
 
+    if es_flujo:
+        return flujo(args.tipo, args.etapa, pregunta, args.guardar, original, args.etapas)
     if es_panel:
         if not args.rol:
             a.error("falta --rol (un tema: auditoria, marketing, nutricion...)")

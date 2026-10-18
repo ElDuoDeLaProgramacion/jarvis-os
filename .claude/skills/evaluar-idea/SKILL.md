@@ -11,3 +11,6 @@ description: Juzga una idea de David (negocio, app, proyecto, video) con el agen
 
 ## Respuesta hablada
 La nota global, el punto más fuerte y el riesgo más serio, en tres frases. Pregunta si la sigue solo si la nota es 7 o más.
+
+## Con todas las IAs
+Si es un pedido de trabajo (no algo rápido), esta habilidad va junto con `panel`: tú pones los datos reales (el juez de ideas como un miembro más) y, con lo que concluya el equipo de IAs, guardas la nota. Mira la tabla de `panel`.

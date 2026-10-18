@@ -15,7 +15,7 @@ paso "Paquetes del sistema"
 sudo apt-get update -qq
 sudo apt-get install -y -qq git curl python3 python3-venv cron syncthing nmap lynis >/dev/null
 
-paso "Zona horaria: $ZONA (para que las rutinas salgan a tu hora)"
+paso "Zona horaria: $ZONA (para que las horas de la agenda salgan bien)"
 sudo timedatectl set-timezone "$ZONA"
 
 paso "WhatsApp: Node.js y librerías"
@@ -78,7 +78,7 @@ echo "$YO ALL=(root) NOPASSWD: $sc restart jarvis-app, $sc restart jarvis-app ja
 sudo chmod 440 "$regla"
 sudo visudo -cf "$regla" >/dev/null || { sudo rm -f "$regla"; echo "Aviso: no pude crear $regla"; }
 
-paso "Rutinas y actualización (cron)"
+paso "Actualización automática (cron)"
 ./servidor/rutinas.sh
 
 paso "Syncthing (bóveda sincronizada con el PC)"

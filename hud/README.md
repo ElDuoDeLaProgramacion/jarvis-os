@@ -4,7 +4,7 @@ Una sola pantalla oscura con todo lo que JARVIS debe saber. Sin pestañas.
 
 | Zona | Qué muestra |
 |---|---|
-| Izquierda | Vitales (CPU con gráfica, memoria, disco), tareas resueltas por la cola, rutinas del día e informes recientes de la bóveda (clic para leerlos) |
+| Izquierda | Vitales (CPU con gráfica, memoria, disco), tareas resueltas por la cola e informes recientes de la bóveda (clic para leerlos) |
 | Centro | La bóveda como esfera 3D: cada punto grande es una nota y cada línea un enlace `[[...]]`. Gira más rápido cuando JARVIS está trabajando. Debajo, el total de notas y una caja para pedirle cualquier cosa |
 | Derecha | Reloj, panel de comandos, agenda y prioridades del plan de hoy, pendientes (en rojo si están vencidos) y actividad de la cola con las últimas respuestas |
 

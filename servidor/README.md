@@ -2,8 +2,7 @@
 
 Con esto JARVIS vive en un servidor que nunca se apaga, con la bóveda dentro. Aunque el PC esté apagado, puedes:
 - usar WhatsApp con JARVIS (órdenes, avisos y respuestas con "sí"),
-- hablarle o escribirle desde la **app del celular** (un chat con micrófono que se instala en la pantalla de inicio),
-- y recibir las rutinas de cada día (resumen matutino, plan, pendientes, cierre).
+- y hablarle o escribirle desde la **app del celular** (un chat con micrófono que se instala en la pantalla de inicio).
 
 El PC sigue funcionando igual: la voz, el HUD y el copiloto trabajan con la misma bóveda, que se sincroniza sola en los dos sentidos.
 
@@ -11,7 +10,7 @@ El PC sigue funcionando igual: la voz, el HUD y el copiloto trabajan con la mism
 celular (app + WhatsApp) ──Tailscale──► servidor Oracle ◄──Syncthing──► PC (boveda/)
                                           ├─ servidor/api.py      app del celular
                                           ├─ whatsapp/puente.mjs  WhatsApp
-                                          ├─ cron                 rutinas
+                                          ├─ cron                 actualizar desde GitHub
                                           └─ boveda/              el cerebro
 ```
 
@@ -41,7 +40,7 @@ git clone https://github.com/ElDuoDeLaProgramacion/jarvis-os.git
 cd jarvis-os
 ./servidor/instalar.sh
 ```
-El instalador pone todo lo necesario: Node, Claude Code, la app como servicio, las rutinas en cron, Syncthing y Tailscale. También ajusta la hora del servidor a Colombia (para otra zona: `JARVIS_ZONA=America/Mexico_City ./servidor/instalar.sh`). Cuando Tailscale muestre un enlace, ábrelo y entra con tu cuenta. Si después pide activar HTTPS en tu red, abre ese enlace también y actívalo.
+El instalador pone todo lo necesario: Node, Claude Code, la app como servicio, la actualización automática en cron, Syncthing y Tailscale. También ajusta la hora del servidor a Colombia (para otra zona: `JARVIS_ZONA=America/Mexico_City ./servidor/instalar.sh`). Cuando Tailscale muestre un enlace, ábrelo y entra con tu cuenta. Si después pide activar HTTPS en tu red, abre ese enlace también y actívalo.
 
 ## 3. Entrar a Claude
 ```
@@ -125,17 +124,10 @@ WhatsApp debe correr en un solo lugar.
 3. Vuelve a ejecutar `./servidor/instalar.sh`. Ahora deja WhatsApp como servicio.
 4. En el celular, en *Dispositivos vinculados*, cierra la sesión del dispositivo viejo (el del PC).
 
-## 7. Apagar las rutinas del PC
-Ahora salen del servidor. Para que no lleguen dos veces (PowerShell):
-```
-Get-ScheduledTask -TaskPath "\JARVIS\" | Disable-ScheduledTask
-```
-Para volver atrás, cambia `Disable` por `Enable`. Si cambias `rutinas/rutinas.csv`, en el servidor ejecuta `./servidor/rutinas.sh`.
-
 ## Día a día
 - **Actualizar:** es automático. Cada 15 minutos el servidor trae lo nuevo de GitHub (`scripts/actualizar.sh`) y reinicia lo que cambió; queda anotado en `logs/actualizar.log`. Si cambió `servidor/instalar.sh` (paquetes nuevos), el registro te pide correrlo. Para forzarlo ya: `./scripts/actualizar.sh`.
 - **Ver si todo corre:** `systemctl status jarvis-app jarvis-whatsapp`
-- **Registros:** `logs/jarvis.log`, `logs/whatsapp.log`, `logs/rutinas.log`, `logs/actualizar.log` y `journalctl -u jarvis-app`
+- **Registros:** `logs/jarvis.log`, `logs/whatsapp.log`, `logs/actualizar.log` y `journalctl -u jarvis-app`
 
 ## Lo que no se puede con el PC apagado
 - El volumen y "abre Spotify" por voz del PC. Desde la app, la música funciona si conectaste Spotify en el servidor (arriba).
@@ -145,7 +137,7 @@ Para volver atrás, cambia `Disable` por `Enable`. Si cambias `rutinas/rutinas.c
 ## Seguridad
 - La app escucha solo dentro del servidor (`127.0.0.1:7788`). Al celular llega por Tailscale con HTTPS. Desde internet no se ve.
 - Cada pedido exige la clave `JARVIS_API_TOKEN`. Si la pierdes o crees que alguien la vio, bórrala del `.env`, ejecuta `./servidor/instalar.sh` (crea otra) y pégala de nuevo en la app.
-- Las mismas reglas que en el PC: los correos solo salen con tu "sí", WhatsApp solo envía con tu "sí", y las rutinas no envían ni agendan nada.
+- Las mismas reglas que en el PC: los correos solo salen con tu "sí", y WhatsApp solo envía con tu "sí".
 
 ## Límites de Oracle gratis
 - Oracle puede **recuperar** máquinas gratis que pasan 7 días casi sin uso. JARVIS usa poco, así que puede pasar. Para evitarlo, pasa la cuenta a *Pay As You Go*: lo que está dentro del nivel gratis sigue sin costar.
