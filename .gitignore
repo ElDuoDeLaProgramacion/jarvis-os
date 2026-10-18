@@ -8,6 +8,7 @@ node_modules/
 cola/*/*.md
 cola/.corredor.lock
 cola/voz-estado.txt
+cola/voz-habla.json
 cola/pantalla/
 cola/analizar-*
 cola/reproducir.txt

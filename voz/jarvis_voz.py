@@ -502,6 +502,42 @@ def limpiar_para_voz(texto):
 
 # ---------- Boca: TTS local ----------
 
+HABLA = COLA / "voz-habla.json"   # el HUD lo lee para que el cerebro se mueva con la voz
+PASO_NIVEL = 0.05                 # un nivel de volumen cada 50 ms
+
+
+def niveles_de_audio(audio, frecuencia):
+    """Volumen (0 a 1) cada 50 ms de un audio int16: el cerebro del HUD late con él."""
+    trozo = max(1, int(frecuencia * PASO_NIVEL))
+    n = len(audio) // trozo
+    if not n:
+        return []
+    rms = np.sqrt(np.mean(audio[:n * trozo].astype(np.float32).reshape(n, trozo) ** 2, axis=1))
+    techo = float(np.percentile(rms, 95)) or 1.0
+    return [round(min(1.0, float(v) / techo), 2) for v in rms]
+
+
+def niveles_de_texto(texto, rapidez=14.0):
+    """Sin el audio (voces de Windows), un volumen aproximado a partir de las letras: las vocales
+    suenan, los espacios y signos son pausas. rapidez = letras por segundo."""
+    por_paso = rapidez * PASO_NIVEL
+    niveles, acumulado = [], 0.0
+    for c in normalizar(texto):
+        acumulado += 1
+        valor = 0.95 if c in "aeiou" else 0.0 if c in " ,.;:!?" else 0.55
+        while acumulado >= por_paso:
+            acumulado -= por_paso
+            niveles.append(valor)
+    return niveles
+
+
+def publicar_habla(niveles):
+    try:
+        HABLA.write_text(json.dumps({"inicio": time.time(), "paso": PASO_NIVEL, "niveles": niveles}),
+                         encoding="utf-8")
+    except OSError:
+        pass
+
 class Voz:
     """Habla con Piper si se da un modelo; si no, con las voces de Windows (SAPI) directamente.
 
@@ -546,6 +582,7 @@ class Voz:
             np.frombuffer(trozo.audio_int16_bytes, dtype=np.int16)
             for trozo in self.piper.synthesize(texto)
         ])
+        publicar_habla(niveles_de_audio(audio, self.piper.config.sample_rate))
         sd.play(audio, self.piper.config.sample_rate)
         while sd.get_stream().active:
             if self.callar.is_set():
@@ -566,6 +603,7 @@ class Voz:
                     sapi.Voice = voces.Item(k)
                     break
             sapi.Rate = 1
+            publicar_habla(niveles_de_texto(texto))
             sapi.Speak(texto, 1)  # 1 = asíncrono, para poder callarlo
             while not sapi.WaitUntilDone(100):
                 if self.callar.is_set():
