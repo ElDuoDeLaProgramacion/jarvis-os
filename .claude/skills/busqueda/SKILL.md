@@ -15,3 +15,6 @@ description: Investiga un tema en internet y deja un informe con fuentes. Úsala
 6. Responde en voz con la respuesta corta.
 
 Para seguir un tema en el tiempo (qué se está moviendo), usa la habilidad `tendencias`.
+
+## Con todas las IAs
+Si es un pedido de trabajo (no algo rápido), esta habilidad va junto con `panel`: tú pones los datos reales (la búsqueda web con fuentes) y, con lo que concluya el equipo de IAs, escribes el informe. Mira la tabla de `panel`.

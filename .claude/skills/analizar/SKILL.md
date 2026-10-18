@@ -19,3 +19,6 @@ El pedido llega como `analiza las fuentes de boveda/raw/analisis/<fecha-hora>/fu
 1. Escribe `boveda/outputs/analisis/AAAA-MM-DD-<tema>.md` con frontmatter (`fecha`, `tipo: analisis`, `tags`), la respuesta a lo que David quería saber (o un resumen con las ideas clave si no preguntó nada), los puntos importantes por fuente y enlace a `[[fuentes]]` de la carpeta en `raw/analisis/`.
 2. Si sale algo que hacer, propónlo como tarea, pero solo añádelo a `boveda/wiki/tareas.md` si David lo pide.
 3. Responde en voz, 3 o 4 frases: lo más importante primero.
+
+## Con todas las IAs
+Si es un pedido de trabajo (no algo rápido), esta habilidad va junto con `panel`: tú pones los datos reales (el contenido de las fuentes, si no es privado) y, con lo que concluya el equipo de IAs, escribes el análisis. Mira la tabla de `panel`.

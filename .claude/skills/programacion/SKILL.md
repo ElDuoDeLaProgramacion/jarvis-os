@@ -25,3 +25,6 @@ description: Tareas de programación en los proyectos de David. Explicar código
 
 ## Respuesta hablada
 Di qué hiciste y si las pruebas pasaron, en dos frases. Nunca leas código en voz alta: di dónde está.
+
+## Con todas las IAs
+Si es un pedido de trabajo (no algo rápido), esta habilidad va junto con `panel`: tú pones los datos reales (el repo, las pruebas) y, con lo que concluya el equipo de IAs, aplicas el código y corres las pruebas. Mira la tabla de `panel`.

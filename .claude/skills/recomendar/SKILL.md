@@ -14,3 +14,6 @@ Si David dice que una le gustó o no, eso va a `aprendizajes.md` (regla "Aprende
 
 ## Respuesta hablada
 La primera recomendación y por qué, en dos frases; las otras, solo nombradas.
+
+## Con todas las IAs
+Si es un pedido de trabajo (no algo rápido), esta habilidad va junto con `panel`: tú pones los datos reales (lo que JARVIS sabe de David) y, con lo que concluya el equipo de IAs, das la recomendación. Mira la tabla de `panel`.

@@ -11,3 +11,6 @@ description: Revisa los canales y redes de David (YouTube, TikTok, GitHub, etc.)
 3. Compara con la nota anterior más reciente en `boveda/outputs/canales/`.
 4. Escribe `boveda/outputs/canales/AAAA-MM-DD.md` con frontmatter (`fecha`, `tipo: canales`, `tags`), una tabla Canal | Métrica | Valor | Cambio, y enlace a la nota anterior.
 5. Responde en voz con el dato principal y el mayor cambio.
+
+## Con todas las IAs
+Si es un pedido de trabajo (no algo rápido), esta habilidad va junto con `panel`: tú pones los datos reales (los números de los canales) y, con lo que concluya el equipo de IAs, guardas el registro y las propuestas. Mira la tabla de `panel`.

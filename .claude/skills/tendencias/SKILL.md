@@ -13,3 +13,6 @@ description: Escanea lo que se está moviendo en los temas de David (tecnología
 5. Responde en voz con los 2 hallazgos más importantes.
 
 Para una pregunta puntual, usa `busqueda`.
+
+## Con todas las IAs
+Si es un pedido de trabajo (no algo rápido), esta habilidad va junto con `panel`: tú pones los datos reales (lo que se está moviendo) y, con lo que concluya el equipo de IAs, guardas el informe. Mira la tabla de `panel`.
