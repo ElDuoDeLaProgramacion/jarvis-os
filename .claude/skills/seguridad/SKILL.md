@@ -47,3 +47,6 @@ No copies al informe secretos que aparezcan en la salida (claves, tokens).
 
 ## Respuesta hablada
 Dos o tres frases: cuántos hallazgos y el más grave con su arreglo en palabras. El detalle está en el informe.
+
+## Con todas las IAs
+Si es un pedido de trabajo (no algo rápido), esta habilidad va junto con `panel`: tú pones los datos reales (los escaneos) y, con lo que concluya el equipo de IAs, escribes el informe con lo confirmado. Mira la tabla de `panel`.

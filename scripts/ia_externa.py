@@ -399,6 +399,13 @@ FLUJOS = {
         ("disenar", ["diseno"], "Diseña las pantallas propuestas como maquetas HTML autocontenidas."),
         ("revisar", ["critica", "qa"], "Revisa las maquetas: usabilidad, accesibilidad, coherencia y errores."),
     ],
+    "investigacion": [
+        ("investigar", ["investigacion", "datos"],
+         "Explica el tema con lo que te pasan (la búsqueda web de JARVIS va en el contexto): lo seguro, lo dudoso "
+         "y las opciones comparadas."),
+        ("contrastar", ["critica", "investigacion"],
+         "Contrasta lo anterior: qué se contradice, qué falta y cuál es la conclusión mejor sustentada."),
+    ],
     "ideas": [
         ("analizar", ["ideas", "negocio", "finanzas"], "Evalúa la idea desde tu especialidad, con nota de 1 a 10."),
         ("criticar", ["critica", "planeacion"],
@@ -406,12 +413,34 @@ FLUJOS = {
     ],
 }
 TIPO_ALIAS = {"seguridad": "auditoria", "codigo": "programacion", "proyecto": "programacion", "app": "programacion",
-              "software": "programacion", "contenido": "marketing", "campana": "marketing", "redes": "marketing",
+              "software": "programacion", "contenido": "marketing", "busqueda": "investigacion",
+              "investigar": "investigacion", "aprender": "investigacion", "comparar": "investigacion",
+              "tendencias": "marketing", "canales": "marketing", "evaluar": "ideas", "campana": "marketing", "redes": "marketing",
               "videos": "marketing", "diseño": "diseno", "ux": "diseno", "idea": "ideas", "negocio": "ideas"}
 
 
-def etapas_de(tipo):
-    """Las etapas del tipo. Cualquier otro tema: expertos de ese tema y luego una crítica."""
+def etapas_a_medida(texto):
+    """--etapas "investigar=investigacion,datos; proponer=nutricion; revisar=critica,qa" (y, si quieres,
+    ": encargo" tras los roles). Así cualquier tema tiene su propio flujo, no solo los de FLUJOS."""
+    trozos = [t.strip() for t in (texto or "").split(";") if t.strip()]
+    etapas = []
+    for i, trozo in enumerate(trozos):
+        nombre, _, resto = trozo.partition("=")
+        roles, _, encargo = resto.partition(":")
+        roles = [r.strip() for r in roles.split(",") if r.strip()] or [nombre.strip()]
+        if not encargo.strip():
+            encargo = ("Analiza el pedido desde tu especialidad y propone." if i == 0 else
+                       "Revisa todo lo anterior, corrige lo que falle y deja la versión final." if i == len(trozos) - 1
+                       else "Construye sobre lo que hicieron las etapas anteriores y entrega tu parte.")
+        etapas.append((nombre.strip().lower(), roles, encargo.strip()))
+    return etapas
+
+
+def etapas_de(tipo, a_medida=None):
+    """Las etapas del tipo. Con a_medida (--etapas), las que diga. Cualquier otro tema: expertos de
+    ese tema y luego una crítica."""
+    if a_medida:
+        return " ".join((tipo or "a medida").strip().lower().split()), a_medida
     clave = " ".join((tipo or "").strip().lower().split())
     clave = TIPO_ALIAS.get(clave, clave)
     if clave in FLUJOS:
@@ -484,8 +513,15 @@ def correr(tareas):
     return salida
 
 
-def flujo(tipo, etapa, pedido, carpeta, resumen):
-    tipo, etapas = etapas_de(tipo)
+def flujo(tipo, etapa, pedido, carpeta, resumen, a_medida=None):
+    # Las etapas a medida se guardan en la carpeta, así las demás llamadas no tienen que repetirlas.
+    guardadas = Path(carpeta) / "etapas.ias" if carpeta else None
+    if a_medida and guardadas:
+        guardadas.parent.mkdir(parents=True, exist_ok=True)
+        guardadas.write_text(a_medida, encoding="utf-8")
+    elif guardadas and guardadas.exists():
+        a_medida = guardadas.read_text(encoding="utf-8")
+    tipo, etapas = etapas_de(tipo, etapas_a_medida(a_medida))
     nombres = [e[0] for e in etapas]
     if not etapa:
         print(f"Flujo de {tipo}: " + " -> ".join(nombres) + " -> resumen")
@@ -564,12 +600,13 @@ def main():
     a.add_argument("--n", type=int, default=3, help="panel: cuántas IAs (máximo 6)")
     a.add_argument("--tipo", help="flujo: auditoria, programacion, marketing, diseno, ideas o cualquier tema")
     a.add_argument("--etapa", help="flujo: la etapa a correr (sin ella, lista las etapas) o 'resumen'")
+    a.add_argument("--etapas", help='flujo a medida: "nombre=rol,rol[: encargo]; nombre=rol..." (se guarda en la carpeta)')
     a.add_argument("--sin-cerebro", action="store_true",
                    help="no añadir la memoria de JARVIS (scripts/cerebro.py) a la pregunta")
     args = a.parse_intermixed_args()
 
     if args.pregunta[:1] == ["flujo"] and not args.etapa:
-        return flujo(args.tipo, None, "", None, None)
+        return flujo(args.tipo, None, "", None, None, args.etapas)
     listas = configuradas()
     if not listas:
         print("No hay ninguna IA externa conectada. David debe poner en .env al menos una clave:")
@@ -612,7 +649,7 @@ def main():
     original, pregunta = pregunta, pedido
 
     if es_flujo:
-        return flujo(args.tipo, args.etapa, pregunta, args.guardar, original)
+        return flujo(args.tipo, args.etapa, pregunta, args.guardar, original, args.etapas)
     if es_panel:
         if not args.rol:
             a.error("falta --rol (un tema: auditoria, marketing, nutricion...)")
