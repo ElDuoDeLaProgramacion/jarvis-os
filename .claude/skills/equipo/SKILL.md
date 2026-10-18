@@ -1,6 +1,6 @@
 ---
 name: equipo
-description: Reparte un pedido entre los agentes especializados de JARVIS (programador, revisor-codigo, auditor-seguridad, disenador, juez-ideas, investigador) y junta sus respuestas. Úsala para "pídele al auditor...", "que lo revise el revisor", "junta al equipo", "crea un programa que..." o pedidos grandes que mezclan áreas.
+description: Reparte un pedido entre los agentes especializados de Orión (programador, revisor-codigo, auditor-seguridad, disenador, juez-ideas, investigador) y junta sus respuestas. Úsala para "pídele al auditor...", "que lo revise el revisor", "junta al equipo", "crea un programa que..." o pedidos grandes que mezclan áreas.
 ---
 # Equipo de agentes
 
@@ -25,7 +25,7 @@ Los agentes están en `.claude/agents/`. Se llaman con la herramienta de agentes
    Si David quiere también la opinión de IAs externas ("con todas las IAs"), usa la habilidad `panel`, que combina estos agentes con varias IAs por especialidad.
 4. Junta los resultados en `boveda/outputs/equipo/AAAA-MM-DD-<tema>.md` (frontmatter `fecha`, `tipo: equipo`, `tags`), con una sección por agente y enlaces `[[...]]` a las notas que usaron.
 
-Las reglas de JARVIS valen para los agentes: nada de push, envíos, despliegues ni borrados sin el "sí" de David, y seguridad solo sobre sus sistemas.
+Las reglas de Orión valen para los agentes: nada de push, envíos, despliegues ni borrados sin el "sí" de David, y seguridad solo sobre sus sistemas.
 
 Cada agente gasta uso de Claude como una petición entera: no lances más de los que el pedido necesita. En rutinas automáticas no uses agentes.
 

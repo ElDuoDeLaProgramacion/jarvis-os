@@ -1,13 +1,13 @@
-# WhatsApp de JARVIS (vinculado por QR)
+# WhatsApp de Orión (vinculado por QR)
 
-JARVIS se vincula a tu WhatsApp como un dispositivo más, igual que WhatsApp Web. No hace falta ninguna clave ni cuenta aparte.
+Orión se vincula a tu WhatsApp como un dispositivo más, igual que WhatsApp Web. No hace falta ninguna clave ni cuenta aparte.
 
-- **Órdenes:** escríbete a ti mismo (el chat "Tú" o "Mensaje a ti mismo") lo mismo que le dirías por voz: "plan de hoy", "agéndame dentista el viernes a las 3", "resume mis correos". JARVIS contesta en ese chat con mensajes que empiezan por *JARVIS:*.
+- **Órdenes:** escríbete a ti mismo (el chat "Tú" o "Mensaje a ti mismo") lo mismo que le dirías por voz: "plan de hoy", "agéndame dentista el viernes a las 3", "resume mis correos". Orión contesta en ese chat con mensajes que empiezan por *Orión:*.
 - **Tus chats:** los mensajes que te llegan quedan anotados en `boveda/raw/whatsapp/chats/AAAA-MM-DD.md`. Puedes preguntar "¿qué me escribieron hoy?" o "¿qué dijo Ana?".
-- **Responder:** "respóndele a Ana que llego a las 8". JARVIS te muestra el mensaje y solo lo envía si contestas "sí". Si contestas "no", no sale nada. Esto también funciona si lo pides por voz: el borrador te llega al chat contigo mismo.
-- **Avisos:** cada vez que alguien te escribe, JARVIS te avisa en tu chat contigo mismo ("Te escribió Ana: ...") y te propone 3 respuestas. Contestas 1, 2 o 3 ("sí" envía la 1), "no" para no responder, o le dices qué contestar ("dile que llego a las 8") y te muestra el mensaje antes de enviarlo. Si la persona manda varios mensajes seguidos, llega un solo aviso. Si le contestas tú desde el celular, el aviso se cancela. Cada aviso es una consulta a Claude. Para apagarlos, pon `WHATSAPP_AVISAR=0` en `.env`.
+- **Responder:** "respóndele a Ana que llego a las 8". Orión te muestra el mensaje y solo lo envía si contestas "sí". Si contestas "no", no sale nada. Esto también funciona si lo pides por voz: el borrador te llega al chat contigo mismo.
+- **Avisos:** cada vez que alguien te escribe, Orión te avisa en tu chat contigo mismo ("Te escribió Ana: ...") y te propone 3 respuestas. Contestas 1, 2 o 3 ("sí" envía la 1), "no" para no responder, o le dices qué contestar ("dile que llego a las 8") y te muestra el mensaje antes de enviarlo. Si la persona manda varios mensajes seguidos, llega un solo aviso. Si le contestas tú desde el celular, el aviso se cancela. Cada aviso es una consulta a Claude. Para apagarlos, pon `WHATSAPP_AVISAR=0` en `.env`.
 - **Notas de voz:** puedes darle órdenes con notas de voz en tu chat contigo mismo. Las notas de voz que te mandan quedan escritas en el registro y en los avisos. Se transcriben en tu equipo con faster-whisper, el audio no se guarda y no gasta uso de Claude.
-- **Música:** "pon música de..." la abre en el Spotify del PC, y "play", "pausa", "siguiente" o "sube el volumen" funcionan al instante. Las dos cosas necesitan que la voz de JARVIS esté encendida en el PC.
+- **Música:** "pon música de..." la abre en el Spotify del PC, y "play", "pausa", "siguiente" o "sube el volumen" funcionan al instante. Las dos cosas necesitan que la voz de Orión esté encendida en el PC.
 
 Nada de lo que escriben otras personas se ejecuta como orden: solo se anota.
 
@@ -22,7 +22,7 @@ git pull
 ```
 1. `instalar.sh` instala Node.js, si no lo tienes, y las librerías del puente.
 2. `iniciar.sh` muestra un QR en la terminal. En el celular, ve a *WhatsApp → Dispositivos vinculados → Vincular dispositivo* y escanéalo.
-3. Cuando diga "WhatsApp de JARVIS en línea", escríbete "hola" en tu chat contigo mismo.
+3. Cuando diga "WhatsApp de Orión en línea", escríbete "hola" en tu chat contigo mismo.
 
 Si el QR se ve mal en la terminal, usa un código: `./whatsapp/iniciar.sh --codigo 57300XXXXXXX` (tu número con código de país). En el celular elige *Vincular con número de teléfono* y escribe el código que aparece.
 
@@ -31,20 +31,20 @@ Si el QR se ve mal en la terminal, usa un código: `./whatsapp/iniciar.sh --codi
 ## Opciones en `.env`
 - `WHATSAPP_GUARDAR_GRUPOS=1` también anota los grupos. Por defecto solo se anotan los chats individuales.
 - `WHATSAPP_NO_GUARDAR=57300...,57311...` son números que nunca se anotan.
-- `WHATSAPP_PERMITIDOS=57300...` solo hace falta si vinculas un número aparte, solo para JARVIS. En ese caso le escribes desde tu celular y obedece únicamente a esos números.
+- `WHATSAPP_PERMITIDOS=57300...` solo hace falta si vinculas un número aparte, solo para Orión. En ese caso le escribes desde tu celular y obedece únicamente a esos números.
 
 ## Cómo funciona
 - `puente.mjs` usa [Baileys](https://github.com/WhiskeySockets/Baileys), la librería que habla con WhatsApp Web. La vinculación se guarda en `whatsapp/sesion/`, que no se sube a git. Si la borras, toca escanear el QR otra vez.
 - Los contactos que va viendo quedan en `cola/whatsapp/contactos.json`, para saber a quién responder.
-- Para responder a alguien, JARVIS escribe `cola/whatsapp/borrador.json`. El puente lo muestra y solo lo envía si tu siguiente mensaje es "sí". Esa regla está en el código, no depende del modelo.
-- Los mensajes seguidos en 30 minutos continúan la misma conversación. Si JARVIS pregunta "¿Lo envío?" por un correo y contestas "sí", lo envía, igual que por voz.
+- Para responder a alguien, Orión escribe `cola/whatsapp/borrador.json`. El puente lo muestra y solo lo envía si tu siguiente mensaje es "sí". Esa regla está en el código, no depende del modelo.
+- Los mensajes seguidos en 30 minutos continúan la misma conversación. Si Orión pregunta "¿Lo envío?" por un correo y contestas "sí", lo envía, igual que por voz.
 - Las órdenes que escribas con el PC apagado no se ejecutan después, para que no te sorprenda nada viejo. Los mensajes de tus chats que llegaron mientras tanto sí se anotan cuando vuelve.
 - Lo que pasa queda en `logs/whatsapp.log` y en la actividad del HUD.
 
 ## Límites y riesgos
-- **No es la API oficial.** WhatsApp puede cerrar la vinculación o bloquear el número si detecta abuso, como envíos masivos o spam. JARVIS solo envía mensajes uno por uno y con tu "sí". Si quieres cero riesgo para tu número principal, vincula un número secundario y usa `WHATSAPP_PERMITIDOS`.
+- **No es la API oficial.** WhatsApp puede cerrar la vinculación o bloquear el número si detecta abuso, como envíos masivos o spam. Orión solo envía mensajes uno por uno y con tu "sí". Si quieres cero riesgo para tu número principal, vincula un número secundario y usa `WHATSAPP_PERMITIDOS`.
 - Las fotos, los videos y los documentos de tus chats se anotan como "(foto)" o "(documento: ...)", sin su contenido. Las notas de voz sí se transcriben.
 - Si `instalar.sh` no pudo instalar faster-whisper, las notas de voz se anotan como "(nota de voz)" sin texto. En ese caso corre `sudo apt install -y python3-venv` y vuelve a ejecutar `./whatsapp/instalar.sh`.
-- El PC tiene que estar encendido. JARVIS trabaja en tu PC y el celular solo es el control remoto.
+- El PC tiene que estar encendido. Orión trabaja en tu PC y el celular solo es el control remoto.
 - Si el celular pasa unos 14 días sin conexión, WhatsApp desvincula los dispositivos. En ese caso vuelve a escanear el QR.
 - Tus chats quedan en `boveda/raw/whatsapp/`, que no se sube a git porque tu repositorio es público.

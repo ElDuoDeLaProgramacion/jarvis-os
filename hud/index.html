@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JARVIS · HUD</title>
+<title>Orión · HUD</title>
 <style>
   :root {
     --fondo: #07080a;
@@ -80,7 +80,7 @@
     aside.izq, aside.der { border-width: 1px 0 0; }
   }
 
-  /* Ventana "Analiza con JARVIS" */
+  /* Ventana "Analiza con Orión" */
   #analizar { width: min(820px, 94vw); max-height: 90vh; border-radius: 22px; padding: 28px 26px 22px; background: #1f2023; border: 1px solid #2c2e33; color: #e3e5e8; }
   #analizar h3 { margin: 0 0 18px; text-align: center; font-size: 21px; font-weight: 400; line-height: 1.35; }
   #analizar h3 span { color: var(--acento); }
@@ -109,7 +109,7 @@
 </head>
 <body>
 <aside class="izq">
-  <h1>J.A.R.V.I.S.</h1>
+  <h1>O.R.I.Ó.N.</h1>
   <div class="sub">Inteligencia centralizada</div>
 
   <h2>Vitales del sistema</h2>
@@ -128,7 +128,7 @@
   <canvas id="esfera"></canvas>
   <div class="contador"><span class="sub">Notas en la bóveda</span><b id="notas">0</b></div>
   <form id="pedir">
-    <input id="pedido" placeholder="Pídele algo a JARVIS… (se encola y se ejecuta)" autocomplete="off">
+    <input id="pedido" placeholder="Pídele algo a Orión… (se encola y se ejecuta)" autocomplete="off">
     <button>Enviar</button>
     <button type="button" id="abrir-analizar" title="Analizar archivos, enlaces o texto">＋ Analizar</button>
     <button type="button" id="abrir-propuestas" title="Lo que proponen los paneles de IAs: código, diseños, presentaciones">Propuestas</button>
@@ -157,7 +157,7 @@
 <dialog id="visor"><header><span id="visor-titulo"></span><button onclick="visor.close()">Cerrar</button></header><pre id="visor-texto"></pre></dialog>
 <dialog id="analizar">
   <button class="cerrar" type="button" onclick="analizar.close()" aria-label="Cerrar">✕</button>
-  <h3>Analiza con JARVIS<br><span>tus archivos, enlaces y textos</span></h3>
+  <h3>Analiza con Orión<br><span>tus archivos, enlaces y textos</span></h3>
   <div class="caja">
     <input id="a-entrada" placeholder="Pega un enlace (web o YouTube) o escribe qué quieres saber" autocomplete="off">
     <div class="fila">
@@ -195,7 +195,7 @@ function aviso(texto) {
 async function encolar(pedido, escrito = false) {
   const r = await fetch("/api/encolar", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({pedido, escrito})});
   const d = r.ok ? await r.json() : {};
-  aviso(!r.ok ? "No se pudo encolar" : d.via === "voz" ? "A JARVIS: " + pedido : "En cola: " + pedido);
+  aviso(!r.ok ? "No se pudo encolar" : d.via === "voz" ? "A Orión: " + pedido : "En cola: " + pedido);
   refrescar();
 }
 
@@ -458,7 +458,7 @@ async function enviarAnalisis() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "No se pudo");
     analizar.close();
-    aviso(d.voz ? "JARVIS lo está analizando y te responde en voz" : "En cola: el análisis aparecerá en Actividad");
+    aviso(d.voz ? "Orión lo está analizando y te responde en voz" : "En cola: el análisis aparecerá en Actividad");
     refrescar();
   } catch (e) {
     aviso("Error: " + e.message);
@@ -486,7 +486,7 @@ zona.onclick = () => $("a-archivos").click();
 zona.ondragover = e => { e.preventDefault(); zona.classList.add("encima"); };
 zona.ondragleave = () => zona.classList.remove("encima");
 zona.ondrop = e => { e.preventDefault(); zona.classList.remove("encima"); agregarArchivos(e.dataTransfer.files); };
-// "Jarvis, analiza..." pide abrir esta ventana desde la voz.
+// "Orión, analiza..." pide abrir esta ventana desde la voz.
 setInterval(async () => {
   try { if ((await (await fetch("/api/analizar/abrir")).json()).abrir) abrirAnalizar(true); } catch {}
 }, 1000);

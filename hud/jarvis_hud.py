@@ -84,12 +84,12 @@ class Api:
 
     def abrir_propuestas(self):
         """Botón Propuestas: lo que proponen los paneles de IAs, en su propia ventana."""
-        webview.create_window("JARVIS · Propuestas", f"{URL}/propuestas", width=1400, height=900,
+        webview.create_window("Orión · Propuestas", f"{URL}/propuestas", width=1400, height=900,
                               background_color=FONDO)
 
 
 def main():
-    p = argparse.ArgumentParser(description="HUD de JARVIS")
+    p = argparse.ArgumentParser(description="HUD de Orión")
     p.add_argument("--distro", default="Ubuntu")
     p.add_argument("--pantalla-completa", action="store_true")
     args = p.parse_args()
@@ -99,9 +99,9 @@ def main():
 
     api = Api()
     ventana = webview.create_window(
-        "JARVIS",
+        "Orión",
         js_api=api,
-        html=PANTALLA.format(texto="JARVIS arrancando..."),
+        html=PANTALLA.format(texto="Orión arrancando..."),
         width=1600, height=900, min_size=(1100, 700),
         background_color=FONDO,
         fullscreen=args.pantalla_completa,

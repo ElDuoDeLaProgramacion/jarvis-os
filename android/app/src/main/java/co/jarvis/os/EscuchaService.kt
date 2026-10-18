@@ -29,12 +29,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Escucha "Jarvis" todo el tiempo, también con la pantalla apagada (servicio en primer plano con
+ * Escucha "Orión" todo el tiempo, también con la pantalla apagada (servicio en primer plano con
  * notificación fija). La palabra se detecta en el celular con Vosk (modelo pequeño en español), sin
  * cuenta ni internet: un reconocedor que solo conoce "jarvis" y unas palabras señuelo
  * (res/raw/gramatica.json), así gasta poco y lo demás no se confunde con "jarvis".
  * Al oírlo: pitido, graba la orden, la manda al servidor, lee la respuesta en voz alta y, si JARVIS
- * preguntó algo, escucha la contestación sin necesidad de decir "Jarvis" otra vez.
+ * preguntó algo, escucha la contestación sin necesidad de decir "Orión" otra vez.
  */
 class EscuchaService : Service() {
 
@@ -45,6 +45,8 @@ class EscuchaService : Service() {
         // Confianza mínima de la palabra "jarvis" en el resultado final. Más alto = menos activaciones
         // falsas, pero hay que decirlo más claro. android/probar_oido.py lo prueba con este mismo valor.
         private const val UMBRAL = 0.9f
+        // El nombre que despierta a la app (res/raw/gramatica.json). "jarvis" queda como señuelo.
+        private val PALABRAS = setOf("orión", "orion")
 
         @Volatile var estado = "Apagado"
             private set
@@ -66,7 +68,7 @@ class EscuchaService : Service() {
     override fun onCreate() {
         super.onCreate()
         getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CANAL, "Escucha de Jarvis", NotificationManager.IMPORTANCE_LOW))
+            NotificationChannel(CANAL, "Escucha de Orión", NotificationManager.IMPORTANCE_LOW))
         voz = TextToSpeech(this) { ok ->
             if (ok == TextToSpeech.SUCCESS) {
                 voz?.language = Locale("es", "ES")
@@ -131,7 +133,7 @@ class EscuchaService : Service() {
                     override fun onTimeout() {}
                 })
             }
-            mostrar("Di \"Jarvis\" y, tras el pitido, tu pedido.")
+            mostrar("Di \"Orión\" y, tras el pitido, tu pedido.")
         } catch (e: Exception) {
             mostrar("No pude abrir el micrófono: ${e.message}")
         }
@@ -141,7 +143,7 @@ class EscuchaService : Service() {
     private fun revisar(json: String?) {
         val palabras = runCatching { JSONObject(json ?: "{}").optJSONArray("result") }.getOrNull() ?: return
         val seguro = (0 until palabras.length()).map { palabras.getJSONObject(it) }
-            .any { it.optString("word") == "jarvis" && it.optDouble("conf") >= UMBRAL }
+            .any { it.optString("word") in PALABRAS && it.optDouble("conf") >= UMBRAL }
         if (seguro) detectado()
     }
 
@@ -174,7 +176,7 @@ class EscuchaService : Service() {
                 if (respuesta.isBlank()) break
                 mostrar(respuesta)
                 hablar(respuesta)
-                if (!respuesta.trim().endsWith("?")) break   // si JARVIS preguntó, la contestación va sin "Jarvis"
+                if (!respuesta.trim().endsWith("?")) break   // si JARVIS preguntó, la contestación va sin "Orión"
             }
         } catch (e: Exception) {
             val error = "No pude hablar con el servidor: ${e.message}"
@@ -214,7 +216,7 @@ class EscuchaService : Service() {
 
     private fun mostrar(texto: String) {
         estado = texto
-        getSystemService(NotificationManager::class.java).notify(AVISO, aviso("JARVIS", texto))
+        getSystemService(NotificationManager::class.java).notify(AVISO, aviso("Orión", texto))
     }
 
     private fun aviso(titulo: String, texto: String?): Notification {
@@ -225,8 +227,8 @@ class EscuchaService : Service() {
         return Notification.Builder(this, CANAL)
             .setSmallIcon(R.drawable.notificacion)
             .setContentTitle(titulo)
-            .setContentText(texto ?: "Escuchando \"Jarvis\"")
-            .setStyle(Notification.BigTextStyle().bigText(texto ?: "Escuchando \"Jarvis\""))
+            .setContentText(texto ?: "Escuchando \"Orión\"")
+            .setStyle(Notification.BigTextStyle().bigText(texto ?: "Escuchando \"Orión\""))
             .setContentIntent(abrir)
             .setOngoing(true)
             .addAction(Notification.Action.Builder(null, "Apagar", detener).build())

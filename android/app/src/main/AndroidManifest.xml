@@ -12,7 +12,7 @@
     <application
         android:allowBackup="false"
         android:icon="@drawable/icono"
-        android:label="JARVIS"
+        android:label="Orión"
         android:theme="@android:style/Theme.DeviceDefault">
 
         <activity

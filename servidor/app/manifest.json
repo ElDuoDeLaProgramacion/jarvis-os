@@ -1,6 +1,6 @@
 {
-  "name": "JARVIS",
-  "short_name": "JARVIS",
+  "name": "Orión",
+  "short_name": "Orión",
   "start_url": "/app/",
   "scope": "/app/",
   "display": "standalone",

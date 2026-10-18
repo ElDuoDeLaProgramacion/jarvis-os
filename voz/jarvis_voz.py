@@ -1,12 +1,12 @@
 """
 JARVIS por voz y gestos (Windows).
 
-Di "Jarvis" seguido de lo que quieras ("Jarvis, plan de hoy"), o solo "Jarvis"
-y espera el "¿Sí?". "Jarvis, activa los gestos" enciende la cámara y la mano maneja
-el ratón (voz/gestos.py); "Jarvis, apaga los gestos" la apaga.
+Di "Orión" seguido de lo que quieras ("Orión, plan de hoy"), o solo "Orión"
+y espera el "¿Sí?". "Orión, activa los gestos" enciende la cámara y la mano maneja
+el ratón (voz/gestos.py); "Orión, apaga los gestos" la apaga.
 1. Escucha el micrófono todo el tiempo y corta cada frase por los silencios.
 2. Transcribe en local con faster-whisper (el audio no sale de la máquina) y
-   solo atiende las frases que empiezan por "Jarvis".
+   solo atiende las frases que empiezan por "Orión".
 3. Pasa el pedido al JARVIS del servidor (voz/servidor_remoto.py) o, si toca tus archivos,
    proyectos o pantalla, a scripts/jarvis.sh dentro de WSL (Claude Code + habilidades).
 4. Siempre contesta en voz alta con un TTS local (voces de Windows o Piper).
@@ -39,8 +39,9 @@ RAIZ = Path(__file__).resolve().parent.parent
 COLA = RAIZ / "cola"
 LOG = RAIZ / "logs" / "voz.log"
 
-# Cómo suele transcribir Whisper "Jarvis" en español
-PALABRA = re.compile(r"\b(?:(?:hey|oye|ok|ey)\s+)?(?:jarvis|jarvi|yarvis|yarbis|jarbis|charvis|harvis|jervis|yervis)\b[\s,.:;!?¿¡]*")
+# Cómo suele transcribir Whisper "Orión" en español (y "Orión", el nombre de antes, que sigue valiendo)
+PALABRA = re.compile(r"\b(?:(?:hey|oye|ok|ey)\s+)?(?:orion|orio|orian|oriol|orrion|o\s+rion|jarvis|jarvi|yarvis|"
+                     r"yarbis|jarbis|charvis|harvis|jervis|yervis)\b[\s,.:;!?¿¡]*")
 
 
 def log(*partes):
@@ -77,13 +78,13 @@ def registrar(pedido, respuesta, origen="voz"):
 
 
 def opciones():
-    p = argparse.ArgumentParser(description="JARVIS por voz y gestos")
+    p = argparse.ArgumentParser(description="Orión por voz y gestos")
     p.add_argument("--tecla", default=None,
-                   help="usar una tecla para hablar (mantener pulsada) en vez de decir 'Jarvis', p. ej. f9")
+                   help="usar una tecla para hablar (mantener pulsada) en vez de decir 'Orión', p. ej. f9")
     p.add_argument("--modelo", default="small",
                    help="modelo de Whisper: tiny, base, small, medium, large-v3")
     p.add_argument("--dispositivo", default="cpu", help="cpu o cuda")
-    p.add_argument("--distro", default="Ubuntu", help="distribución de WSL donde vive JARVIS")
+    p.add_argument("--distro", default="Ubuntu", help="distribución de WSL donde vive Orión")
     p.add_argument("--repo", default="/mnt/p/jarvis-os", help="ruta del repo dentro de WSL")
     p.add_argument("--voz-neural", default="es-MX-JorgeNeural",
                    help="voz neural de Microsoft (edge-tts, necesita internet), p. ej. es-ES-AlvaroNeural, "
@@ -91,11 +92,11 @@ def opciones():
     p.add_argument("--piper", default=None,
                    help="ruta a un modelo .onnx de Piper; sin internet o sin voz neural, se usa este o Windows")
     p.add_argument("--conversacion", type=float, default=8,
-                   help="segundos tras cada respuesta en que puedes seguir hablando sin decir 'Jarvis' (0 = nunca)")
+                   help="segundos tras cada respuesta en que puedes seguir hablando sin decir 'Orión' (0 = nunca)")
     p.add_argument("--sin-gestos", action="store_true",
                    help="no usar la cámara nunca, ni aunque se pida por voz")
     p.add_argument("--sin-copiloto", action="store_true",
-                   help="arrancar sin recomendaciones automáticas (se activan con 'Jarvis, activa el copiloto')")
+                   help="arrancar sin recomendaciones automáticas (se activan con 'Orión, activa el copiloto')")
     p.add_argument("--camara", type=int, default=0, help="número de cámara para los gestos")
     p.add_argument("--ver-camara", action="store_true", help="mostrar la cámara con el gesto detectado")
     p.add_argument("--sensibilidad", type=float, default=3.0,
@@ -111,7 +112,7 @@ def normalizar(texto):
 
 
 def separar_pedido(texto):
-    """'Jarvis, plan de hoy' -> (True, 'plan de hoy'). Sin palabra de activación -> (False, '')."""
+    """'Orión, plan de hoy' -> (True, 'plan de hoy'). Sin palabra de activación -> (False, '')."""
     plano = normalizar(texto)
     m = PALABRA.search(plano)
     if not m or m.start() > 12:  # la palabra debe ir al principio de la frase
@@ -133,7 +134,7 @@ def copiloto_a_jarvis(texto, distro, repo):
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except (OSError, subprocess.TimeoutExpired) as e:
-        log("Copiloto: no pude preguntar a JARVIS:", repr(e))
+        log("Copiloto: no pude preguntar a Orión:", repr(e))
         return ""
     return r.stdout.strip() if r.returncode == 0 else ""
 
@@ -154,12 +155,12 @@ def preguntar_a_jarvis(texto, distro, repo, reanudar=None, confirmado=False):
     sesion = next((l[7:].strip() for l in r.stderr.splitlines() if l.startswith("SESION=")), None)
     if r.returncode != 0:
         detalle = (r.stderr or r.stdout).strip().splitlines()
-        log("Error de JARVIS:", "\n".join(detalle[-5:]))
+        log("Error de Orión:", "\n".join(detalle[-5:]))
         return "Hubo un error al ejecutar la petición. Lo dejé anotado en el registro de la voz.", None
     return r.stdout.strip(), sesion
 
 
-# "Jarvis, para", "Jarvis, ya", "Jarvis, cállate": dejar de hablar ya.
+# "Orión, para", "Orión, ya", "Orión, cállate": dejar de hablar ya.
 PARAR = re.compile(r"^(para|parale|ya|basta|callate|silencio|stop|detente|espera|olvidalo|cancela)\b")
 
 SI = re.compile(r"^(si|sip|dale|claro|confirmo|confirmado|hazlo|envialo|enviala|envialos|mandalo|mandala|"
@@ -173,7 +174,7 @@ def es_si(texto):
 
 
 def es_pregunta(respuesta):
-    """JARVIS espera respuesta si termina preguntando ("¿Lo envío? Sí o no.")."""
+    """Orión espera respuesta si termina preguntando ("¿Lo envío? Sí o no.")."""
     final = respuesta.strip()[-160:]
     return final.endswith("?") or bool(re.search(r"\?\s*(s[ií] o no|responde|dime)[^?]*$", normalizar(final)))
 
@@ -290,7 +291,7 @@ def ejecutar_navegacion(tipo, objetivo):
         keyboard.send(objetivo)
         return "Listo."
     if objetivo.lower() in PROTEGIDOS:
-        return "Ese no lo cierro: es parte de Windows o del propio JARVIS."
+        return "Ese no lo cierro: es parte de Windows o del propio Orión."
     # Sin /F: le pide al programa que se cierre, así puede preguntar si guardar.
     r = subprocess.run(["taskkill", "/IM", objetivo], capture_output=True, text=True,
                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
@@ -303,7 +304,7 @@ def ejecutar_navegacion(tipo, objetivo):
 REPRODUCIR = COLA / "reproducir.txt"   # la habilidad musica deja aquí el spotify:... que encontró
 URI_SPOTIFY = re.compile(r"^spotify:(track|album|playlist|artist|show|episode):[A-Za-z0-9]{10,40}$")
 MUSICA = "(la )?(musica|cancion|tema|spotify|rola)"
-# "Jarvis, abre ...": nombre dicho -> lo que Windows sabe abrir (programa registrado o enlace de la app).
+# "Orión, abre ...": nombre dicho -> lo que Windows sabe abrir (programa registrado o enlace de la app).
 HUD_WEB = "http://localhost:7777/"
 LIENZO = HUD_WEB + "lienzo"
 PROPUESTAS = HUD_WEB + "propuestas"
@@ -454,7 +455,7 @@ def abrir_lo_encontrado():
         log("No abro esto en Spotify, no es una dirección spotify: válida:", uri[:80])
 
 
-# ---------- Pantalla: "Jarvis, lee mi pantalla" ----------
+# ---------- Pantalla: "Orión, lee mi pantalla" ----------
 
 PANTALLAS = COLA / "pantalla"
 
@@ -477,7 +478,7 @@ def capturar_pantalla():
     return destino.relative_to(RAIZ).as_posix()
 
 
-# ---------- Analizar: "Jarvis, analiza este archivo" ----------
+# ---------- Analizar: "Orión, analiza este archivo" ----------
 
 ABRIR_ANALIZAR = COLA / "analizar-abrir"
 PEDIDO_ANALIZAR = COLA / "analizar-pedido.json"
@@ -713,14 +714,14 @@ class Jarvis:
         self.voz = Voz(args.piper, args.voz_neural)
         self.turno = threading.Lock()          # una orden a la vez
         self.ocupado = threading.Event()       # mientras piensa o habla, el micro no escucha
-        self.esperando_hasta = 0.0             # tras "Jarvis" a secas: la frase siguiente es la orden
+        self.esperando_hasta = 0.0             # tras "Orión" a secas: la frase siguiente es la orden
         self.seguimiento = None                # (id de conversación, hasta cuándo) si JARVIS preguntó algo
         self.modelo = None                     # Whisper, para transcribir audio y video al analizar
         self.copiloto = None                   # recomendaciones sin que se las pidas (Copiloto)
         self.ultima_orden = 0.0                # el copiloto no interrumpe justo después de una orden
         self.gestos = None                     # hilo de la cámara, solo mientras se pidió (gestos.Ojos)
         self.pregunto = False                  # la última respuesta fue una pregunta ("¿Lo envío?")
-        self.cancelado = False                 # "Jarvis, para" mientras pensaba: no decir la respuesta
+        self.cancelado = False                 # "Orión, para" mientras pensaba: no decir la respuesta
         self.pedidos = queue.Queue()           # lo que dices se atiende aquí, sin dejar de escuchar
         threading.Thread(target=self._atender_en_orden, daemon=True).start()
 
@@ -739,7 +740,7 @@ class Jarvis:
 
     def _atender_en_orden(self):
         """Los pedidos de voz se atienden en este hilo: el micrófono sigue escuchando mientras
-        JARVIS piensa o habla, así lo puedes interrumpir ("Jarvis, para") o pedirle otra cosa."""
+        JARVIS piensa o habla, así lo puedes interrumpir ("Orión, para") o pedirle otra cosa."""
         while True:
             pedido, reanudar = self.pedidos.get()
             try:
@@ -755,7 +756,7 @@ class Jarvis:
     def atender(self, pedido, origen="voz", reanudar=None):
         # "Sí" solo confirma (enviar un correo, borrar un evento) si lo último fue una pregunta de JARVIS.
         confirmado = bool(reanudar) and self.pregunto and origen in ("voz", "texto") and es_si(pedido)
-        # Las órdenes al instante (abrir, cerrar, música) valen también al responder sin "Jarvis".
+        # Las órdenes al instante (abrir, cerrar, música) valen también al responder sin "Orión".
         rapida = origen in ("voz", "texto")
         navegacion = accion_navegacion(pedido) if rapida else None
         if navegacion and navegacion[0] == "programa?":
@@ -803,7 +804,7 @@ class Jarvis:
             except Exception as e:
                 log("No pude cerrar:", repr(e))
                 respuesta = "No pude hacerlo."
-            log(f"JARVIS: {respuesta}")
+            log(f"Orión: {respuesta}")
             self.hablar(respuesta)
             return
         if origen == "voz" and not reanudar and pide_analizar(pedido):
@@ -831,9 +832,9 @@ class Jarvis:
                 log("No pude abrir Spotify:", repr(e))
             if not respuesta:
                 respuesta = "Listo, ya está hecho. Los detalles quedaron en la bóveda."
-            log(f"JARVIS{' (servidor)' if sesion == SERVIDOR else ' (PC)'}: {respuesta}\n")
+            log(f"Orión{' (servidor)' if sesion == SERVIDOR else ' (PC)'}: {respuesta}\n")
             registrar(pedido, respuesta, origen)
-            # Como una conversación: tras responder, lo siguiente que digas no necesita "Jarvis"
+            # Como una conversación: tras responder, lo siguiente que digas no necesita "Orión"
             # (20 s si preguntó algo, unos segundos si no) y sigue la misma conversación.
             self.pregunto = es_pregunta(respuesta)
             ventana = 20 if self.pregunto else self.args.conversacion
@@ -919,7 +920,7 @@ class Jarvis:
 
     def frase(self, texto, durante=False):
         """Decide qué hacer con una frase transcrita. durante = empezó mientras JARVIS pensaba o
-        hablaba: entonces solo cuenta si empieza por "Jarvis" (si no, puede ser su propia voz)."""
+        hablaba: entonces solo cuenta si empieza por "Orión" (si no, puede ser su propia voz)."""
         if not texto:
             return
         activada, pedido = separar_pedido(texto)
@@ -928,14 +929,14 @@ class Jarvis:
                 return
             self.voz.callar.set()              # le hablas encima: deja de hablar ya
             if not pedido or PARAR.match(normalizar(pedido)):
-                log("(interrumpido)")          # "Jarvis, para" / "Jarvis, ya"
+                log("(interrumpido)")          # "Orión, para" / "Orión, ya"
                 self.cancelado = True          # si aún pensaba, su respuesta no se dice
                 return
             self.seguimiento = None
             self.pedidos.put((pedido, None))  # y te atiende en cuanto termine lo que estaba haciendo
             return
         if self.seguimiento and time.monotonic() < self.seguimiento[1]:
-            # Seguimos conversando: la respuesta va sin "Jarvis" y en la misma conversación.
+            # Seguimos conversando: la respuesta va sin "Orión" y en la misma conversación.
             sesion, self.seguimiento = self.seguimiento[0], None
             self.pedidos.put((pedido if activada and pedido else texto, sesion))
             return
@@ -958,7 +959,7 @@ def transcribir(modelo, audio):
     if len(audio) < FRECUENCIA * 0.4:  # menos de 0,4 s: un golpe o un ruido
         return ""
     segmentos, _ = modelo.transcribe(audio, language="es", vad_filter=True,
-                                     initial_prompt="Jarvis, plan de hoy.")
+                                     initial_prompt="Orión, plan de hoy.")
     return " ".join(s.text.strip() for s in segmentos).strip()
 
 
@@ -977,7 +978,7 @@ def escuchar_siempre(jarvis, modelo, sensibilidad):
     with sd.InputStream(samplerate=FRECUENCIA, channels=1, dtype="float32",
                         blocksize=tam, callback=callback):
         estado_audio("EN ESPERA")
-        log('Listo. Di "Jarvis" y lo que necesitas. Ctrl+C para salir.')
+        log('Listo. Di "Orión" y lo que necesitas. Ctrl+C para salir.')
         while True:
             bloque = bloques.get()
             # Mientras piensa o habla seguimos escuchando, para poder interrumpirlo. Mientras habla,
@@ -1241,7 +1242,7 @@ def main():
     threading.Thread(target=atender_escritos, args=(jarvis,), daemon=True).start()
     jarvis.copiloto = Copiloto(jarvis, activo=not args.sin_copiloto)
     jarvis.copiloto.start()
-    jarvis.hablar("JARVIS en línea.")
+    jarvis.hablar("Orión en línea.")
 
     if args.tecla:
         escuchar_con_tecla(jarvis, modelo, args.tecla)

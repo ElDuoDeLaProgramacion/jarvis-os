@@ -143,7 +143,7 @@ class Ojos(threading.Thread):
                 if self.ver:
                     texto = f"{det.pose}  {'PAUSA' if self.filtro.pausado else (hecho.name if hecho else '')}"
                     cv2.putText(cuadro, texto, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 200), 2)
-                    cv2.imshow("JARVIS gestos", cuadro)
+                    cv2.imshow("Orión gestos", cuadro)
                     cv2.waitKey(1)
                 else:
                     time.sleep(0.02)

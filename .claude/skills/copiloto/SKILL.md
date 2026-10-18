@@ -1,6 +1,6 @@
 ---
 name: copiloto
-description: Recomendaciones que David no pidió. La voz manda una captura de la pantalla cuando está jugando ajedrez o programando, y JARVIS dice algo solo si vale la pena. Úsala cuando el pedido empieza con "Modo copiloto".
+description: Recomendaciones que David no pidió. La voz manda una captura de la pantalla cuando está jugando ajedrez o programando, y Orión dice algo solo si vale la pena. Úsala cuando el pedido empieza con "Modo copiloto".
 ---
 # Copiloto
 

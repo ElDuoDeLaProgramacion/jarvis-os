@@ -22,8 +22,8 @@ from vosk import KaldiRecognizer, Model, SetLogLevel
 
 SetLogLevel(-1)
 
-FRASES = ["Jarvis", "Jarvis, qué tengo hoy", "Jarvis, pasa la canción", "Jarvis, apaga la música",
-          "Jarvis, cuántos correos tengo", "Oye Jarvis, pon algo de Queen"]
+FRASES = ["Orión", "Orión, qué tengo hoy", "Orión, pasa la canción", "Orión, apaga la música",
+          "Orión, cuántos correos tengo", "Oye Orión, pon algo de Queen"]
 VOCES = ["es-419", "es", "es-419 -s 140", "es-419 -s 200 -p 30", "es-419+m3", "es-419+f2"]
 CON = [(v, f) for v in VOCES for f in FRASES]
 SIN = [("es-419", "Buenos días, cómo estás"), ("es-419", "Mañana tengo una reunión con Ana"),
@@ -33,7 +33,10 @@ SIN = [("es-419", "Buenos días, cómo estás"), ("es-419", "Mañana tengo una r
        ("es-419", "Garbanzos con arroz"), ("es", "Las variables del sistema"),
        ("es-419+m3", "Harvey es mi amigo"), ("es-419+f2", "La jarra está en el jardín"),
        ("es", "Qué hora es"), ("es-419", "Ponme un vaso de agua")]
-SIN += [("es-419", "Anoche vimos un partido muy bueno en la televisión"),
+SIN += [("es-419", "Vamos a hacer una oración"), ("es-419", "Esa es mi opinión"),
+        ("es-419+m3", "El avión salió tarde"), ("es", "El camión está en la vía"),
+        ("es-419", "Mario fue al río"), ("es-419", "Jarvis es el de Iron Man"),
+        ("es-419", "Anoche vimos un partido muy bueno en la televisión"),
         ("es-419", "Harvard es una universidad de Estados Unidos"), ("es-419+m3", "Marvin llegó tarde"),
         ("es", "Los jardines del parque están bonitos"), ("es-419", "Javier vino a la casa ayer"),
         ("es-419+f2", "Carlos y Marcos fueron al mercado"), ("es-419", "Ya revisé la lista de tareas"),
@@ -64,7 +67,7 @@ def confianza(modelo, ruta):
         if r.AcceptWaveform(datos[i:i + 3200]):
             finales.append(json.loads(r.Result()))
     finales.append(json.loads(r.FinalResult()))
-    return max((p["conf"] for f in finales for p in f.get("result", []) if p["word"] == "jarvis"), default=0)
+    return max((p["conf"] for f in finales for p in f.get("result", []) if p["word"] in ("orión", "orion")), default=0)
 
 
 def main():
@@ -80,7 +83,7 @@ def main():
     for u in (0.5, 0.7, 0.8, 0.9, 0.95, 0.99):
         print(f"  umbral {u}: oye {sum(c >= u for c, *_ in con)}/{len(con)}, falsos {sum(c >= u for c, *_ in sin)}/{len(sin)}")
     aciertos, falsos = sum(c >= UMBRAL for c, *_ in con), sum(c >= UMBRAL for c, *_ in sin)
-    print(f"Con el umbral {UMBRAL}: oyó Jarvis en {aciertos}/{len(con)} y se confundió en {falsos}/{len(sin)}.")
+    print(f"Con el umbral {UMBRAL}: oyó Orión en {aciertos}/{len(con)} y se confundió en {falsos}/{len(sin)}.")
     if aciertos < len(con) - 2 or falsos > 0:
         sys.exit(1)
 

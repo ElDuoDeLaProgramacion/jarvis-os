@@ -1,6 +1,6 @@
 ---
 name: boveda
-description: Lee y escribe la memoria de JARVIS en la bóveda de Obsidian. Úsala para recordar, guardar, anotar, responder "¿qué sé de...?" o "¿qué decidí...?", y para la limpieza de bóveda.
+description: Lee y escribe la memoria de Orión en la bóveda de Obsidian. Úsala para recordar, guardar, anotar, responder "¿qué sé de...?" o "¿qué decidí...?", y para la limpieza de bóveda.
 ---
 # Bóveda
 
@@ -13,8 +13,8 @@ La bóveda (`boveda/`) es la única memoria. Son archivos Markdown enlazados con
 - `wiki/decisiones.md`: qué se decidió, cuándo y por qué.
 - `wiki/personas.md`: contactos frecuentes, su relación con David y el tono con cada uno.
 - `wiki/proyectos/`: una nota por proyecto, con su estado, stack, decisiones y pendientes.
-- `wiki/ideas-jarvis.md`: lo que JARVIS no supo hacer y las mejoras propuestas.
-- `wiki/comandos.md`: todo lo que JARVIS sabe hacer y cómo pedirlo.
+- `wiki/ideas-jarvis.md`: lo que Orión no supo hacer y las mejoras propuestas.
+- `wiki/comandos.md`: todo lo que Orión sabe hacer y cómo pedirlo.
 - `wiki/tareas.md` y `wiki/suscripciones.md`.
 - Plantillas en `plantillas/` (proyecto, persona, decisión).
 

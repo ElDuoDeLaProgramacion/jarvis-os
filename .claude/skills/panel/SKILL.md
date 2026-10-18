@@ -21,7 +21,7 @@ En cada etapa trabajan todas las IAs del equipo (hasta `JARVIS_IAS_MAX`, 8 por d
 Para una pregunta suelta sin etapas (una opinión rápida de todas), usa `panel --rol <tema> --n 6`.
 
 ## 2. Tus habilidades trabajan con el equipo
-Las IAs externas solo leen y escriben texto: no buscan en internet, no ven tus archivos ni ejecutan nada. Eso lo ponen las habilidades de JARVIS, que van **junto** con el equipo, antes (datos reales para el contexto) y después (hacer el trabajo con el resultado):
+Las IAs externas solo leen y escriben texto: no buscan en internet, no ven tus archivos ni ejecutan nada. Eso lo ponen las habilidades de Orión, que van **junto** con el equipo, antes (datos reales para el contexto) y después (hacer el trabajo con el resultado):
 
 | Trabajo | Antes del flujo | Después del flujo |
 |---|---|---|
@@ -31,13 +31,13 @@ Las IAs externas solo leen y escriben texto: no buscan en internet, no ven tus a
 | Marketing, contenido, canales | `tendencias`, `canales` y `busqueda` (competencia) | el plan y las piezas en `outputs/` |
 | Ideas y negocios | `evaluar-idea` (el juez de ideas entra como un miembro más) | la nota en `outputs/ideas/` |
 | Archivos, PDFs, videos, enlaces | `analizar` (su contenido al contexto, si no es privado) | el análisis en `outputs/analisis/` |
-| Recomendaciones | `recomendar` (lo que JARVIS sabe de David) | — |
+| Recomendaciones | `recomendar` (lo que Orión sabe de David) | — |
 | Plan grande | `plan` (tareas y metas) | las prioridades en el plan |
 
 Los agentes de Claude (`equipo`) entran en la etapa que les toca. Sigue las reglas de cada habilidad (lo que guarda, lo que pide confirmar) igual que si la usaras sola.
 
 ## 3. Contexto para las IAs
-Cada IA recibe sola la memoria de JARVIS: `scripts/ia_externa.py` le añade lo que devuelve `scripts/cerebro.py` (perfil, proyectos, decisiones, aprendizajes, conocimiento y entregables anteriores, empezando por lo relacionado con la pregunta). Ese script deja fuera `raw/` (chats, correos), personas, suscripciones, tareas, diario, seguridad y análisis de documentos, y tapa correos, teléfonos, IPs y claves. Para ver qué notas les llegarán: `python3 scripts/cerebro.py --notas "<pregunta>"`. Solo usa `--sin-cerebro` si la memoria no tiene nada que ver con el pedido.
+Cada IA recibe sola la memoria de Orión: `scripts/ia_externa.py` le añade lo que devuelve `scripts/cerebro.py` (perfil, proyectos, decisiones, aprendizajes, conocimiento y entregables anteriores, empezando por lo relacionado con la pregunta). Ese script deja fuera `raw/` (chats, correos), personas, suscripciones, tareas, diario, seguridad y análisis de documentos, y tapa correos, teléfonos, IPs y claves. Para ver qué notas les llegarán: `python3 scripts/cerebro.py --notas "<pregunta>"`. Solo usa `--sin-cerebro` si la memoria no tiene nada que ver con el pedido.
 
 Lo que la memoria no tiene son los archivos del trabajo: arma un resumen en `boveda/raw/panel/AAAA-MM-DD-<tema>-contexto.md` (máximo unos 40 000 caracteres):
 - Qué es (README), árbol de carpetas (sin `node_modules`, `.venv`, `.git`), dependencias y el `git log --oneline -15`.
@@ -82,7 +82,7 @@ Después, que lo aprendido vuelva al cerebro (una línea cada cosa, sin repetir)
 No uses el panel en tareas automáticas de la cola (botones del HUD).
 
 ## 6. Ventana de propuestas
-Todo se ve en la ventana de propuestas: en el PC, el botón **Propuestas** del HUD o "Jarvis, abre las propuestas" (`http://localhost:7777/propuestas`); en el celular, el botón **Propuestas** de la app. Tiene la conclusión, una pestaña "Lo visual" con todas las maquetas, diagramas, presentaciones y código juntos, y una pestaña por especialidad con cada IA en su columna. Las maquetas corren aisladas, sin acceso a JARVIS.
+Todo se ve en la ventana de propuestas: en el PC, el botón **Propuestas** del HUD o "Orión, abre las propuestas" (`http://localhost:7777/propuestas`); en el celular, el botón **Propuestas** de la app. Tiene la conclusión, una pestaña "Lo visual" con todas las maquetas, diagramas, presentaciones y código juntos, y una pestaña por especialidad con cada IA en su columna. Las maquetas corren aisladas, sin acceso a Orión.
 
 ## Respuesta hablada
 La nota global (si aplica) y las dos acciones o propuestas más importantes en las que coincidieron, en tres frases. Di cuántas IAs participaron y en qué etapas y, si hubo código, maquetas o presentaciones, que puede verlas en la ventana de propuestas.
