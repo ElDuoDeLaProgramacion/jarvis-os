@@ -56,7 +56,12 @@ permitidas=(
   # IAs externas (Gemini, OpenRouter) para una segunda opinión; ya entra en python3, se nombra por claridad.
   "Bash(python3 scripts/ia_externa.py:*)"
   "Bash(python3 scripts/cerebro.py:*)"
+  # Skills de documentos y diseño (scripts/instalar-skills.sh): Word y PowerPoint con Node, conversiones
+  # con LibreOffice y pandoc, PDF con qpdf.
+  "Bash(node:*)" "Bash(soffice:*)" "Bash(libreoffice:*)" "Bash(pandoc:*)" "Bash(qpdf:*)" "Bash(pdftoppm:*)"
 )
+# Las librerías de Node se instalan globales; así un script en cualquier carpeta las encuentra.
+command -v npm >/dev/null && export NODE_PATH="${NODE_PATH:-$(npm root -g 2>/dev/null)}"
 # Agentes especializados (.claude/agents/: programador, revisor, auditor, diseñador, juez, investigador).
 # Heredan estas mismas herramientas; en la cola (rutinas y botones) no se usan, por el gasto.
 if [ "${JARVIS_AUTOMATICO:-0}" != "1" ]; then permitidas+=(Task Agent); fi
