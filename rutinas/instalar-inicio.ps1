@@ -35,7 +35,7 @@ if (-not $SinVoz) {
     if (-not (Test-Path "$repo\voz\.venv")) {
         Write-Host "Aviso: la voz aún no está instalada. Ejecuta $repo\voz\instalar.bat antes de reiniciar."
     }
-    # La voz queda en una ventana minimizada escuchando "Jarvis" y los gestos.
+    # La voz queda en una ventana minimizada escuchando "Jarvis" (la cámara solo se enciende si se la pides).
     Registrar "Voz" "cmd.exe" "/c start `"JARVIS voz`" /min `"$repo\voz\jarvis.bat`" --distro $Distro" "PT30S"
 }
 

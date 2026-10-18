@@ -24,9 +24,9 @@ boveda/           vault de Obsidian
   raw/            todo lo capturado (sin procesar)
   wiki/           conocimiento depurado
   outputs/        todo lo que JARVIS entrega (reportes, planes, resúmenes)
-scripts/          jarvis.sh (petición directa), encolar.sh, corredor.sh, rutina.sh
+scripts/          jarvis.sh (petición directa), encolar.sh, corredor.sh, actualizar.sh
 cola/             intenciones pendientes, en curso, hechas y fallidas
-rutinas/          horarios del día real para el Programador de tareas de Windows
+rutinas/          arranque automático en Windows (HUD, voz, WhatsApp, actualizar)
 hud/              la pantalla de JARVIS (programa de Windows + servidor local)
 voz/              voz del PC: "Jarvis", gestos y Spotify
 whatsapp/         puente de WhatsApp por QR
@@ -99,7 +99,7 @@ La lista completa de lo que entiende está en la bóveda: `boveda/wiki/comandos.
 JARVIS se vincula a tu WhatsApp con un QR, como WhatsApp Web. Le das órdenes en tu chat contigo mismo y te contesta ahí. También anota tus chats en la bóveda para leerlos y resumirlos, y te prepara respuestas que solo envía si dices "sí". Instalación y límites en [whatsapp/README.md](whatsapp/README.md).
 
 ## Servidor y app del celular
-JARVIS puede vivir en un servidor (Oracle Cloud gratis, Clouding u otro Ubuntu), con la bóveda dentro. Así WhatsApp, las rutinas y la app del celular siguen funcionando con el PC apagado. La bóveda se sincroniza con el PC. Guía paso a paso en [servidor/README.md](servidor/README.md).
+JARVIS puede vivir en un servidor (Oracle Cloud gratis, Clouding u otro Ubuntu), con la bóveda dentro. Así WhatsApp y la app del celular siguen funcionando con el PC apagado. La bóveda se sincroniza con el PC. Guía paso a paso en [servidor/README.md](servidor/README.md).
 
 El PC también puede pasarle los pedidos al servidor, para que haya un solo JARVIS con una sola memoria: lo que toca tus archivos, proyectos o pantalla se sigue haciendo en el PC. Ver "El PC conectado al servidor" en [servidor/README.md](servidor/README.md).
 
@@ -110,8 +110,7 @@ Es automático: el servidor trae lo nuevo de GitHub cada 15 minutos y el PC al i
 
 ## Arranque automático
 
-- Las rutinas de 7, 9, 14 y 19 h: `rutinas\instalar-rutinas.ps1`.
-- El HUD, la voz y la actualización automática al iniciar sesión: `rutinas\instalar-inicio.ps1`.
+El HUD, la voz y la actualización automática al iniciar sesión: `rutinas\instalar-inicio.ps1`.
 
 Detalles en [rutinas/README.md](rutinas/README.md).
 
@@ -124,7 +123,7 @@ Instala una vez con `P:\jarvis-os\hud\instalar.bat` y luego abre `hud\abrir-hud.
 | Fuente | Cómo se conecta | Qué puede hacer JARVIS |
 |---|---|---|
 | Gmail | Conector **Gmail** en claude.ai (Configuración → Conectores). Claude Code lo recibe solo si iniciaste sesión con la misma cuenta | Leer, buscar y crear borradores. Nunca envía, reenvía ni borra sin tu "sí" |
-| Google Calendar | Conector **Google Calendar** en claude.ai | Ver la agenda del día para el resumen y el plan, y crear o cambiar eventos cuando se lo pides ("Jarvis, agéndame..."). Las rutinas solo leen; borrar eventos no puede |
+| Google Calendar | Conector **Google Calendar** en claude.ai | Ver la agenda del día para el resumen y el plan, y crear o cambiar eventos cuando se lo pides ("Jarvis, agéndame..."). Borrar eventos solo tras tu "sí" |
 | GitHub | API pública, sin configurar nada | Seguidores, repos y estrellas |
 | YouTube | Clave gratis de YouTube Data API en `.env` (copia `.env.example`) | Suscriptores, vistas y videos |
 | TikTok / Instagram | Página pública del perfil | Seguidores (puede fallar si la plataforma lo bloquea; entonces dice "sin dato") |
@@ -165,32 +164,22 @@ Regla: habilidades pequeñas de un solo propósito superan a un prompt gigante.
 
 ### Agentes especializados
 
-En `.claude/agents/` hay seis agentes que JARVIS puede llamar (directamente o con la habilidad `equipo`): `programador`, `revisor-codigo`, `auditor-seguridad`, `disenador`, `juez-ideas` e `investigador`. Cada uno tiene sus propias instrucciones y herramientas, y trabajan en paralelo cuando el pedido lo permite ("audita todos mis servidores" lanza un auditor por servidor). Cada agente gasta uso de Claude como una petición entera, así que las rutinas automáticas no los usan.
+En `.claude/agents/` hay seis agentes que JARVIS puede llamar (directamente o con la habilidad `equipo`): `programador`, `revisor-codigo`, `auditor-seguridad`, `disenador`, `juez-ideas` e `investigador`. Cada uno tiene sus propias instrucciones y herramientas, y trabajan en paralelo cuando el pedido lo permite ("audita todos mis servidores" lanza un auditor por servidor). Cada agente gasta uso de Claude como una petición entera, así que los botones del HUD (que corren sin conversación) no los usan.
 
 **IAs externas.** Para que JARVIS consulte otras IAs, pon en `.env` `GEMINI_API_KEY` (gratis en https://aistudio.google.com/apikey) y/o `OPENROUTER_API_KEY` (https://openrouter.ai/settings/keys: una clave para GPT, Llama, DeepSeek, Mistral, Grok y más; sin saldo usa sus modelos gratis, con límite diario, y con saldo prepago cualquier modelo). Ponlas solo en el `.env` del servidor: el PC (con `JARVIS_SERVIDOR` y `JARVIS_API_TOKEN`) las usa a través de él. Prueba con `python3 scripts/ia_externa.py --todas "hola"`. Para un panel por especialidad: `python3 scripts/ia_externa.py panel --rol auditoria --n 3 "..."` (`--rol` acepta cualquier tema).
 
 **Ventana de propuestas.** El código, las maquetas, los diagramas y las presentaciones que proponen los paneles, y también las auditorías, informes y páginas que JARVIS deja en `outputs/`, se ven en `http://localhost:7777/propuestas` (botón **Propuestas** del HUD o "Jarvis, abre las propuestas") y en el celular con el botón **Propuestas** de la app. Las maquetas corren aisladas en la página, sin acceso a JARVIS. Cada IA recibe la memoria de la bóveda (`scripts/cerebro.py`: perfil, proyectos, decisiones, aprendizajes, conocimiento y entregables), sin chats, correos, personas, dinero, diario ni seguridad, y con correos, teléfonos, IPs y claves tapados; mira qué les llega con `python3 scripts/cerebro.py --notas "pregunta"`. En todo pedido de trabajo (auditorías, código, diseño, planes, marketing, contenido, ideas, investigación) JARVIS pone a **todas** las IAs disponibles en equipo por etapas: por ejemplo, en programación unas planean, otras programan, otras auditan y otras hacen QA; en marketing unas planifican, otras desarrollan, otras preparan los videos y diseños y otras editan. Deja un resumen general y uno por cada IA. A mano: `python3 scripts/ia_externa.py flujo --tipo programacion` lista las etapas. Las IAs solo devuelven texto: si algo pide un video o una imagen, lo dicen y entregan guion, storyboard y prompts. Di "sin panel" para evitarlo.
 
-## Día real (rutinas automáticas)
+## Día real (cuando se lo pides)
 
-| Hora | Rutina | Qué pasa |
-|---|---|---|
-| 6:45 | "Noticias" | Noticias de tus temas en `outputs/noticias/` |
-| 7:00 | "Resumen matutino" | Correo, agenda, pendientes y noticias, en `outputs/resumenes/` |
-| 9:00 | "Plan de hoy" | Las 3 prioridades aterrizan en la bóveda |
-| 14:00 | "Revisa pendientes" | Tareas del día y correos que esperan respuesta |
-| 19:00 | "Cierra el día" | Reflexión registrada, mañana en cola |
-| 19:30 | "Aprender" | Lo que vale la pena recordar de lo del día pasa a `wiki/conocimiento/` |
-| Siempre | Cualquier pregunta | La bóveda recuerda todo |
-
-Instálalas una vez en Windows siguiendo [rutinas/README.md](rutinas/README.md). Funcionan así: el Programador de tareas encola la intención en `cola/` y el corredor la ejecuta.
+JARVIS ya no corre rutinas a horas fijas: casi nunca servían y gastaban uso. Pídeselo cuando lo necesites: "Jarvis, noticias", "resumen matutino", "plan de hoy", "revisa mis pendientes", "cierra el día" o "aprende de lo nuevo en la bóveda". Al actualizarse, el PC borra solo sus tareas viejas de rutinas y el servidor las quita de su cron.
 
 Para dejar algo en cola tú mismo: `./scripts/encolar.sh "investiga X"` y luego `./scripts/corredor.sh`.
 
 ## Hoja de ruta
 
 1. **Cerebro + memoria** (hecha): habilidades, bóveda, enrutador.
-2. **Corredor y rutinas** (hecha): cola de intenciones y horarios automáticos.
+2. **Corredor** (hecha): cola de intenciones (las rutinas de horario se quitaron en octubre de 2026).
 3. **HUD** (hecha): panel oscuro de una sola pantalla servido en local.
 4. **Voz** (hecha): palabra de activación "Jarvis" y gestos con la cámara en Windows, STT local (faster-whisper) y TTS local (voces de Windows o Piper).
 5. **Fuentes reales** (hecha): Gmail y Google Calendar por conectores de claude.ai; GitHub, YouTube, TikTok e Instagram con `scripts/canales.py`.
