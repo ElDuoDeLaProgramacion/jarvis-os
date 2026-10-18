@@ -312,18 +312,80 @@ async function cargarGrafo() {
   aristas = g.aristas;
 }
 
+// ---------- La voz en el cerebro ----------
+// La voz deja en cola/voz-habla.json el volumen de lo que dice cada 50 ms (voz/jarvis_voz.py) y el
+// HUD lo pregunta varias veces por segundo: mientras habla, el cerebro late, ondula y suelta ondas.
+let voz = {estado: "", habla: null, desfase: 0}, nivel = 0, ondas = [], ultimaOnda = 0;
+async function pedirVoz() {
+  try {
+    const d = await (await fetch("/api/voz")).json();
+    voz = {estado: d.estado, habla: d.habla, desfase: d.ahora * 1000 - Date.now()};
+  } catch {}
+}
+setInterval(pedirVoz, 150);
+
+function nivelDeVoz(ahora) {
+  const h = voz.habla;
+  if (voz.estado !== "HABLANDO" || !h || !h.niveles || !h.niveles.length) return 0;
+  const t = (ahora + voz.desfase) / 1000 - h.inicio, i = t / h.paso;
+  if (i < 0 || i >= h.niveles.length) return 0;
+  const a = h.niveles[Math.floor(i)] || 0, b = h.niveles[Math.min(h.niveles.length - 1, Math.floor(i) + 1)] || 0;
+  return a + (b - a) * (i % 1);
+}
+
 let angulo = 0;
 function animar() {
   const w = lienzo.width = lienzo.clientWidth * devicePixelRatio;
   const h = lienzo.height = lienzo.clientHeight * devicePixelRatio;
   const radio = Math.min(w, h) * 0.4, cx = w / 2, cy = h * 0.46;
+  const ahora = performance.timeOrigin + performance.now(), seg = ahora / 1000;
+  const objetivo = nivelDeVoz(ahora);
+  nivel += (objetivo - nivel) * (objetivo > nivel ? 0.5 : 0.18);   // sube rápido, baja suave
+  const hablando = voz.estado === "HABLANDO", pensando = voz.estado === "PENSANDO", oyendo = voz.estado === "ESCUCHANDO";
   const activo = $("estado").classList.contains("activo") || $("audio").style.color !== "";
-  angulo += activo ? 0.006 : 0.0018;
+  angulo += pensando ? 0.012 : hablando ? 0.004 + nivel * 0.01 : activo ? 0.006 : 0.0018;
   const s = Math.sin(angulo), c = Math.cos(angulo);
+  const late = 1 + nivel * 0.16 + (oyendo ? Math.sin(seg * 3) * 0.015 : 0);
   const proy = puntos.map(p => {
-    const x = p.x * c - p.z * s, z = p.x * s + p.z * c, esc3 = 1 / (1.9 - z * 0.6);
-    return {sx: cx + x * radio * esc3 * 1.3, sy: cy + p.y * radio * esc3 * 1.3, z, p};
+    // Al hablar, los puntos se abren en ondas que recorren el cerebro de arriba abajo.
+    const onda = hablando ? 1 + nivel * 0.22 * Math.sin(p.y * 9 - seg * 12 + p.x * 3) * (p.polvo ? 1 : 0.4) : 1;
+    const k = late * onda;
+    const x = (p.x * c - p.z * s) * k, z = p.x * s + p.z * c, esc3 = 1 / (1.9 - z * 0.6);
+    return {sx: cx + x * radio * esc3 * 1.3, sy: cy + p.y * k * radio * esc3 * 1.3, z, p};
   });
+
+  // Ondas que salen del centro con cada golpe de voz, y un anillo con la forma de la voz.
+  if (hablando && nivel > 0.45 && ahora - ultimaOnda > 160) { ondas.push({t: ahora, fuerza: nivel}); ultimaOnda = ahora; }
+  ondas = ondas.filter(o => ahora - o.t < 1400);
+  for (const o of ondas) {
+    const f = (ahora - o.t) / 1400;
+    ctx.strokeStyle = `rgba(198,232,75,${(1 - f) * 0.45 * o.fuerza})`;
+    ctx.lineWidth = devicePixelRatio * (2.5 - f * 2);
+    ctx.beginPath(); ctx.arc(cx, cy, radio * (0.55 + f * 0.75), 0, Math.PI * 2); ctx.stroke();
+  }
+  if (hablando || oyendo || pensando) {
+    const barras = 120, base = radio * 1.1;
+    ctx.lineWidth = devicePixelRatio * 2;
+    for (let i = 0; i < barras; i++) {
+      const a = i / barras * Math.PI * 2;
+      const forma = hablando
+        ? nivel * (0.5 + 0.5 * Math.sin(a * 6 + seg * 9)) * (0.6 + 0.4 * Math.sin(a * 13 - seg * 5))
+        : pensando ? 0.12 * (1 + Math.sin(a * 3 - seg * 6)) : 0.06 * (1 + Math.sin(seg * 3));
+      const largo = radio * (0.02 + forma * 0.18);
+      ctx.strokeStyle = hablando ? `rgba(198,232,75,${0.35 + nivel * 0.6})` : "rgba(139,108,242,.45)";
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * base, cy + Math.sin(a) * base);
+      ctx.lineTo(cx + Math.cos(a) * (base + largo), cy + Math.sin(a) * (base + largo));
+      ctx.stroke();
+    }
+  }
+  if (hablando) {   // núcleo que brilla con la voz
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radio * (0.35 + nivel * 0.3));
+    g.addColorStop(0, `rgba(198,232,75,${0.18 + nivel * 0.35})`);
+    g.addColorStop(1, "rgba(198,232,75,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, radio * (0.35 + nivel * 0.3), 0, Math.PI * 2); ctx.fill();
+  }
   ctx.lineWidth = devicePixelRatio * 0.6;
   for (const [a, b] of aristas) {
     const A = proy[a], B = proy[b];
@@ -334,7 +396,7 @@ function animar() {
     const alfa = q.p.polvo ? 0.12 + 0.35 * (q.z + 1) / 2 : 0.6 + 0.4 * (q.z + 1) / 2;
     ctx.globalAlpha = alfa;
     ctx.fillStyle = q.p.color;
-    ctx.beginPath(); ctx.arc(q.sx, q.sy, q.p.tam * devicePixelRatio, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(q.sx, q.sy, q.p.tam * devicePixelRatio * (1 + nivel * (q.p.polvo ? 0.8 : 0.3)), 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
   requestAnimationFrame(animar);

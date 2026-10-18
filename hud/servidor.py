@@ -375,6 +375,16 @@ def estado_audio():
         return "VOZ APAGADA"
 
 
+def voz_ahora():
+    """Para el cerebro del HUD, que pregunta varias veces por segundo: estado y volumen de lo que dice."""
+    habla = None
+    try:
+        habla = json.loads((COLA / "voz-habla.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pass
+    return {"estado": estado_audio(), "habla": habla, "ahora": time.time()}
+
+
 VOZ_VIVA = COLA / "voz-viva"     # la voz lo toca cada pocos segundos mientras corre
 ESCRITOS = COLA / "escritos"     # lo que David escribe en el HUD, para que la voz lo atienda
 
@@ -544,6 +554,8 @@ class Manejador(BaseHTTPRequestHandler):
             self._json(datos if datos else {"error": "no existe"}, 200 if datos else 404)
         elif url.path == "/api/estado":
             self._json(estado_completo())
+        elif url.path == "/api/voz":
+            self._json(voz_ahora())
         elif url.path == "/api/analizar/abrir":
             self._json({"abrir": pedir_abrir_analizar()})
         elif url.path == "/api/grafo":
