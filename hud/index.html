@@ -119,9 +119,6 @@
   <div class="vital"><div><b id="v-disco">–</b><br><span>Disco</span></div></div>
   <div class="vital"><div><b id="v-hechas">–</b><br><span>Tareas resueltas</span></div><span id="v-fallidas"></span></div>
 
-  <h2>Rutinas</h2>
-  <ul class="lista" id="rutinas"></ul>
-
   <h2>Informes</h2>
   <ul id="informes"></ul>
 </aside>
@@ -248,7 +245,6 @@ async function refrescar() {
   $("audio").textContent = d.audio;
   $("audio").style.color = ["ESCUCHANDO", "PENSANDO", "HABLANDO"].includes(d.audio) ? "var(--acento)" : "";
 
-  $("rutinas").innerHTML = d.rutinas.map(r => `<li>${esc(r.hora)} ${esc(r.nombre)}</li>`).join("") || `<li class="vacio">Sin rutinas</li>`;
   $("informes").innerHTML = d.informes.map(i =>
     `<li class="informe" data-ruta="${esc(i.ruta)}"><span>${esc(i.nombre)}</span><small>${esc(i.tipo)} →</small></li>`).join("")
     || `<li class="vacio">Aún no hay informes</li>`;

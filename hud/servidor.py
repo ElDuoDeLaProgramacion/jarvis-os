@@ -477,14 +477,6 @@ def guardar_fuentes(datos):
     return pedido, medios
 
 
-def rutinas():
-    archivo = RAIZ / "rutinas" / "rutinas.csv"
-    if not archivo.exists():
-        return []
-    filas = archivo.read_text(encoding="utf-8").strip().splitlines()[1:]
-    return [dict(zip(("hora", "nombre", "pedido"), f.strip().split(",", 2))) for f in filas]
-
-
 # ---------- HTTP ----------
 
 def estado_completo():
@@ -504,7 +496,6 @@ def estado_completo():
         "cola": cola,
         "actividad": "EJECUTANDO" if cola["en_curso"] else ("EN COLA" if cola["pendientes"] else "EN ESPERA"),
         "audio": estado_audio(),
-        "rutinas": rutinas(),
         "comandos": [{"etiqueta": e, "pedido": p} for e, p in COMANDOS],
     }
 
