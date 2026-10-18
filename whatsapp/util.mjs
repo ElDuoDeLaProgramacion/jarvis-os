@@ -113,3 +113,37 @@ export function lineaChat({ hora, chat, autor, texto, grupo }) {
   if (grupo) return `- ${hora} · ${chat} · ${autor}: ${plano}\n`
   return autor === 'yo' ? `- ${hora} · yo → ${chat}: ${plano}\n` : `- ${hora} · ${chat}: ${plano}\n`
 }
+
+/** "opciones", "dame opciones", "qué le respondo": David pide respuestas propuestas para el último aviso. */
+export function pideOpciones(texto) {
+  const t = texto.trim().toLowerCase().replace(/[¿?¡!.,]/g, '')
+  if (t.length > 40) return false
+  return /^(dame |dime |mu[eé]strame |prop[oó]n(me)? )?(las |unas )?(opciones|respuestas)( de respuesta)?$/.test(t) ||
+    /^qu[eé] le (respondo|contesto|digo|puedo responder|puedo decir)$/.test(t)
+}
+
+const TIPOS = {
+  pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel', csv: 'text/csv', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', txt: 'text/plain', md: 'text/markdown',
+  html: 'text/html', json: 'application/json', zip: 'application/zip',
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif',
+}
+
+/** Tipo MIME por la extensión del archivo. */
+export function tipoDe(nombre) {
+  return TIPOS[(nombre.split('.').pop() || '').toLowerCase()] || 'application/octet-stream'
+}
+
+/** Extensión que corresponde a un tipo MIME (para guardar lo que manda David). */
+export function extensionDe(mime, nombre = '') {
+  const propia = /\.([a-z0-9]{1,5})$/i.exec(nombre)?.[1]
+  if (propia) return propia.toLowerCase()
+  const base = (mime || '').split(';')[0].trim()
+  return Object.keys(TIPOS).find((e) => TIPOS[e] === base) || 'bin'
+}
+
+/** Nombre de archivo seguro: sin rutas ni caracteres raros. */
+export function nombreSeguro(nombre) {
+  return (nombre || 'archivo').split(/[\\/]/).pop().replace(/[^\w.\- áéíóúñÁÉÍÓÚÑ]/g, '_').slice(-80) || 'archivo'
+}
