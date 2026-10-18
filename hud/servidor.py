@@ -375,13 +375,28 @@ def estado_audio():
         return "VOZ APAGADA"
 
 
+_visto = {}   # "inicio" que escribió la voz -> cuándo lo vio este servidor, con su propio reloj
+
+
 def voz_ahora():
-    """Para el cerebro del HUD, que pregunta varias veces por segundo: estado y volumen de lo que dice."""
+    """Para el cerebro del HUD, que pregunta varias veces por segundo: estado y volumen de lo que dice.
+
+    La voz corre en Windows y este servidor en WSL, y sus relojes se desfasan (WSL se atrasa tras
+    suspender el PC). Por eso "inicio" se cambia por el momento en que este servidor vio el archivo
+    nuevo: la voz lo escribe justo antes de empezar a hablar."""
     habla = None
     try:
         habla = json.loads((COLA / "voz-habla.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         pass
+    if isinstance(habla, dict) and "inicio" in habla:
+        clave = habla["inicio"]
+        if clave not in _visto:
+            # Lo primero que ve al arrancar es lo último que dijo antes: eso ya pasó.
+            _visto[clave] = time.time() - (3600 if not _visto else 0)
+            for viejo in [k for k in _visto if k != clave]:
+                del _visto[viejo]
+        habla["inicio"] = _visto[clave]
     return {"estado": estado_audio(), "habla": habla, "ahora": time.time()}
 
 
