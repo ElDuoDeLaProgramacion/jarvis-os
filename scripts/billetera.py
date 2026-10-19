@@ -55,6 +55,8 @@ def ajustes():
         "max_operaciones": int(os.environ.get("BILLETERA_MAX_OPERACIONES", "3")),
         "comision": float(os.environ.get("BILLETERA_COMISION", "0.5")) / 100,
         "ias": int(os.environ.get("JARVIS_IAS_MAX", "8")),
+        # Si responden menos IAs que esto, no se opera: una sola no decide por todas.
+        "quorum": int(os.environ.get("BILLETERA_QUORUM", "2")),
         "perdida_max": float(os.environ.get("BILLETERA_PERDIDA_MAX", "30")),
     }
 
@@ -247,7 +249,7 @@ def decidir(votos):
 
 def aplicar(estado, decision, p, aj):
     """Ejecuta la decisión (en la cartera simulada o en Bitso). Devuelve la operación hecha o None."""
-    if decision["accion"] == "mantener":
+    if decision["accion"] == "mantener" or decision.get("bloqueo"):
         return None
     if operaciones_de_hoy(estado) >= aj["max_operaciones"]:
         decision["bloqueo"] = f"ya hubo {aj['max_operaciones']} operaciones hoy"
@@ -374,6 +376,9 @@ def ronda(_args):
                + "; ".join(f"{m}: {t[:120]}" for m, _, t in resultados), evento="sin ronda")
         return 1
     decision = decidir(votos)
+    validos = sum(1 for v in votos if v.get("valido"))
+    if decision["accion"] != "mantener" and validos < aj["quorum"]:
+        decision["bloqueo"] = f"solo votaron {validos} IAs (mínimo {aj['quorum']})"
     try:
         operacion = aplicar(estado, decision, p, aj)
     except RuntimeError as e:          # Bitso rechazó o no respondió: se anota y la cartera no cambia
