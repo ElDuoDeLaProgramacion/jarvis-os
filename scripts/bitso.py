@@ -49,8 +49,18 @@ def pedir(metodo, ruta, cuerpo=None):
     return respuesta["payload"]
 
 
+def libros():
+    """Los libros que Bitso tiene abiertos, p. ej. {"btc_cop", "eth_cop", "btc_mxn"}. Es público: sin firma."""
+    req = urllib.request.Request(BASE + "/v3/available_books/", headers={"User-Agent": "orion-billetera"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return {b["book"] for b in json.load(r)["payload"]}
+    except (OSError, ValueError, KeyError) as e:
+        raise RuntimeError(f"no pude leer los libros de Bitso: {e}") from None
+
+
 def saldos():
-    """{"mxn": 500.0, "btc": 0.0001, ...} con lo disponible (no lo reservado en órdenes)."""
+    """{"cop": 500000.0, "btc": 0.0001, ...} con lo disponible (no lo reservado en órdenes)."""
     return {b["currency"].lower(): float(b["available"]) for b in pedir("GET", "/v3/balance/")["balances"]}
 
 
@@ -72,10 +82,10 @@ def _orden(libro, lado, campo, monto):
 
 
 def comprar(libro, gastar):
-    """Compra a mercado gastando `gastar` de la moneda base (MXN en btc_mxn)."""
+    """Compra a mercado gastando `gastar` de la moneda base (COP en btc_cop)."""
     return _orden(libro, "buy", "minor", gastar)
 
 
 def vender(libro, cantidad):
-    """Vende a mercado `cantidad` de la cripto (BTC en btc_mxn)."""
+    """Vende a mercado `cantidad` de la cripto (BTC en btc_cop)."""
     return _orden(libro, "sell", "major", cantidad)

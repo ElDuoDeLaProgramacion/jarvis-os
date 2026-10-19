@@ -7,13 +7,14 @@ una cartera de cripto durante unos días (14 por defecto). Hay dos modos:
   (2026-10-19): una cuenta de Bitso exclusiva para Orión, que maneja el 100 % (BILLETERA_PORCENTAJE_REAL);
   en cada ronda el tope se recalcula con lo que vale la cuenta. Para arrancarlo hacen falta tres cosas que
   solo pone David: BITSO_API_KEY/BITSO_API_SECRET con permiso de operar y SIN permiso de retiro;
-  BILLETERA_PORCENTAJE_REAL=100 en .env; y --confirmo "<monto> MXN" con el monto exacto que el script
+  BILLETERA_PORCENTAJE_REAL=100 en .env; y --confirmo "<monto> COP" con el monto exacto que el script
   calcula al iniciar. Se pausa solo si pierde BILLETERA_PERDIDA_MAX (30 %) de lo que se le dio.
 Antes de votar, las IAs reciben el contexto del mercado sacado de internet: noticias de cripto de hoy
 (CoinDesk, Cointelegraph, Decrypt), el índice de miedo y codicia y el mercado global de CoinGecko.
 
     python3 scripts/billetera.py iniciar [--saldo 1000] [--dias 14]   empieza el experimento simulado
-    python3 scripts/billetera.py iniciar --modo real [--confirmo "<monto> MXN"]   con dinero real en Bitso
+    python3 scripts/billetera.py iniciar --modo real [--confirmo "<monto> COP"]   con dinero real en Bitso
+        (la cuenta de David es de Colombia: pesos colombianos; otra moneda con --moneda o BILLETERA_MONEDA)
     python3 scripts/billetera.py ronda      una ronda: precios, voto de todas las IAs, decisión (la corre el cron)
     python3 scripts/billetera.py estado     cómo va: valor, posiciones, ganancia y comparación con solo guardar BTC
     python3 scripts/billetera.py pausar     no decide nada más hasta reanudar
@@ -354,6 +355,8 @@ def ronda(_args):
         print("La billetera está en pausa.")
         return 0
     aj = ajustes()
+    if estado.get("activos"):          # en Bitso, solo las monedas que tienen libro en la moneda de la cuenta
+        aj["activos"] = {s: i for s, i in aj["activos"].items() if s in estado["activos"]}
     if time.time() >= estado["fin"]:
         return terminar(None)
     try:
@@ -451,6 +454,16 @@ def iniciar(args):
     saldo, moneda, porcentaje = args.saldo, "USD", None
     if args.modo == "real":
         moneda = args.moneda.upper()
+        import bitso
+        try:
+            abiertos = bitso.libros()
+        except RuntimeError as e:
+            print(e)
+            return 2
+        aj["activos"] = {s: i for s, i in aj["activos"].items() if f"{s.lower()}_{moneda.lower()}" in abiertos}
+        if not aj["activos"]:
+            print(f"Bitso no tiene libros en {moneda} para {', '.join(ajustes()['activos'])}.")
+            return 2
         p = precios(aj["activos"], moneda)
         saldo, porcentaje, error = permiso_real(args, p, moneda)
         if error:
@@ -462,6 +475,7 @@ def iniciar(args):
     estado = {"modo": args.modo, "moneda": moneda, "porcentaje": porcentaje, "inicio": ahora,
               "fin": ahora + args.dias * 86400, "dias": args.dias,
               "saldo_inicial": saldo, "efectivo": saldo, "posiciones": {s: 0 for s in aj["activos"]},
+              "activos": list(aj["activos"]),
               "precios_inicio": {s: d["precio"] for s, d in p.items()}, "historial": []}
     if CARPETA.exists() and (CARPETA / "estado.json").exists():
         # El experimento anterior se guarda aparte para no mezclar diarios.
@@ -568,8 +582,9 @@ def main():
     i.add_argument("--saldo", type=float, default=float(os.environ.get("BILLETERA_SALDO", "1000")))
     i.add_argument("--dias", type=int, default=14)
     i.add_argument("--modo", default="simulado", choices=["simulado", "real"])
-    i.add_argument("--moneda", default="MXN", help="real: moneda de los libros de Bitso (MXN)")
-    i.add_argument("--confirmo", help='real: David repite el monto que calcula el script, p. ej. "2500.00 MXN"')
+    i.add_argument("--moneda", default=os.environ.get("BILLETERA_MONEDA", "COP"),
+                   help="real: moneda de la cuenta de Bitso (COP, pesos colombianos, por defecto)")
+    i.add_argument("--confirmo", help='real: David repite el monto que calcula el script, p. ej. "500000.00 COP"')
     for nombre in ("ronda", "estado", "pausar", "reanudar", "terminar"):
         sub.add_parser(nombre)
     args = a.parse_args()

@@ -101,13 +101,14 @@ class Billetera(unittest.TestCase):
 
 class BitsoFalso:
     """Una cuenta de Bitso en memoria: compra y vende al precio de PRECIOS con 0,5 % de comisión."""
-    def __init__(self, mxn):
-        self.saldo = {"mxn": mxn, "btc": 0.0, "eth": 0.0, "sol": 0.0}
+    def __init__(self, cop):
+        self.saldo = {"cop": cop, "btc": 0.0, "eth": 0.0, "sol": 0.0}
         self.ordenes = []
 
     def modulo(self):
         m = types.ModuleType("bitso")
         m.configurado = lambda: True
+        m.libros = lambda: {"btc_cop", "eth_cop", "usd_cop"}        # SOL no tiene libro en COP
         m.saldos = lambda: dict(self.saldo)
         m.comprar = self.comprar
         m.vender = self.vender
@@ -116,7 +117,7 @@ class BitsoFalso:
     def comprar(self, libro, gastar):
         s = libro.split("_")[0]
         cantidad = gastar / PRECIOS[s.upper()]["precio"]
-        self.saldo["mxn"] -= gastar
+        self.saldo["cop"] -= gastar
         self.saldo[s] += cantidad * 0.995
         self.ordenes.append(("buy", libro, gastar))
         return {"oid": "1", "mayor": cantidad, "menor": gastar, "comision": cantidad * 0.005, "moneda_comision": s}
@@ -125,9 +126,9 @@ class BitsoFalso:
         s = libro.split("_")[0]
         cobro = cantidad * PRECIOS[s.upper()]["precio"]
         self.saldo[s] -= cantidad
-        self.saldo["mxn"] += cobro * 0.995
+        self.saldo["cop"] += cobro * 0.995
         self.ordenes.append(("sell", libro, cantidad))
-        return {"oid": "2", "mayor": cantidad, "menor": cobro, "comision": cobro * 0.005, "moneda_comision": "mxn"}
+        return {"oid": "2", "mayor": cantidad, "menor": cobro, "comision": cobro * 0.005, "moneda_comision": "cop"}
 
 
 class Real(unittest.TestCase):
@@ -149,24 +150,24 @@ class Real(unittest.TestCase):
         self.tmp.cleanup()
 
     def iniciar(self, confirmo=None):
-        return billetera.iniciar(type("A", (), {"saldo": 0, "dias": 14, "modo": "real", "moneda": "MXN",
+        return billetera.iniciar(type("A", (), {"saldo": 0, "dias": 14, "modo": "real", "moneda": "COP",
                                                 "confirmo": confirmo}))
 
     def test_sin_confirmar_el_monto_no_arranca(self):
         self.assertEqual(self.iniciar(), 2)
-        self.assertEqual(self.iniciar("1999 MXN"), 2)
+        self.assertEqual(self.iniciar("1999 COP"), 2)
         self.assertIsNone(billetera.leer_estado())
 
     def test_sin_porcentaje_en_env_no_arranca(self):
         os.environ.pop("BILLETERA_PORCENTAJE_REAL")
-        self.assertEqual(self.iniciar("2000.00 MXN"), 2)
+        self.assertEqual(self.iniciar("2000.00 COP"), 2)
 
     def test_compra_y_vende_en_bitso(self):
-        self.assertEqual(self.iniciar("2000.00 MXN"), 0)
+        self.assertEqual(self.iniciar("2000.00 COP"), 0)
         self.votos = ['{"accion":"comprar","activo":"BTC","porcentaje":20}']
         billetera.ronda(None)
         e = billetera.leer_estado()
-        self.assertEqual(self.bitso.ordenes, [("buy", "btc_mxn", 400.0)])
+        self.assertEqual(self.bitso.ordenes, [("buy", "btc_cop", 400.0)])
         self.assertAlmostEqual(e["efectivo"], 1600.0)
         self.assertAlmostEqual(e["posiciones"]["BTC"], self.bitso.saldo["btc"])
         self.votos = ['{"accion":"vender","activo":"BTC","porcentaje":25}']
@@ -175,8 +176,8 @@ class Real(unittest.TestCase):
         self.assertAlmostEqual(billetera.leer_estado()["posiciones"]["BTC"], self.bitso.saldo["btc"])
 
     def test_deposito_de_david_se_suma(self):
-        self.iniciar("2000.00 MXN")
-        self.bitso.saldo["mxn"] += 500
+        self.iniciar("2000.00 COP")
+        self.bitso.saldo["cop"] += 500
         self.votos = ['{"accion":"mantener"}']
         billetera.ronda(None)
         e = billetera.leer_estado()
@@ -184,14 +185,22 @@ class Real(unittest.TestCase):
         self.assertAlmostEqual(e["saldo_inicial"], 2500.0)
 
     def test_freno_por_perdida(self):
-        self.iniciar("2000.00 MXN")
-        self.bitso.saldo["mxn"] = 1000.0               # la cuenta perdió la mitad
+        self.iniciar("2000.00 COP")
+        self.bitso.saldo["cop"] = 1000.0               # la cuenta perdió la mitad
         self.votos = ['{"accion":"mantener"}']
         billetera.ronda(None)
         self.assertTrue(billetera.pausada())
 
+    def test_solo_monedas_con_libro_en_cop(self):
+        self.iniciar("2000.00 COP")
+        e = billetera.leer_estado()
+        self.assertEqual((e["moneda"], e["activos"]), ("COP", ["BTC", "ETH"]))
+        self.votos = ['{"accion":"comprar","activo":"SOL","porcentaje":10}']
+        billetera.ronda(None)
+        self.assertEqual(self.bitso.ordenes, [])
+
     def test_bitso_falla_y_no_toca_la_cartera(self):
-        self.iniciar("2000.00 MXN")
+        self.iniciar("2000.00 COP")
         def falla(*a):
             raise RuntimeError("caído")
         sys.modules["bitso"].comprar = falla
