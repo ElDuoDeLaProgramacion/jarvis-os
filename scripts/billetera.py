@@ -489,8 +489,18 @@ def iniciar(args):
         if not aj["activos"]:
             print(f"Bitso no tiene libros en {cuenta} para {', '.join(ajustes()['activos'])}.")
             return 2
-        p = precios(aj["activos"], cuenta)
-        saldo, porcentaje, error = permiso_real(args, p, cuenta)
+        try:
+            p = precios(aj["activos"], moneda)
+            if puente:
+                # CoinGecko no da precios en pesos colombianos: se pasan de dólares con el precio de Bitso.
+                dolar = bitso.ultimo(puente)
+                en_cuenta = {s: dict(d, precio=d["precio"] * dolar) for s, d in p.items()}
+            else:
+                en_cuenta = p
+        except RuntimeError as e:
+            print(e)
+            return 2
+        saldo, porcentaje, error = permiso_real(args, en_cuenta, cuenta)
         if error:
             print(error)
             return 2
@@ -500,7 +510,6 @@ def iniciar(args):
             except RuntimeError as e:
                 print(f"No pude cambiar los {cuenta} a dólares en Bitso: {e}")
                 return 2
-            p = precios(aj["activos"], moneda)
     else:
         p = precios(aj["activos"], moneda)
     ahora = time.time()

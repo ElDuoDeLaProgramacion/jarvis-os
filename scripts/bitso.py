@@ -50,14 +50,27 @@ def pedir(metodo, ruta, cuerpo=None):
     return respuesta["payload"]
 
 
-def libros():
-    """Los libros que Bitso tiene abiertos, p. ej. {"btc_cop", "eth_cop", "btc_mxn"}. Es público: sin firma."""
-    req = urllib.request.Request(BASE + "/v3/available_books/", headers={"User-Agent": "orion-billetera"})
+def _publico(ruta, que):
+    """GET a la parte pública de Bitso (sin firma)."""
+    req = urllib.request.Request(BASE + ruta, headers={"User-Agent": "orion-billetera"})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            return {b["book"] for b in json.load(r)["payload"]}
+            return json.load(r)["payload"]
     except (OSError, ValueError, KeyError) as e:
-        raise RuntimeError(f"no pude leer los libros de Bitso: {e}") from None
+        raise RuntimeError(f"no pude leer {que} de Bitso: {e}") from None
+
+
+def libros():
+    """Los libros que Bitso tiene abiertos, p. ej. {"btc_cop", "eth_cop", "btc_mxn"}."""
+    return {b["book"] for b in _publico("/v3/available_books/", "los libros")}
+
+
+def ultimo(libro):
+    """Último precio de un libro: en usd_cop, cuántos pesos vale un dólar."""
+    try:
+        return float(_publico(f"/v3/ticker/?book={libro}", f"el precio de {libro}")["last"])
+    except (TypeError, ValueError) as e:
+        raise RuntimeError(f"Bitso no dio el precio de {libro}: {e}") from None
 
 
 def saldos():
