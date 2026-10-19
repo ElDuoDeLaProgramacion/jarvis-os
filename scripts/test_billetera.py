@@ -21,6 +21,7 @@ class Billetera(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         billetera.CARPETA = Path(self.tmp.name) / "billetera"
         billetera.precios = lambda activos, moneda="USD": PRECIOS
+        os.environ["BILLETERA_QUORUM"] = "1"
         self.votos = []
         billetera.votar = lambda estado, p, aj: [(f"ia-{i}", billetera.leer_voto(t, aj["activos"], aj["tope"]), t)
                                                  for i, t in enumerate(self.votos)]
@@ -28,6 +29,17 @@ class Billetera(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def test_una_sola_ia_no_decide(self):
+        os.environ["BILLETERA_QUORUM"] = "2"
+        self.votos = ['{"accion":"comprar","activo":"BTC","porcentaje":10}']   # las demás no respondieron
+        billetera.ronda(None)
+        e = billetera.leer_estado()
+        self.assertEqual(e["efectivo"], 1000.0)
+        self.assertIn("solo votaron 1 IAs", e["historial"][-1]["resumen"])
+        self.votos = ['{"accion":"comprar","activo":"BTC","porcentaje":10}'] * 2
+        billetera.ronda(None)
+        self.assertLess(billetera.leer_estado()["efectivo"], 1000.0)
 
     def test_leer_voto(self):
         v = billetera.leer_voto('Claro: {"accion":"comprar","activo":"btc","porcentaje":80,"razon":"sube"}',
@@ -45,7 +57,8 @@ class Billetera(unittest.TestCase):
         e = billetera.leer_estado()
         self.assertAlmostEqual(e["efectivo"], 850.0)                       # mediana 15 % de 1000
         self.assertAlmostEqual(e["posiciones"]["BTC"], 150 * 0.995 / 100000)
-        self.assertEqual(len((billetera.CARPETA / "decisiones.jsonl").read_text().splitlines()), 1)
+        lineas = [json.loads(x) for x in (billetera.CARPETA / "decisiones.jsonl").read_text().splitlines()]
+        self.assertEqual([x["tipo"] for x in lineas], ["inicio", "ronda"])
         self.assertIn("ia-1", next((billetera.CARPETA / "diario").glob("*.md")).read_text())
 
     def test_empate_mantiene(self):
@@ -122,6 +135,7 @@ class Real(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         billetera.CARPETA = Path(self.tmp.name) / "billetera"
         billetera.precios = lambda activos, moneda="USD": PRECIOS
+        os.environ["BILLETERA_QUORUM"] = "1"
         self.bitso = BitsoFalso(2000.0)
         sys.modules["bitso"] = self.bitso.modulo()
         os.environ["BILLETERA_PORCENTAJE_REAL"] = "100"

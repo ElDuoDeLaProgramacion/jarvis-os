@@ -87,6 +87,11 @@ class Api:
         webview.create_window("Orión · Propuestas", f"{URL}/propuestas", width=1400, height=900,
                               background_color=FONDO)
 
+    def abrir_billetera(self):
+        """Botón Billetera: resumen de la cartera y cada movimiento de las IAs en vivo."""
+        webview.create_window("Orión · Billetera", f"{URL}/billetera", width=1200, height=900,
+                              background_color=FONDO)
+
 
 def main():
     p = argparse.ArgumentParser(description="HUD de Orión")

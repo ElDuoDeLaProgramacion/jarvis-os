@@ -132,6 +132,7 @@
     <button>Enviar</button>
     <button type="button" id="abrir-analizar" title="Analizar archivos, enlaces o texto">＋ Analizar</button>
     <button type="button" id="abrir-propuestas" title="Lo que proponen los paneles de IAs: código, diseños, presentaciones">Propuestas</button>
+    <button type="button" id="abrir-billetera" title="La billetera de Orión: resumen y cada movimiento en vivo">Billetera</button>
   </form>
 </main>
 
@@ -471,6 +472,10 @@ $("abrir-propuestas").onclick = () => {
   // En el programa del HUD, ventana propia; en un navegador, otra pestaña.
   if (window.pywebview && window.pywebview.api && window.pywebview.api.abrir_propuestas) window.pywebview.api.abrir_propuestas();
   else window.open("/propuestas", "jarvis-propuestas");
+};
+$("abrir-billetera").onclick = () => {
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.abrir_billetera) window.pywebview.api.abrir_billetera();
+  else window.open("/billetera", "jarvis-billetera");
 };
 $("a-subir").onclick = () => $("a-archivos").click();
 $("a-archivos").onchange = e => { agregarArchivos(e.target.files); e.target.value = ""; };

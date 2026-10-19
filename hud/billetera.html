@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Las razones de cada voto las escriben IAs externas: se muestran siempre como texto, nunca como HTML. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<title>Orión · Billetera</title>
+<style>
+  :root {
+    --fondo: #07080a; --panel: #0d0f12; --panel-2: #12151a; --linea: #1d2127; --texto: #c9cdd3; --claro: #eef0f2;
+    --tenue: #6b727c; --acento: #c6e84b; --acento-2: #8b6cf2; --sube: #4fd18b; --baja: #f06b5b; --aviso: #f2b84b;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--fondo); color: var(--texto); font: 14px/1.55 system-ui, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    padding: 12px 16px; background: var(--fondo); border-bottom: 1px solid var(--linea); }
+  header h1 { margin: 0 auto 0 0; font: 600 15px var(--mono); letter-spacing: .3em; color: var(--claro); white-space: nowrap; }
+  header h1 small { color: var(--acento); letter-spacing: .2em; font-weight: 500; }
+  button { background: var(--panel); color: var(--texto); border: 1px solid var(--linea); font: 12px var(--mono);
+    padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+  .pestanas { display: flex; gap: 8px; }
+  button:hover { border-color: var(--acento); color: var(--acento); }
+  button.activo { color: var(--fondo); background: var(--acento); border-color: var(--acento); }
+  button:disabled { opacity: .5; cursor: wait; }
+  main { padding: 16px; max-width: 1200px; margin: 0 auto; }
+  .vacio { color: var(--tenue); text-align: center; padding: 60px 16px; }
+  .error { color: var(--baja); }
+  .chip { display: inline-block; font: 11px var(--mono); padding: 2px 8px; border-radius: 99px; border: 1px solid var(--linea); color: var(--tenue); }
+  .chip.real { color: var(--aviso); border-color: var(--aviso); }
+  .chip.pausa { color: var(--baja); border-color: var(--baja); }
+  .sube { color: var(--sube); } .baja { color: var(--baja); }
+  .barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; color: var(--tenue); font-size: 13px; }
+  .frase { background: var(--panel); border: 1px solid var(--linea); border-left: 3px solid var(--acento); border-radius: 8px;
+    padding: 12px 14px; color: var(--claro); margin-bottom: 14px; }
+  .cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 10px; margin-bottom: 18px; }
+  .cifra { background: var(--panel); border: 1px solid var(--linea); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+  .cifra span { display: block; font: 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--tenue); }
+  .cifra b { display: block; font: 600 20px var(--mono); color: var(--claro); margin-top: 4px; overflow-wrap: anywhere; }
+  h2 { font: 500 12px var(--mono); letter-spacing: .15em; text-transform: uppercase; color: var(--acento-2); margin: 22px 0 8px; }
+  .tabla { overflow-x: auto; border: 1px solid var(--linea); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--linea); white-space: nowrap; }
+  th { font: 11px var(--mono); color: var(--tenue); text-transform: uppercase; letter-spacing: .1em; background: var(--panel-2); }
+  td.num { font-family: var(--mono); text-align: right; }
+  tr:last-child td { border-bottom: 0; }
+  .parte { height: 6px; background: var(--panel-2); border-radius: 3px; min-width: 60px; }
+  .parte i { display: block; height: 100%; background: var(--acento); border-radius: 3px; }
+  .vivo-estado { display: flex; align-items: center; gap: 8px; color: var(--tenue); font-size: 13px; margin-bottom: 12px; }
+  .punto { width: 8px; height: 8px; border-radius: 50%; background: var(--sube); animation: latido 2s infinite; }
+  @keyframes latido { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .punto { animation: none; } }
+  .evento { background: var(--panel); border: 1px solid var(--linea); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+  .evento.nuevo { border-color: var(--acento); }
+  .evento > div:first-child { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; padding: 10px 14px; }
+  .evento time { font: 12px var(--mono); color: var(--tenue); }
+  .evento .que { color: var(--claro); font-weight: 500; flex: 1 1 240px; min-width: 0; }
+  .evento .que.compra { color: var(--sube); } .evento .que.venta { color: var(--baja); }
+  .evento .valor { font: 12px var(--mono); color: var(--tenue); }
+  .evento details { border-top: 1px solid var(--linea); }
+  .evento summary { cursor: pointer; padding: 8px 14px; font: 12px var(--mono); color: var(--tenue); }
+  .evento summary:hover { color: var(--acento); }
+  .voto { padding: 6px 14px 8px; border-top: 1px dashed var(--linea); overflow-wrap: anywhere; }
+  .voto b { color: var(--acento-2); font: 500 12px var(--mono); }
+  .voto .accion { font: 12px var(--mono); margin-left: 6px; }
+  .voto p { margin: 2px 0 0; color: var(--texto); }
+  .aviso { padding: 10px 14px; color: var(--aviso); }
+</style>
+</head>
+<body>
+<header>
+  <h1>ORIÓN <small>BILLETERA</small></h1>
+  <div class="pestanas">
+    <button id="tab-resumen" class="activo" type="button">Resumen general</button>
+    <button id="tab-vivo" type="button">En vivo</button>
+  </div>
+</header>
+<main>
+  <section id="resumen">
+    <div class="barra">
+      <button id="hacer" type="button">Hacer resumen ahora</button>
+      <span id="estado-resumen"></span>
+    </div>
+    <div id="contenido-resumen"><div class="vacio">Cargando…</div></div>
+  </section>
+  <section id="vivo" hidden>
+    <div class="vivo-estado"><span class="punto"></span><span id="estado-vivo">Escuchando cada movimiento de las IAs…</span></div>
+    <div id="eventos"></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id)
+// En el HUD del PC no hace falta clave; servida por la app del servidor (/app/billetera) usa la de la app.
+const EN_APP = location.pathname.startsWith('/app/')
+let moneda = 'USD', total = 0, vivoActivo = false, temporizador = null, primeraCarga = true
+
+function cabeceras () {
+  if (!EN_APP) return {}
+  let token = ''
+  try { token = localStorage.getItem('jarvis-token') || '' } catch (e) {}
+  return { Authorization: 'Bearer ' + token }
+}
+
+async function pedir (ruta) {
+  const r = await fetch(ruta, { headers: cabeceras(), cache: 'no-store' })
+  if (r.status === 401) throw new Error('Abre la app de Orión y entra con tu clave; luego vuelve aquí.')
+  if (!r.ok) throw new Error('No pude leer la billetera (' + r.status + ').')
+  return r.json()
+}
+
+function el (etiqueta, props = {}, ...hijos) {
+  const e = document.createElement(etiqueta)
+  Object.assign(e, props)
+  for (const h of hijos) if (h != null) e.append(h)
+  return e
+}
+
+const dinero = (n) => Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + moneda
+const pct = (n) => (n > 0 ? '+' : '') + Number(n || 0).toFixed(2) + ' %'
+const clase = (n) => n > 0 ? 'sube' : n < 0 ? 'baja' : ''
+const cripto = (n) => Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 8 })
+
+function cifra (etiqueta, valor, extra) {
+  return el('div', { className: 'cifra' }, el('span', { textContent: etiqueta }),
+    el('b', { textContent: valor, className: extra || '' }))
+}
+
+// ---------- Resumen general: se calcula de nuevo cada vez que se oprime el botón ----------
+async function hacerResumen () {
+  $('hacer').disabled = true
+  $('estado-resumen').textContent = 'Calculando con los precios de ahora…'
+  try {
+    const d = await pedir('/api/billetera/resumen')
+    pintarResumen(d)
+    $('estado-resumen').textContent = d.activa
+      ? 'Resumen de las ' + d.hecho + (d.precios_en_vivo ? ', con precios en vivo.' : ', con los precios de la última ronda.') : ''
+  } catch (e) {
+    $('estado-resumen').textContent = ''
+    $('contenido-resumen').replaceChildren(el('div', { className: 'vacio error', textContent: e.message }))
+  } finally {
+    $('hacer').disabled = false
+  }
+}
+
+function pintarResumen (d) {
+  const caja = $('contenido-resumen')
+  if (!d.activa) {
+    caja.replaceChildren(el('div', { className: 'vacio', textContent:
+      'Todavía no hay billetera. Dile a Orión "empieza el experimento" (simulado) o "empieza la billetera real".' }))
+    return
+  }
+  moneda = d.moneda
+  total = d.valor
+  const chips = el('div', { className: 'barra' },
+    el('span', { className: 'chip' + (d.modo === 'real' ? ' real' : ''), textContent: d.modo === 'real' ? 'REAL · Bitso' : 'Simulada' }),
+    el('span', { className: 'chip', textContent: 'Día ' + d.dia + ' de ' + d.dias }),
+    d.terminado ? el('span', { className: 'chip', textContent: 'Terminada' }) : null,
+    d.pausa ? el('span', { className: 'chip pausa', textContent: 'En pausa: ' + d.pausa }) : null)
+  const cifras = el('div', { className: 'cifras' },
+    cifra('Valor ahora', dinero(d.valor)),
+    cifra('Ganancia', pct(d.ganancia), clase(d.ganancia)),
+    cifra('Se le dio', dinero(d.inicial)),
+    cifra('Efectivo', dinero(d.efectivo)),
+    cifra('Solo guardar BTC', d.solo_btc == null ? '—' : pct(d.solo_btc), clase(d.solo_btc)),
+    cifra('Movimientos', String(d.movimientos.length) + ' en ' + d.rondas + ' rondas'))
+
+  const filasMonedas = d.monedas.map(m => el('tr', {},
+    el('td', { textContent: m.activo }), el('td', { className: 'num', textContent: cripto(m.cantidad) }),
+    el('td', { className: 'num', textContent: dinero(m.precio) }),
+    el('td', { className: 'num ' + clase(m.cambio_24h), textContent: pct(m.cambio_24h) }),
+    el('td', { className: 'num', textContent: dinero(m.valor) }),
+    el('td', {}, el('div', { className: 'parte', title: m.parte + ' %' }, el('i', { style: 'width:' + Math.min(100, m.parte) + '%' })))))
+  filasMonedas.push(el('tr', {}, el('td', { textContent: moneda + ' (efectivo)' }), el('td'), el('td'), el('td'),
+    el('td', { className: 'num', textContent: dinero(d.efectivo) }),
+    el('td', {}, el('div', { className: 'parte' }, el('i', { style: 'width:' + (total ? Math.min(100, d.efectivo / total * 100) : 0) + '%' })))))
+  const monedas = el('div', { className: 'tabla' }, el('table', {},
+    el('thead', {}, el('tr', {}, ...['Moneda', 'Cantidad', 'Precio', '24 h', 'Valor', 'Parte'].map(t => el('th', { textContent: t })))),
+    el('tbody', {}, ...filasMonedas)))
+
+  const movimientos = d.movimientos.length
+    ? el('div', { className: 'tabla' }, el('table', {},
+      el('thead', {}, el('tr', {}, ...['Fecha', 'Acción', 'Moneda', 'Cantidad', 'Precio', 'Monto'].map(t => el('th', { textContent: t })))),
+      el('tbody', {}, ...d.movimientos.map(m => el('tr', {},
+        el('td', { textContent: m.fecha }),
+        el('td', { className: m.accion === 'comprar' ? 'sube' : 'baja', textContent: m.accion === 'comprar' ? 'Compra' : 'Venta' }),
+        el('td', { textContent: m.activo }), el('td', { className: 'num', textContent: cripto(m.cantidad) }),
+        el('td', { className: 'num', textContent: dinero(m.precio) }), el('td', { className: 'num', textContent: dinero(m.monto) }))))))
+    : el('div', { className: 'vacio', textContent: 'Aún no hay compras ni ventas.' })
+
+  caja.replaceChildren(chips, el('div', { className: 'frase', textContent: d.frase }), cifras,
+    el('h2', { textContent: 'Monedas' }), monedas, el('h2', { textContent: 'Movimientos' }), movimientos)
+}
+
+// ---------- En vivo: cada ronda, con el voto y la razón de cada IA, en cuanto pasa ----------
+let visto = 0, lista = []
+const AVISOS = { inicio: 'Empieza la billetera', pausa: 'Pausa', reanuda: 'Se reanuda', fin: 'Termina', 'sin ronda': 'Ronda sin decisión' }
+
+function textoAccion (v) {
+  if (!v || v.error) return 'no respondió'
+  if (v.accion === 'mantener') return 'mantener'
+  return v.accion + ' ' + v.activo + ' ' + v.porcentaje + ' %'
+}
+
+function tarjeta (e, nuevo, abierta) {
+  if (e.tipo !== 'ronda') {
+    return el('div', { className: 'evento' + (nuevo ? ' nuevo' : '') },
+      el('div', {}, el('time', { textContent: e.fecha }), el('span', { className: 'que', textContent: AVISOS[e.tipo] || e.tipo })),
+      el('div', { className: 'aviso', textContent: e.texto || '' }))
+  }
+  const op = e.operacion
+  const d = e.decision || {}
+  let que = op ? (op.accion === 'comprar' ? 'Compró ' : 'Vendió ') + op.activo + ' por ' + dinero(op.monto)
+    : 'Mantener' + (d.bloqueo ? ' (se quería ' + d.accion + ' ' + d.activo + ', pero ' + d.bloqueo + ')' : '')
+  const votos = (e.votos || []).length
+  que += ' · ' + (d.votos || 0) + ' de ' + votos + ' votos'
+  const precios = Object.entries(e.precios || {}).map(([s, p]) => s + ' ' + dinero(p.precio)).join(' · ')
+  return el('div', { className: 'evento' + (nuevo ? ' nuevo' : '') },
+    el('div', {}, el('time', { textContent: e.fecha }),
+      el('span', { className: 'que' + (op ? (op.accion === 'comprar' ? ' compra' : ' venta') : ''), textContent: que }),
+      el('span', { className: 'valor', textContent: 'Cartera ' + dinero(e.valor) })),
+    el('details', { open: nuevo || abierta },
+      el('summary', { textContent: 'Qué votó cada IA · ' + precios }),
+      ...(e.votos || []).map(v => el('div', { className: 'voto' },
+        el('b', { textContent: v.modelo }), el('span', { className: 'accion', textContent: textoAccion(v) }),
+        el('p', { textContent: v.razon || v.error || '' })))))
+}
+
+async function leerEventos () {
+  try {
+    const d = await pedir('/api/billetera/eventos?desde=' + visto)
+    if (d.total < visto) { visto = 0; lista = []; return leerEventos() }      // empezó una billetera nueva
+    const nuevos = d.eventos
+    visto = d.total
+    if (nuevos.length) {
+      if (nuevos.some(e => e.moneda)) moneda = nuevos.find(e => e.moneda).moneda
+      lista = lista.concat(nuevos).slice(-300)
+      const caja = $('eventos')
+      // La ronda más reciente se ve abierta, con el voto de cada IA.
+      caja.replaceChildren(...lista.slice().reverse().map((e, i) => tarjeta(e, !primeraCarga && nuevos.includes(e), i === 0)))
+    } else if (!lista.length) {
+      $('eventos').replaceChildren(el('div', { className: 'vacio', textContent:
+        'Todavía no hay movimientos. Cada ronda (cada 4 horas) aparece aquí en cuanto pasa.' }))
+    }
+    primeraCarga = false
+    $('estado-vivo').textContent = 'En vivo · revisado a las ' + new Date().toLocaleTimeString('es-MX')
+  } catch (e) {
+    $('estado-vivo').textContent = e.message
+  }
+}
+
+function mostrar (cual) {
+  vivoActivo = cual === 'vivo'
+  $('resumen').hidden = vivoActivo
+  $('vivo').hidden = !vivoActivo
+  $('tab-resumen').classList.toggle('activo', !vivoActivo)
+  $('tab-vivo').classList.toggle('activo', vivoActivo)
+  clearInterval(temporizador)
+  if (vivoActivo) { leerEventos(); temporizador = setInterval(leerEventos, 5000) }
+}
+
+$('hacer').onclick = hacerResumen
+$('tab-resumen').onclick = () => mostrar('resumen')
+$('tab-vivo').onclick = () => mostrar('vivo')
+// La moneda viene del resumen; se pide una vez al abrir para que el panel en vivo la sepa.
+hacerResumen()
+</script>
+</body>
+</html>
