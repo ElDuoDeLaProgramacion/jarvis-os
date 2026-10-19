@@ -112,6 +112,7 @@ class BitsoFalso:
         m = types.ModuleType("bitso")
         m.configurado = lambda: True
         m.libros = lambda: set(self.libros)
+        m.ultimo = lambda libro: self.DOLAR
         m.saldos = lambda: dict(self.saldo)
         m.comprar = self.comprar
         m.vender = self.vender
@@ -223,9 +224,11 @@ class PuenteDolares(unittest.TestCase):
         Real.setUp(self)
         self.bitso = BitsoFalso(35000.0, ("usd_cop", "usdt_cop", "btc_usd", "eth_usd", "sol_usd", "btc_mxn"))
         sys.modules["bitso"] = self.bitso.modulo()
-        billetera.precios = lambda activos, moneda="USD": (
-            {s: dict(d, precio=d["precio"] * BitsoFalso.DOLAR) for s, d in PRECIOS.items()} if moneda == "COP"
-            else PRECIOS)
+        def precios(activos, moneda="USD"):
+            if moneda != "USD":
+                raise RuntimeError("HTTP Error 400: Bad Request")    # CoinGecko no tiene COP
+            return PRECIOS
+        billetera.precios = precios
 
     tearDown = Real.tearDown
     iniciar = Real.iniciar
