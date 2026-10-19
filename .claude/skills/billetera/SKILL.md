@@ -13,7 +13,7 @@ Dos modos:
 | Pedido | Comando |
 |---|---|
 | "empieza el experimento" (simulado) | `python3 scripts/billetera.py iniciar` |
-| "empieza con dinero real", "arranca la billetera real" | primero `python3 scripts/billetera.py iniciar --modo real` **sin** `--confirmo`: imprime el monto exacto. Díselo a David ("la cuenta tiene X pesos, ¿arranco con eso?"). Solo cuando él diga que sí, corre otra vez con `--confirmo "<monto exacto> MXN"` |
+| "empieza con dinero real", "arranca la billetera real" | primero `python3 scripts/billetera.py iniciar --modo real` **sin** `--confirmo`: imprime el monto exacto. Díselo a David ("la cuenta tiene X pesos, ¿arranco con eso?"). Solo cuando él diga que sí, corre otra vez con `--confirmo "<monto exacto> COP"` (la cuenta es en pesos colombianos) |
 | "cómo va la billetera", "cuánto lleva" | `python3 scripts/billetera.py estado` |
 | "pausa la billetera", "para la billetera" | `python3 scripts/billetera.py pausar` |
 | "reanuda la billetera" | `python3 scripts/billetera.py reanudar` |
