@@ -168,7 +168,7 @@ En `.claude/agents/` hay seis agentes que Orión puede llamar (directamente o co
 
 **IAs externas.** Para que Orión consulte otras IAs, pon en `.env` `GEMINI_API_KEY` (gratis en https://aistudio.google.com/apikey) y/o `OPENROUTER_API_KEY` (https://openrouter.ai/settings/keys: una clave para GPT, Llama, DeepSeek, Mistral, Grok y más; sin saldo usa sus modelos gratis, con límite diario, y con saldo prepago cualquier modelo). Ponlas solo en el `.env` del servidor: el PC (con `JARVIS_SERVIDOR` y `JARVIS_API_TOKEN`) las usa a través de él. Prueba con `python3 scripts/ia_externa.py --todas "hola"`. Para un panel por especialidad: `python3 scripts/ia_externa.py panel --rol auditoria --n 3 "..."` (`--rol` acepta cualquier tema).
 
-**Billetera de Orión.** Todas las IAs deciden cada 4 horas qué comprar o vender (BTC, ETH, SOL), con noticias de cripto del día, el índice de miedo y codicia y el mercado global (`scripts/billetera.py`, habilidad `billetera`, cron en `servidor/rutinas.sh`). Simulada: di "empieza el experimento". Real en Bitso, solo en el servidor:
+**Billetera de Orión.** Todas las IAs deciden cada 2 horas qué comprar o vender (BTC, ETH, SOL), con noticias de cripto del día, el índice de miedo y codicia y el mercado global (`scripts/billetera.py`, habilidad `billetera`, cron en `servidor/rutinas.sh`). Simulada: di "empieza el experimento". Real en Bitso, solo en el servidor:
 1. Crea una cuenta o subcuenta de Bitso solo para Orión y deposita lo que quieras que maneje.
 2. En Bitso, Perfil > API, crea una clave con permiso de **operar** y **sin** permiso de retiro.
 3. En el `.env` del servidor: `BITSO_API_KEY=...`, `BITSO_API_SECRET=...` y `BILLETERA_PORCENTAJE_REAL=100`.

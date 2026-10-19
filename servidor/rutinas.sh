@@ -9,8 +9,8 @@ repo=$(printf '%q' "$(pwd)")
 bloque="# JARVIS rutinas (servidor/rutinas.sh)
 # Cada 15 minutos trae lo nuevo de GitHub (scripts/actualizar.sh), así no hace falta git pull.
 */15 * * * * cd $repo && ./scripts/actualizar.sh
-# Billetera simulada de Orión: una ronda cada 4 horas. Sin experimento iniciado (o en pausa) no hace nada.
-7 */4 * * * cd $repo && mkdir -p logs && python3 scripts/billetera.py ronda >> logs/billetera.log 2>&1
+# Billetera de Orión: una ronda cada 2 horas (máximo 3 operaciones al día). Sin experimento iniciado (o en pausa) no hace nada.
+7 */2 * * * cd $repo && mkdir -p logs && python3 scripts/billetera.py ronda >> logs/billetera.log 2>&1
 # fin JARVIS rutinas"
 { { crontab -l 2>/dev/null || true; } | sed '/^# JARVIS rutinas/,/^# fin JARVIS rutinas/d'; echo "$bloque"; } | crontab -
 echo "$bloque"
