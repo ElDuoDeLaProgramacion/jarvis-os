@@ -45,7 +45,8 @@ class Billetera(unittest.TestCase):
         e = billetera.leer_estado()
         self.assertAlmostEqual(e["efectivo"], 850.0)                       # mediana 15 % de 1000
         self.assertAlmostEqual(e["posiciones"]["BTC"], 150 * 0.995 / 100000)
-        self.assertEqual(len((billetera.CARPETA / "decisiones.jsonl").read_text().splitlines()), 1)
+        lineas = [json.loads(x) for x in (billetera.CARPETA / "decisiones.jsonl").read_text().splitlines()]
+        self.assertEqual([x["tipo"] for x in lineas], ["inicio", "ronda"])
         self.assertIn("ia-1", next((billetera.CARPETA / "diario").glob("*.md")).read_text())
 
     def test_empate_mantiene(self):

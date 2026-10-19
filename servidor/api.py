@@ -384,6 +384,8 @@ class Manejador(BaseHTTPRequestHandler):
         elif url.path == "/app/propuestas":
             # La misma ventana del HUD; pide los datos con el token que la app guardó.
             self._archivo("propuestas.html", HUD_DIR)
+        elif url.path == "/app/billetera":
+            self._archivo("billetera.html", HUD_DIR)
         elif url.path.startswith("/app/vendor/"):
             self._archivo(url.path[12:], HUD_DIR / "vendor")
         elif url.path.startswith("/app/"):
@@ -400,6 +402,16 @@ class Manejador(BaseHTTPRequestHandler):
             if self._autorizado():
                 datos = self.modulo_hud.propuesta(unquote(url.path[16:]))
                 self._json(datos if datos else {"error": "no existe"}, 200 if datos else 404)
+        elif url.path == "/api/billetera/resumen":
+            if self._autorizado():
+                self._json(self.modulo_hud.billetera_resumen())
+        elif url.path == "/api/billetera/eventos":
+            if self._autorizado():
+                try:
+                    desde = int(parse_qs(url.query).get("desde", ["0"])[0])
+                except ValueError:
+                    desde = 0
+                self._json(self.modulo_hud.billetera_eventos(desde))
         elif url.path == "/api/conversacion":
             if self._autorizado():
                 try:

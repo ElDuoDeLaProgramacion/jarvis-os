@@ -220,6 +220,86 @@ def propuestas_lista(limite=40):
     return sorted(_paneles(limite) + _informes(limite * 2), key=lambda x: x["cambio"], reverse=True)
 
 
+# ---------- Billetera de Orión (scripts/billetera.py): la escribe el servidor, llega al PC por Syncthing ----------
+BILLETERA = BOVEDA / "outputs" / "billetera"
+
+
+def _modulo_billetera():
+    if str(RAIZ / "scripts") not in sys.path:
+        sys.path.insert(0, str(RAIZ / "scripts"))
+    import billetera
+    return billetera
+
+
+def billetera_eventos(desde=0, tope=300):
+    """Cada ronda (con el voto de cada IA) y cada aviso (inicio, pausa, fin...) desde la línea `desde`."""
+    f = BILLETERA / "decisiones.jsonl"
+    if not f.exists():
+        return {"eventos": [], "total": 0}
+    lineas = f.read_text(encoding="utf-8", errors="replace").splitlines()
+    desde = max(0, min(desde, len(lineas)))
+    if len(lineas) - desde > tope:
+        desde = len(lineas) - tope
+    eventos = []
+    for i, linea in enumerate(lineas[desde:], desde):
+        try:
+            e = json.loads(linea)
+        except ValueError:
+            continue
+        e.setdefault("tipo", "ronda")
+        e["n"] = i
+        eventos.append(e)
+    return {"eventos": eventos, "total": len(lineas)}
+
+
+def billetera_resumen():
+    """Foto de la cartera ahora: valor, ganancia, monedas y movimientos. Precios en vivo si se puede."""
+    f = BILLETERA / "estado.json"
+    if not f.exists():
+        return {"activa": False}
+    estado = json.loads(f.read_text(encoding="utf-8"))
+    moneda = estado.get("moneda", "USD")
+    precios, en_vivo = None, False
+    try:
+        b = _modulo_billetera()
+        precios, en_vivo = b.precios(b.ajustes()["activos"], moneda), True
+    except Exception:  # sin internet o sin CoinGecko: los precios de la última ronda
+        for e in reversed(billetera_eventos(0)["eventos"]):
+            if e.get("precios"):
+                precios = e["precios"]
+                break
+    if not precios:
+        precios = {s: {"precio": v, "cambio_24h": 0, "cambio_7d": 0} for s, v in estado.get("precios_inicio", {}).items()}
+    monedas = []
+    for s, c in estado["posiciones"].items():
+        if c > 0 and s in precios:
+            monedas.append({"activo": s, "cantidad": c, "precio": precios[s]["precio"],
+                            "valor": round(c * precios[s]["precio"], 2), "cambio_24h": precios[s].get("cambio_24h", 0)})
+    total = estado["efectivo"] + sum(m["valor"] for m in monedas)
+    for m in monedas:
+        m["parte"] = round(m["valor"] / total * 100, 1) if total else 0
+    inicial = estado["saldo_inicial"] or 0
+    movimientos = [{"fecha": h["fecha"], **h["operacion"]} for h in estado["historial"] if h.get("operacion")]
+    base = estado.get("precios_inicio", {}).get("BTC")
+    solo_btc = round((precios["BTC"]["precio"] / base - 1) * 100, 2) if base and "BTC" in precios else None
+    ganancia = round((total / inicial - 1) * 100, 2) if inicial else 0
+    dia = min(int((time.time() - estado["inicio"]) // 86400) + 1, estado["dias"])
+    pausa = BILLETERA / "PAUSA"
+    motivo = pausa.read_text(encoding="utf-8").split(" ", 2)[-1] if pausa.exists() else None
+    compras = sum(1 for m in movimientos if m["accion"] == "comprar")
+    frase = (f"Día {dia} de {estado['dias']}. La cartera vale {total:,.2f} {moneda}, "
+             f"{'gana' if ganancia >= 0 else 'pierde'} {abs(ganancia):.2f} % sobre lo que se le dio"
+             + (f" (guardar solo BTC habría dado {solo_btc:+.2f} %)" if solo_btc is not None else "") + ". "
+             f"Lleva {len(estado['historial'])} rondas y {len(movimientos)} movimientos "
+             f"({compras} compras, {len(movimientos) - compras} ventas).")
+    return {"activa": True, "modo": estado["modo"], "moneda": moneda, "dia": dia, "dias": estado["dias"],
+            "terminado": bool(estado.get("terminado")), "pausa": motivo, "valor": round(total, 2),
+            "inicial": round(inicial, 2), "ganancia": ganancia, "solo_btc": solo_btc,
+            "efectivo": round(estado["efectivo"], 2), "tope": estado.get("tope"), "monedas": monedas,
+            "movimientos": movimientos[::-1][:100], "rondas": len(estado["historial"]),
+            "precios": precios, "precios_en_vivo": en_vivo, "frase": frase, "hecho": time.strftime("%H:%M:%S")}
+
+
 def informe(rel):
     destino = (SALIDAS / rel).resolve()
     if SALIDAS.resolve() not in destino.parents or destino.suffix not in (".md", ".html") \
@@ -548,7 +628,7 @@ class Manejador(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         paginas = {"/": "index.html", "/index.html": "index.html", "/lienzo": "lienzo.html",
-                   "/propuestas": "propuestas.html"}
+                   "/propuestas": "propuestas.html", "/billetera": "billetera.html"}
         if url.path in paginas:
             self._archivo(HUD / paginas[url.path])
         elif url.path.startswith("/vendor/") and archivo_vendor(url.path[8:]):
@@ -558,6 +638,14 @@ class Manejador(BaseHTTPRequestHandler):
         elif url.path.startswith("/api/propuestas/"):
             datos = propuesta(unquote(url.path[16:]))
             self._json(datos if datos else {"error": "no existe"}, 200 if datos else 404)
+        elif url.path == "/api/billetera/resumen":
+            self._json(billetera_resumen())
+        elif url.path == "/api/billetera/eventos":
+            try:
+                desde = int(parse_qs(url.query).get("desde", ["0"])[0])
+            except ValueError:
+                desde = 0
+            self._json(billetera_eventos(desde))
         elif url.path == "/api/estado":
             self._json(estado_completo())
         elif url.path == "/api/voz":

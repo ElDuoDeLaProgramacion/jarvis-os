@@ -79,8 +79,15 @@ def pausada():
     return (CARPETA / "PAUSA").exists()
 
 
-def diario(texto, cuando=None):
+def diario(texto, cuando=None, evento=None):
+    """Añade al diario legible. Con `evento`, lo anota también en decisiones.jsonl para el panel en vivo."""
     cuando = cuando or time.localtime()
+    if evento:
+        CARPETA.mkdir(parents=True, exist_ok=True)
+        cuerpo = texto.split("\n", 1)[1] if texto.startswith("## ") and "\n" in texto else texto
+        with (CARPETA / "decisiones.jsonl").open("a", encoding="utf-8") as h:
+            h.write(json.dumps({"fecha": time.strftime("%Y-%m-%d %H:%M", cuando), "tipo": evento,
+                                "texto": cuerpo.strip()}, ensure_ascii=False) + "\n")
     carpeta = CARPETA / "diario"
     carpeta.mkdir(parents=True, exist_ok=True)
     f = carpeta / time.strftime("%Y-%m-%d.md", cuando)
@@ -352,19 +359,19 @@ def ronda(_args):
         if estado["modo"] == "real":
             ajustar_tope(estado, p)
     except RuntimeError as e:
-        diario(f"## {time.strftime('%H:%M')} · sin ronda\n{e}")
+        diario(f"## {time.strftime('%H:%M')} · sin ronda\n{e}", evento="sin ronda")
         print(e)
         return 1
     try:
         resultados = votar(estado, p, aj)
     except RuntimeError as e:
-        diario(f"## {time.strftime('%H:%M')} · sin ronda\nNo hubo IAs para votar: {e}")
+        diario(f"## {time.strftime('%H:%M')} · sin ronda\nNo hubo IAs para votar: {e}", evento="sin ronda")
         print(e)
         return 1
     votos = [v for _, v, _ in resultados if v]
     if not votos:
         diario(f"## {time.strftime('%H:%M')} · sin ronda\nNinguna IA respondió: "
-               + "; ".join(f"{m}: {t[:120]}" for m, _, t in resultados))
+               + "; ".join(f"{m}: {t[:120]}" for m, _, t in resultados), evento="sin ronda")
         return 1
     decision = decidir(votos)
     try:
@@ -389,7 +396,7 @@ def ronda(_args):
                      f"{aj['perdida_max']:g} % por debajo de lo que se le dio")
 
     with (CARPETA / "decisiones.jsonl").open("a", encoding="utf-8") as h:
-        h.write(json.dumps({"fecha": fecha, "precios": p, "decision": decision, "operacion": operacion,
+        h.write(json.dumps({"fecha": fecha, "tipo": "ronda", "precios": p, "decision": decision, "operacion": operacion,
                             "valor": round(total, 2),
                             "votos": [{"modelo": m, **(v or {"error": t[:300]})} for m, v, t in resultados]},
                            ensure_ascii=False) + "\n")
@@ -460,7 +467,7 @@ def iniciar(args):
     diario(f"## Empieza el experimento\nCartera {'REAL en Bitso' if args.modo == 'real' else 'simulada'} de "
            f"{saldo:.2f} {moneda} durante {args.dias} días. "
            f"Activos: {', '.join(aj['activos'])}. Tope {aj['tope']:g} % por operación, "
-           f"{aj['max_operaciones']} operaciones al día, comisión {aj['comision'] * 100:g} %.")
+           f"{aj['max_operaciones']} operaciones al día, comisión {aj['comision'] * 100:g} %.", evento="inicio")
     print(f"Listo: {saldo:.2f} {moneda} {'reales en Bitso' if args.modo == 'real' else 'simulados'} durante "
           f"{args.dias} días. La primera ronda la hace el cron.")
     return 0
@@ -514,14 +521,14 @@ def estado_cmd(_args):
 def pausar(_args, motivo="David pausó la billetera."):
     CARPETA.mkdir(parents=True, exist_ok=True)
     (CARPETA / "PAUSA").write_text(f"{time.strftime('%Y-%m-%d %H:%M')} {motivo}", encoding="utf-8")
-    diario(f"## {time.strftime('%H:%M')} · pausa\n{motivo}")
+    diario(f"## {time.strftime('%H:%M')} · pausa\n{motivo}", evento="pausa")
     print(f"Billetera en pausa ({motivo}). No decide nada hasta que digas reanudar.")
     return 0
 
 
 def reanudar(_args):
     (CARPETA / "PAUSA").unlink(missing_ok=True)
-    diario(f"## {time.strftime('%H:%M')} · reanuda\nDavid reanudó la billetera.")
+    diario(f"## {time.strftime('%H:%M')} · reanuda\nDavid reanudó la billetera.", evento="reanuda")
     print("Billetera reanudada.")
     return 0
 
@@ -543,7 +550,7 @@ def terminar(_args):
     informe.write_text(f"---\nfecha: {time.strftime('%Y-%m-%d')}\ntipo: billetera\ntags: [billetera, informe]\n---\n"
                        f"# Informe final de la billetera de Orión\n\n{texto}\n\nEl detalle de cada voto está en "
                        f"decisiones.jsonl y en diario/.\n", encoding="utf-8")
-    diario(f"## Termina el experimento\n{texto}")
+    diario(f"## Termina el experimento\n{texto}", evento="fin")
     print(texto)
     return 0
 

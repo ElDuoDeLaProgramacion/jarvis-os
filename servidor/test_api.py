@@ -211,6 +211,33 @@ class PruebaApi(Base):
         with self.assertRaises(urllib.error.HTTPError):
             urllib.request.urlopen(self.base + "/app/vendor/..%2Fservidor.py")
 
+    def test_billetera(self):
+        h = api.Manejador.modulo_hud
+        h.BILLETERA = self.dir / "billetera"
+        self.assertEqual(self.pedir("/api/billetera/resumen")[1], {"activa": False})
+        self.assertEqual(self.pedir("/api/billetera/eventos")[1], {"eventos": [], "total": 0})
+        h.BILLETERA.mkdir()
+        (h.BILLETERA / "estado.json").write_text(json.dumps({
+            "modo": "real", "moneda": "MXN", "inicio": time.time(), "dias": 14, "saldo_inicial": 1000,
+            "efectivo": 500, "posiciones": {"BTC": 0.0005}, "precios_inicio": {"BTC": 1000000},
+            "historial": [{"fecha": "2026-10-19 12:00", "resumen": "comprar BTC", "valor": 1000,
+                           "operacion": {"accion": "comprar", "activo": "BTC", "cantidad": 0.0005,
+                                         "precio": 1000000, "monto": 500}}]}))
+        (h.BILLETERA / "decisiones.jsonl").write_text(
+            json.dumps({"fecha": "2026-10-19 11:00", "tipo": "inicio", "texto": "empieza"}) + "\n"
+            + json.dumps({"fecha": "2026-10-19 12:00", "precios": {"BTC": {"precio": 1100000}}, "votos": []}) + "\n")
+        h._modulo_billetera = lambda: (_ for _ in ()).throw(RuntimeError("sin internet"))
+        _, d = self.pedir("/api/billetera/resumen")
+        self.assertEqual((d["valor"], d["ganancia"], d["solo_btc"]), (1050.0, 5.0, 10.0))
+        self.assertEqual(len(d["movimientos"]), 1)
+        _, d = self.pedir("/api/billetera/eventos?desde=1")
+        self.assertEqual([(e["n"], e["tipo"]) for e in d["eventos"]], [(1, "ronda")])
+        with self.assertRaises(urllib.error.HTTPError) as e:
+            self.pedir("/api/billetera/eventos", token="otro")
+        self.assertEqual(e.exception.code, 401)
+        with urllib.request.urlopen(self.base + "/app/billetera") as r:
+            self.assertIn(b"BILLETERA", r.read())
+
     def test_el_pc_usa_las_ias_del_servidor(self):
         """El PC no tiene claves: ia_externa.py pasa por /api/ia y el servidor llama con las suyas."""
         import types

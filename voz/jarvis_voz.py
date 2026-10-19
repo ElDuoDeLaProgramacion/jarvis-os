@@ -308,6 +308,7 @@ MUSICA = "(la )?(musica|cancion|tema|spotify|rola)"
 HUD_WEB = "http://localhost:7777/"
 LIENZO = HUD_WEB + "lienzo"
 PROPUESTAS = HUD_WEB + "propuestas"
+BILLETERA = HUD_WEB + "billetera"
 ABRIBLES = {
     "spotify": "spotify:", "chrome": "chrome.exe", "google chrome": "chrome.exe", "edge": "msedge.exe",
     "firefox": "firefox.exe", "brave": "brave.exe", "word": "winword.exe", "excel": "excel.exe",
@@ -323,6 +324,9 @@ ABRIBLES = {
     "propuestas": PROPUESTAS, "las propuestas": PROPUESTAS, "la ventana de propuestas": PROPUESTAS,
     "las propuestas de las ias": PROPUESTAS, "lo que propusieron las ias": PROPUESTAS, "panel de ias": PROPUESTAS,
     "el panel de ias": PROPUESTAS,
+    # Ventana de la billetera (hud/billetera.html): resumen y movimientos en vivo.
+    "billetera": BILLETERA, "la billetera": BILLETERA, "el panel de la billetera": BILLETERA,
+    "la ventana de la billetera": BILLETERA, "mi billetera": BILLETERA,
 }
 
 
@@ -421,6 +425,8 @@ def ejecutar_musica(tipo, objetivo, veces):
                 os.startfile(objetivo)
             if objetivo == LIENZO:
                 return "Abro el lienzo 3D. Pellizca con la mano derecha para dibujar."
+            if objetivo == BILLETERA:
+                return "Abro la billetera."
             return "Abro las propuestas de las IAs."
         try:
             os.startfile(objetivo)
