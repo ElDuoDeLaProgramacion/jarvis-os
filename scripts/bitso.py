@@ -10,6 +10,7 @@ no puede salir de la cuenta. Solo usa la biblioteca estándar.
 import hashlib
 import hmac
 import json
+import math
 import os
 import time
 import urllib.error
@@ -64,8 +65,13 @@ def saldos():
     return {b["currency"].lower(): float(b["available"]) for b in pedir("GET", "/v3/balance/")["balances"]}
 
 
+def _cifra(monto, decimales):
+    """Redondea hacia abajo: nunca pide más de lo que hay en la cuenta."""
+    return f"{math.floor(monto * 10 ** decimales) / 10 ** decimales:.{decimales}f}"
+
+
 def _orden(libro, lado, campo, monto):
-    oid = pedir("POST", "/v3/orders/", {"book": libro, "side": lado, "type": "market", campo: f"{monto:.8f}"})["oid"]
+    oid = pedir("POST", "/v3/orders/", {"book": libro, "side": lado, "type": "market", campo: _cifra(monto, 2 if campo == "minor" else 8)})["oid"]
     # Una orden de mercado se llena casi al instante; se suman sus operaciones para saber cuánto fue de verdad.
     for _ in range(5):
         time.sleep(1)

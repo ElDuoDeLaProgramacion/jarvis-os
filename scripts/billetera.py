@@ -297,6 +297,15 @@ def ajustar_tope(estado, p):
     lo recibe como efectivo; si la cuenta tiene menos que lo que Orión cree tener, se ajusta a la realidad."""
     import bitso
     saldos = bitso.saldos()
+    if estado.get("puente") and estado["porcentaje"] >= 100:
+        cuenta = estado["puente"].split("_")[1]
+        if saldos.get(cuenta, 0) >= float(os.environ.get("BILLETERA_MINIMO_PUENTE", "10000")):
+            try:
+                cambiar_a_dolares(estado["puente"], saldos[cuenta])
+                diario(f"David depositó {saldos[cuenta]:.2f} {cuenta.upper()}; Orión los cambió a dólares.")
+            except RuntimeError as e:
+                diario(f"No pude cambiar el depósito en {cuenta.upper()} a dólares: {e}")
+            saldos = bitso.saldos()
     tope = valor_cuenta(saldos, p, mon(estado)) * estado["porcentaje"] / 100
     for s in estado["posiciones"]:          # nunca cree tener más cripto de la que hay
         estado["posiciones"][s] = min(estado["posiciones"][s], saldos.get(s.lower(), 0))
@@ -309,11 +318,18 @@ def ajustar_tope(estado, p):
     estado["tope"] = round(tope, 2)
 
 
+def cambiar_a_dolares(puente, monto):
+    """Compra dólares con los pesos en el libro usd_cop. Devuelve los USD que quedaron de verdad."""
+    import bitso
+    o = bitso.comprar(puente, monto)
+    return round(o["mayor"] - (o["comision"] if o["moneda_comision"] == "usd" else 0), 2)
+
+
 def comprar_real(estado, s, gastar):
     """Compra en Bitso sin pasar del efectivo de Orión ni de lo que de verdad hay disponible."""
     import bitso
     gastar = min(gastar, estado["efectivo"], bitso.saldos().get(mon(estado).lower(), 0))
-    if gastar < 10:
+    if gastar < float(os.environ.get("BILLETERA_MINIMO", "1")):
         raise RuntimeError(f"no hay suficiente {mon(estado)} disponible")
     o = bitso.comprar(libro(estado, s), gastar)
     recibido = o["mayor"] - (o["comision"] if o["moneda_comision"] == s.lower() else 0)
@@ -451,7 +467,7 @@ def iniciar(args):
         print("Ya hay un experimento en marcha. Usa 'terminar' antes de empezar otro.")
         return 1
     aj = ajustes()
-    saldo, moneda, porcentaje = args.saldo, "USD", None
+    saldo, moneda, porcentaje, puente = args.saldo, "USD", None, None
     if args.modo == "real":
         moneda = args.moneda.upper()
         import bitso
@@ -460,15 +476,31 @@ def iniciar(args):
         except RuntimeError as e:
             print(e)
             return 2
-        aj["activos"] = {s: i for s, i in aj["activos"].items() if f"{s.lower()}_{moneda.lower()}" in abiertos}
+        cuenta = moneda
+        directos = {s: i for s, i in aj["activos"].items() if f"{s.lower()}_{moneda.lower()}" in abiertos}
+        puente = f"usd_{moneda.lower()}"
+        if not directos and puente in abiertos:
+            # En Colombia Bitso solo cambia pesos por dólares: Orión pasa los pesos a USD y opera en btc_usd.
+            directos = {s: i for s, i in aj["activos"].items() if f"{s.lower()}_usd" in abiertos}
+            moneda = "USD"
+        else:
+            puente = None
+        aj["activos"] = directos
         if not aj["activos"]:
-            print(f"Bitso no tiene libros en {moneda} para {', '.join(ajustes()['activos'])}.")
+            print(f"Bitso no tiene libros en {cuenta} para {', '.join(ajustes()['activos'])}.")
             return 2
-        p = precios(aj["activos"], moneda)
-        saldo, porcentaje, error = permiso_real(args, p, moneda)
+        p = precios(aj["activos"], cuenta)
+        saldo, porcentaje, error = permiso_real(args, p, cuenta)
         if error:
             print(error)
             return 2
+        if puente:
+            try:
+                saldo = cambiar_a_dolares(puente, saldo)
+            except RuntimeError as e:
+                print(f"No pude cambiar los {cuenta} a dólares en Bitso: {e}")
+                return 2
+            p = precios(aj["activos"], moneda)
     else:
         p = precios(aj["activos"], moneda)
     ahora = time.time()
@@ -476,6 +508,7 @@ def iniciar(args):
               "fin": ahora + args.dias * 86400, "dias": args.dias,
               "saldo_inicial": saldo, "efectivo": saldo, "posiciones": {s: 0 for s in aj["activos"]},
               "activos": list(aj["activos"]),
+              "puente": puente if args.modo == "real" else None,
               "precios_inicio": {s: d["precio"] for s, d in p.items()}, "historial": []}
     if CARPETA.exists() and (CARPETA / "estado.json").exists():
         # El experimento anterior se guarda aparte para no mezclar diarios.
@@ -485,6 +518,7 @@ def iniciar(args):
     (CARPETA / "PAUSA").unlink(missing_ok=True)
     diario(f"## Empieza el experimento\nCartera {'REAL en Bitso' if args.modo == 'real' else 'simulada'} de "
            f"{saldo:.2f} {moneda} durante {args.dias} días. "
+           f"{f'Los pesos se cambiaron a dólares en {puente}. ' if puente else ''}"
            f"Activos: {', '.join(aj['activos'])}. Tope {aj['tope']:g} % por operación, "
            f"{aj['max_operaciones']} operaciones al día, comisión {aj['comision'] * 100:g} %.", evento="inicio")
     print(f"Listo: {saldo:.2f} {moneda} {'reales en Bitso' if args.modo == 'real' else 'simulados'} durante "
