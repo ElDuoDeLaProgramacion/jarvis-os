@@ -13,7 +13,7 @@ Dos modos:
 | Pedido | Comando |
 |---|---|
 | "empieza el experimento" (simulado) | `python3 scripts/billetera.py iniciar` |
-| "empieza con dinero real", "arranca la billetera real" | primero `python3 scripts/billetera.py iniciar --modo real` **sin** `--confirmo`: imprime el monto exacto. Díselo a David ("la cuenta tiene X pesos, ¿arranco con eso?"). Solo cuando él diga que sí, corre otra vez con `--confirmo "<monto exacto> COP"` (la cuenta es en pesos colombianos) |
+| "empieza con dinero real", "arranca la billetera real" | primero `python3 scripts/billetera.py iniciar --modo real` **sin** `--confirmo`: imprime el monto exacto. Díselo a David ("la cuenta tiene X pesos, ¿arranco con eso?"). Solo cuando él diga que sí, corre otra vez con `--confirmo "<monto exacto> COP"` (la cuenta es en pesos colombianos). Como Bitso en Colombia no vende cripto por pesos, al arrancar cambia los pesos a dólares (libro usd_cop) y opera en BTC/USD, ETH/USD y SOL/USD; si David deposita más pesos, los cambia solo |
 | "cómo va la billetera", "cuánto lleva" | `python3 scripts/billetera.py estado` |
 | "pausa la billetera", "para la billetera" | `python3 scripts/billetera.py pausar` |
 | "reanuda la billetera" | `python3 scripts/billetera.py reanudar` |

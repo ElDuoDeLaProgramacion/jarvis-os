@@ -101,34 +101,40 @@ class Billetera(unittest.TestCase):
 
 class BitsoFalso:
     """Una cuenta de Bitso en memoria: compra y vende al precio de PRECIOS con 0,5 % de comisión."""
-    def __init__(self, cop):
-        self.saldo = {"cop": cop, "btc": 0.0, "eth": 0.0, "sol": 0.0}
+    DOLAR = 4000.0                                     # un dólar en pesos, para el libro usd_cop
+
+    def __init__(self, cop, libros=("btc_cop", "eth_cop", "usd_cop")):   # SOL no tiene libro en COP
+        self.saldo = {"cop": cop, "usd": 0.0, "btc": 0.0, "eth": 0.0, "sol": 0.0}
+        self.libros = set(libros)
         self.ordenes = []
 
     def modulo(self):
         m = types.ModuleType("bitso")
         m.configurado = lambda: True
-        m.libros = lambda: {"btc_cop", "eth_cop", "usd_cop"}        # SOL no tiene libro en COP
+        m.libros = lambda: set(self.libros)
         m.saldos = lambda: dict(self.saldo)
         m.comprar = self.comprar
         m.vender = self.vender
         return m
 
+    def precio(self, s):
+        return self.DOLAR if s == "usd" else PRECIOS[s.upper()]["precio"]
+
     def comprar(self, libro, gastar):
-        s = libro.split("_")[0]
-        cantidad = gastar / PRECIOS[s.upper()]["precio"]
-        self.saldo["cop"] -= gastar
+        s, m = libro.split("_")
+        cantidad = gastar / self.precio(s)
+        self.saldo[m] -= gastar
         self.saldo[s] += cantidad * 0.995
         self.ordenes.append(("buy", libro, gastar))
         return {"oid": "1", "mayor": cantidad, "menor": gastar, "comision": cantidad * 0.005, "moneda_comision": s}
 
     def vender(self, libro, cantidad):
-        s = libro.split("_")[0]
-        cobro = cantidad * PRECIOS[s.upper()]["precio"]
+        s, m = libro.split("_")
+        cobro = cantidad * self.precio(s)
         self.saldo[s] -= cantidad
-        self.saldo["cop"] += cobro * 0.995
+        self.saldo[m] += cobro * 0.995
         self.ordenes.append(("sell", libro, cantidad))
-        return {"oid": "2", "mayor": cantidad, "menor": cobro, "comision": cobro * 0.005, "moneda_comision": "cop"}
+        return {"oid": "2", "mayor": cantidad, "menor": cobro, "comision": cobro * 0.005, "moneda_comision": m}
 
 
 class Real(unittest.TestCase):
@@ -209,6 +215,43 @@ class Real(unittest.TestCase):
         e = billetera.leer_estado()
         self.assertEqual(e["efectivo"], 2000.0)
         self.assertIn("Bitso falló", e["historial"][-1]["resumen"])
+
+
+class PuenteDolares(unittest.TestCase):
+    """La cuenta de David en Colombia: solo hay usd_cop, y las criptos se compran en dólares."""
+    def setUp(self):
+        Real.setUp(self)
+        self.bitso = BitsoFalso(35000.0, ("usd_cop", "usdt_cop", "btc_usd", "eth_usd", "sol_usd", "btc_mxn"))
+        sys.modules["bitso"] = self.bitso.modulo()
+        billetera.precios = lambda activos, moneda="USD": (
+            {s: dict(d, precio=d["precio"] * BitsoFalso.DOLAR) for s, d in PRECIOS.items()} if moneda == "COP"
+            else PRECIOS)
+
+    tearDown = Real.tearDown
+    iniciar = Real.iniciar
+
+    def test_cambia_los_pesos_a_dolares_y_opera_en_usd(self):
+        self.assertEqual(self.iniciar(), 2)            # el monto se confirma en pesos
+        self.assertEqual(self.bitso.ordenes, [])
+        self.assertEqual(self.iniciar("35000.00 COP"), 0)
+        e = billetera.leer_estado()
+        self.assertEqual(self.bitso.ordenes, [("buy", "usd_cop", 35000.0)])
+        self.assertEqual((e["moneda"], e["puente"], e["activos"]), ("USD", "usd_cop", ["BTC", "ETH", "SOL"]))
+        self.assertAlmostEqual(e["efectivo"], 8.71, places=2)      # 35000 / 4000 menos 0,5 %
+        self.votos = ['{"accion":"comprar","activo":"SOL","porcentaje":20}']
+        billetera.ronda(None)
+        self.assertEqual(self.bitso.ordenes[-1][:2], ("buy", "sol_usd"))
+        self.assertAlmostEqual(billetera.leer_estado()["posiciones"]["SOL"], self.bitso.saldo["sol"])
+
+    def test_deposito_en_pesos_se_cambia_a_dolares(self):
+        self.iniciar("35000.00 COP")
+        self.bitso.saldo["cop"] += 40000
+        self.votos = ['{"accion":"mantener"}']
+        billetera.ronda(None)
+        e = billetera.leer_estado()
+        self.assertEqual(self.bitso.ordenes[-1], ("buy", "usd_cop", 40000.0))
+        self.assertAlmostEqual(e["efectivo"], 8.71 + 9.95, places=1)
+        self.assertFalse(billetera.pausada())
 
 
 if __name__ == "__main__":
