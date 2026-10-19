@@ -4,7 +4,7 @@ description: La billetera de Orión, donde todas las IAs deciden solas qué comp
 ---
 # Billetera de Orión
 
-Script: `python3 scripts/billetera.py`. Corre solo en el servidor; el cron hace una ronda cada 4 horas (`servidor/rutinas.sh`). En cada ronda todas las IAs disponibles reciben los precios, la cartera y el contexto de mercado de internet (noticias de cripto de hoy, índice de miedo y codicia, mercado global), votan una acción en JSON con su razón y gana la mayoría (empate = mantener).
+Script: `python3 scripts/billetera.py`. Corre solo en el servidor; el cron hace una ronda cada 2 horas (`servidor/rutinas.sh`). En cada ronda todas las IAs disponibles reciben los precios, la cartera y el contexto de mercado de internet (noticias de cripto de hoy, índice de miedo y codicia, mercado global), votan una acción en JSON con su razón y gana la mayoría (empate = mantener).
 
 Dos modos:
 - **simulado**: 1000 USD de mentira.

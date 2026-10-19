@@ -240,7 +240,7 @@ async function leerEventos () {
       caja.replaceChildren(...lista.slice().reverse().map((e, i) => tarjeta(e, !primeraCarga && nuevos.includes(e), i === 0)))
     } else if (!lista.length) {
       $('eventos').replaceChildren(el('div', { className: 'vacio', textContent:
-        'Todavía no hay movimientos. Cada ronda (cada 4 horas) aparece aquí en cuanto pasa.' }))
+        'Todavía no hay movimientos. Cada ronda (cada 2 horas) aparece aquí en cuanto pasa.' }))
     }
     primeraCarga = false
     $('estado-vivo').textContent = 'En vivo · revisado a las ' + new Date().toLocaleTimeString('es-MX')
