@@ -27,6 +27,7 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | WhatsApp, chats, "qué me escribieron", "qué dijo X", "respóndele a X por WhatsApp" | `whatsapp` |
 | seguridad, auditoría, pruebas de seguridad, puertos abiertos, vulnerabilidades, certificados, "prueba la seguridad del servidor" | `seguridad` |
 | suscripciones, cobros recurrentes, renovaciones, pruebas gratis, "cuánto pago al mes", cancelar un servicio | `suscripciones` |
+| billetera, cripto, Bitso, "cómo va la billetera", pausar o reanudar la billetera, el experimento de inversión de las IAs | `billetera` |
 | analizar archivos, PDFs, enlaces, videos o texto ("analiza las fuentes de...") | `analizar` |
 | recordar, guardar, "¿qué sé de...?", "¿qué decidí...?", limpieza de bóveda | `boveda` |
 | cerrar el día, reflexión, diario | `cierre-dia` |
