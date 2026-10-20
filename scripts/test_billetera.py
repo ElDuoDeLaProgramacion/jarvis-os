@@ -41,6 +41,32 @@ class Billetera(unittest.TestCase):
         billetera.ronda(None)
         self.assertLess(billetera.leer_estado()["efectivo"], 1000.0)
 
+    def test_vigilante_convoca_ronda_de_emergencia(self):
+        self.votos = ['{"accion":"mantener"}']
+        billetera.ronda(None)
+        e = billetera.leer_estado()
+        e["ultima_ronda"]["hora"] -= 3600
+        billetera.guardar_estado(e)
+        self.assertEqual(billetera.vigilar(None), 0)               # nada se movió: no hay ronda
+        self.assertEqual(len(billetera.leer_estado()["historial"]), 1)
+        movido = dict(PRECIOS, SOL=dict(PRECIOS["SOL"], precio=180.0))   # SOL bajó 10 %
+        billetera.precios = lambda activos, moneda="USD": movido
+        preguntas = []
+        billetera.votar = lambda estado, p, aj: preguntas.append(billetera.pregunta_de(estado, p, aj)) or [
+            ("ia-0", billetera.leer_voto('{"accion":"mantener"}', aj["activos"], aj["tope"]), "")]
+        billetera.vigilar(None)
+        h = billetera.leer_estado()["historial"]
+        self.assertEqual(len(h), 2)
+        self.assertIn("SOL bajó 10.0 %", h[-1]["emergencia"])
+        self.assertIn("RONDA DE EMERGENCIA", preguntas[0])
+        billetera.vigilar(None)                                    # recién votaron: no repite
+        self.assertEqual(len(billetera.leer_estado()["historial"]), 2)
+
+    def test_voto_por_moneda_sin_precio_no_opera(self):
+        self.votos = ['{"accion":"comprar","activo":"XRP","porcentaje":10}']   # CoinGecko no dio XRP
+        billetera.ronda(None)
+        self.assertEqual(billetera.leer_estado()["efectivo"], 1000.0)
+
     def test_leer_voto(self):
         v = billetera.leer_voto('Claro: {"accion":"comprar","activo":"btc","porcentaje":80,"razon":"sube"}',
                                 {"BTC": "bitcoin"}, 25)
@@ -125,7 +151,7 @@ class BitsoFalso:
         s, m = libro.split("_")
         cantidad = gastar / self.precio(s)
         self.saldo[m] -= gastar
-        self.saldo[s] += cantidad * 0.995
+        self.saldo[s] = self.saldo.get(s, 0) + cantidad * 0.995
         self.ordenes.append(("buy", libro, gastar))
         return {"oid": "1", "mayor": cantidad, "menor": gastar, "comision": cantidad * 0.005, "moneda_comision": s}
 
@@ -245,6 +271,19 @@ class PuenteDolares(unittest.TestCase):
         billetera.ronda(None)
         self.assertEqual(self.bitso.ordenes[-1][:2], ("buy", "sol_usd"))
         self.assertAlmostEqual(billetera.leer_estado()["posiciones"]["SOL"], self.bitso.saldo["sol"])
+
+    def test_solo_monedas_con_libro_en_usd_y_las_nuevas_entran_solas(self):
+        self.iniciar("35000.00 COP")
+        self.assertEqual(billetera.leer_estado()["activos"], ["BTC", "ETH", "SOL"])   # ADA, XRP... sin libro
+        self.bitso.libros.add("xrp_usd")
+        PRECIOS["XRP"] = {"precio": 2.0, "cambio_24h": 0, "cambio_7d": 0}
+        try:
+            self.votos = ['{"accion":"comprar","activo":"XRP","porcentaje":20}']
+            billetera.ronda(None)
+        finally:
+            PRECIOS.pop("XRP")
+        self.assertEqual(self.bitso.ordenes[-1][:2], ("buy", "xrp_usd"))
+        self.assertIn("XRP", billetera.leer_estado()["activos"])
 
     def test_deposito_en_pesos_se_cambia_a_dolares(self):
         self.iniciar("35000.00 COP")

@@ -21,7 +21,9 @@ Dos modos:
 | "abre la billetera", "muéstrame la billetera" | la voz del PC la abre sola; si no, dile que está en el botón **Billetera** del HUD o de la app (Resumen general y En vivo) |
 | "qué decidieron", "por qué compró X" | lee `boveda/outputs/billetera/diario/AAAA-MM-DD.md`; cada voto está en `decisiones.jsonl` |
 
-Reglas en el código, que ninguna IA puede saltarse: máximo 25 % por operación, 3 operaciones al día, solo BTC, ETH y SOL, sin préstamos ni apalancamiento, no se opera si votan menos de 2 IAs (`BILLETERA_QUORUM`), y freno automático (pausa) si pierde el 30 % de lo que se le dio. Si se pausó sola, dile a David por qué y que él decide si reanudar.
+Reglas en el código, que ninguna IA puede saltarse: máximo 25 % por operación, 3 operaciones al día, solo las criptos de la lista (BTC, ETH, SOL, XRP, ADA, DOGE y otras grandes) que Bitso tenga en la moneda de la cuenta, sin préstamos ni apalancamiento, no se opera si votan menos de 2 IAs (`BILLETERA_QUORUM`), y freno automático (pausa) si pierde el 30 % de lo que se le dio. Si se pausó sola, dile a David por qué y que él decide si reanudar.
+
+Vigilante: cada 30 minutos `python3 scripts/billetera.py vigilar` mira los precios, sin IAs y gratis. Si una moneda se movió 5 % o más desde la última ronda, anota una alerta y convoca una ronda de emergencia (como mucho 4 al día, `BILLETERA_EMERGENCIAS_MAX`). Las 3 operaciones al día siguen siendo el tope.
 
 ## Nunca
 - Nunca pidas, guardes ni escribas claves de Bitso, frases semilla o contraseñas; las pone David en el `.env` del servidor.
