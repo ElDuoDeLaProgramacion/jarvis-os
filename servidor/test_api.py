@@ -128,6 +128,13 @@ class PruebaApi(Base):
         with self.assertRaises(urllib.error.HTTPError):
             urllib.request.urlopen(self.base + "/app/../api.py")
 
+    def test_head_y_cabeceras(self):
+        with urllib.request.urlopen(urllib.request.Request(self.base + "/app/", method="HEAD")) as r:
+            self.assertEqual(r.status, 200)
+            self.assertEqual(r.read(), b"")
+            self.assertEqual(r.headers["X-Frame-Options"], "DENY")
+            self.assertIn("camera=()", r.headers["Permissions-Policy"])
+
     def test_conversacion_y_si_confirmado(self):
         self.assertEqual(self.pedir("/api/pedir", {"texto": "redacta un correo a Ana"})[0], 202)
         m = self.esperar()

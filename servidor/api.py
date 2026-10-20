@@ -337,6 +337,13 @@ class Manejador(BaseHTTPRequestHandler):
     modulo_hud = None
     modulo_ia = None
     transcriptor = None
+    sin_cuerpo = False    # HEAD: las mismas cabeceras que GET, sin el cuerpo
+
+    def end_headers(self):
+        # Nadie puede meter la app en un marco de otra web, ni pedir cámara o ubicación desde ella.
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Permissions-Policy", "camera=(), geolocation=()")
+        super().end_headers()
 
     def _json(self, datos, codigo=200):
         cuerpo = json.dumps(datos, ensure_ascii=False).encode()
@@ -345,7 +352,8 @@ class Manejador(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(cuerpo)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(cuerpo)
+        if not self.sin_cuerpo:
+            self.wfile.write(cuerpo)
 
     def _ip(self):
         # Solo escuchamos en 127.0.0.1: lo de afuera llega por Caddy, que pone la IP real en X-Forwarded-For.
@@ -373,7 +381,15 @@ class Manejador(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(cuerpo)))
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
-        self.wfile.write(cuerpo)
+        if not self.sin_cuerpo:
+            self.wfile.write(cuerpo)
+
+    def do_HEAD(self):
+        self.sin_cuerpo = True
+        try:
+            self.do_GET()
+        finally:
+            self.sin_cuerpo = False
 
     def do_GET(self):
         url = urlparse(self.path)

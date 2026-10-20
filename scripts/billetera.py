@@ -224,7 +224,8 @@ def dia_del_experimento(estado):
 
 def operaciones_de_hoy(estado):
     hoy = time.strftime("%Y-%m-%d")
-    return sum(1 for h in estado["historial"] if h["fecha"].startswith(hoy) and h.get("operacion"))
+    # Una orden que Bitso no confirmó cuenta igual: pudo llenarse.
+    return sum(1 for h in estado["historial"] if h["fecha"].startswith(hoy) and (h.get("operacion") or h.get("incierta")))
 
 
 def leer_voto(texto, activos, tope):
@@ -276,6 +277,8 @@ def aplicar(estado, decision, p, aj):
             decision["bloqueo"] = "no queda efectivo"
             return None
         if estado["modo"] == "real":
+            if not precio_parejo(estado, s, precio, decision):
+                return None
             usd, cantidad = comprar_real(estado, s, usd)
         else:
             cantidad = usd * (1 - aj["comision"]) / precio
@@ -288,6 +291,8 @@ def aplicar(estado, decision, p, aj):
             decision["bloqueo"] = f"no hay {s} para vender"
             return None
         if estado["modo"] == "real":
+            if not precio_parejo(estado, s, precio, decision):
+                return None
             cantidad, usd = vender_real(estado, s, cantidad)
         else:
             usd = cantidad * precio * (1 - aj["comision"])
@@ -298,6 +303,23 @@ def aplicar(estado, decision, p, aj):
 
 def libro(estado, s):
     return f"{s.lower()}_{mon(estado).lower()}"
+
+
+def precio_parejo(estado, s, precio, decision):
+    """Las órdenes son de mercado: si el último precio de Bitso se aleja del de CoinGecko más de
+    BILLETERA_DESVIO_MAX (2 %), el libro está raro o vacío y no se opera."""
+    import bitso
+    desvio = float(os.environ.get("BILLETERA_DESVIO_MAX", "2"))
+    try:
+        en_bitso = bitso.ultimo(libro(estado, s))
+    except RuntimeError as e:
+        decision["bloqueo"] = f"no pude ver el precio de {s} en Bitso ({e})"
+        return False
+    if abs(en_bitso / precio - 1) * 100 > desvio:
+        decision["bloqueo"] = (f"el precio de {s} en Bitso ({en_bitso:.2f}) se aleja más de {desvio:g} % del de "
+                               f"CoinGecko ({precio:.2f})")
+        return False
+    return True
 
 
 def valor_cuenta(saldos, p, moneda):
@@ -320,8 +342,14 @@ def ajustar_tope(estado, p):
                 diario(f"No pude cambiar el depósito en {cuenta.upper()} a dólares: {e}")
             saldos = bitso.saldos()
     tope = valor_cuenta(saldos, p, mon(estado)) * estado["porcentaje"] / 100
-    for s in estado["posiciones"]:          # nunca cree tener más cripto de la que hay
-        estado["posiciones"][s] = min(estado["posiciones"][s], saldos.get(s.lower(), 0))
+    if estado["porcentaje"] >= 100:
+        # La cuenta es toda de Orión: sus posiciones son lo que hay. Así una orden que Bitso llenó tarde (y Orión
+        # dio por fallida) vuelve sola a la cartera en vez de quedar huérfana.
+        for s in set(estado["posiciones"]) | set(p):
+            estado["posiciones"][s] = saldos.get(s.lower(), 0)
+    else:
+        for s in estado["posiciones"]:          # nunca cree tener más cripto de la que hay
+            estado["posiciones"][s] = min(estado["posiciones"][s], saldos.get(s.lower(), 0))
     estado["efectivo"] = min(estado["efectivo"], saldos.get(mon(estado).lower(), 0))
     libre = tope - valor(estado, p)
     if libre > 1:
@@ -343,7 +371,7 @@ def comprar_real(estado, s, gastar):
     import bitso
     gastar = min(gastar, estado["efectivo"], bitso.saldos().get(mon(estado).lower(), 0))
     if gastar < float(os.environ.get("BILLETERA_MINIMO", "1")):
-        raise RuntimeError(f"no hay suficiente {mon(estado)} disponible")
+        raise bitso.Rechazo(f"no hay suficiente {mon(estado)} disponible")
     o = bitso.comprar(libro(estado, s), gastar)
     recibido = o["mayor"] - (o["comision"] if o["moneda_comision"] == s.lower() else 0)
     pagado = o["menor"] + (o["comision"] if o["moneda_comision"] == mon(estado).lower() else 0)
@@ -411,11 +439,24 @@ def ronda(_args):
     validos = sum(1 for v in votos if v.get("valido"))
     if decision["accion"] != "mantener" and validos < aj["quorum"]:
         decision["bloqueo"] = f"solo votaron {validos} IAs (mínimo {aj['quorum']})"
+    if decision["accion"] != "mantener" and pausada():
+        # Votar tarda minutos: si David pausó mientras tanto, la orden de esta ronda tampoco va.
+        decision["bloqueo"] = "la billetera se pausó durante la ronda"
+    incierta = False
     try:
         operacion = aplicar(estado, decision, p, aj)
     except RuntimeError as e:          # Bitso rechazó o no respondió: se anota y la cartera no cambia
         decision["bloqueo"] = f"Bitso falló ({e})"
         operacion = None
+        import bitso
+        if not isinstance(e, bitso.Rechazo):
+            # Sin respuesta clara la orden pudo llenarse: cuenta para el tope del día y la cartera se cuadra
+            # ya mismo con los saldos reales de Bitso.
+            incierta = True
+            try:
+                ajustar_tope(estado, p)
+            except RuntimeError:
+                pass
     total = valor(estado, p)
     fecha = time.strftime("%Y-%m-%d %H:%M")
     if operacion:
@@ -426,6 +467,7 @@ def ronda(_args):
             f"; se quería {decision['accion']} {decision['activo']} pero {decision['bloqueo']}"
             if decision.get("bloqueo") else "")
     estado["historial"].append({"fecha": fecha, "resumen": resumen, "operacion": operacion, "valor": round(total, 2),
+                                **({"incierta": True} if incierta else {}),
                                 **({"emergencia": estado.pop("alerta")} if estado.get("alerta") else {})})
     estado["ultima_ronda"] = {"hora": time.time(), "precios": {s: d["precio"] for s, d in p.items()}}
     guardar_estado(estado)
@@ -698,16 +740,20 @@ def main():
     for nombre in ("ronda", "vigilar", "estado", "pausar", "reanudar", "terminar"):
         sub.add_parser(nombre)
     args = a.parse_args()
-    if args.orden in ("ronda", "vigilar"):
-        # Una ronda a la vez: el vigilante y el cron nunca operan al mismo tiempo con dinero real.
+    if args.orden in ("ronda", "vigilar", "iniciar", "terminar"):
+        # Una ronda a la vez: el vigilante, el cron y un pedido a mano nunca tocan el estado al mismo tiempo.
+        # El candado va junto a la carpeta y no dentro, porque 'iniciar' la renombra.
         import fcntl
-        CARPETA.mkdir(parents=True, exist_ok=True)
-        candado = open(CARPETA / ".candado", "w")
+        CARPETA.parent.mkdir(parents=True, exist_ok=True)
+        candado = open(CARPETA.with_name(f".{CARPETA.name}.candado"), "w")
         try:
             fcntl.flock(candado, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
-            print("Ya hay una ronda en marcha.")
-            return 0
+            if args.orden in ("ronda", "vigilar"):
+                print("Ya hay una ronda en marcha.")
+                return 0
+            print("Hay una ronda en marcha; espero a que termine...")
+            fcntl.flock(candado, fcntl.LOCK_EX)
     return {"iniciar": iniciar, "ronda": ronda, "vigilar": vigilar, "estado": estado_cmd, "pausar": pausar,
             "reanudar": reanudar, "terminar": terminar}[args.orden](args)
 
