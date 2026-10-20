@@ -194,7 +194,7 @@ function pintarResumen (d) {
 
 // ---------- En vivo: cada ronda, con el voto y la razón de cada IA, en cuanto pasa ----------
 let visto = 0, lista = []
-const AVISOS = { inicio: 'Empieza la billetera', pausa: 'Pausa', reanuda: 'Se reanuda', fin: 'Termina', 'sin ronda': 'Ronda sin decisión' }
+const AVISOS = { inicio: 'Empieza la billetera', pausa: 'Pausa', reanuda: 'Se reanuda', fin: 'Termina', 'sin ronda': 'Ronda sin decisión', alerta: 'Alerta del vigilante' }
 
 function textoAccion (v) {
   if (!v || v.error) return 'no respondió'

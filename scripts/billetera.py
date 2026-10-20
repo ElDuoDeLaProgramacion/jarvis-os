@@ -16,6 +16,8 @@ Antes de votar, las IAs reciben el contexto del mercado sacado de internet: noti
     python3 scripts/billetera.py iniciar --modo real [--confirmo "<monto> COP"]   con dinero real en Bitso
         (la cuenta de David es de Colombia: pesos colombianos; otra moneda con --moneda o BILLETERA_MONEDA)
     python3 scripts/billetera.py ronda      una ronda: precios, voto de todas las IAs, decisión (la corre el cron)
+    python3 scripts/billetera.py vigilar    sin IAs: si una moneda se movió BILLETERA_ANOMALIA (5 %) desde la
+                                            última ronda, convoca una de emergencia (cron cada 30 min)
     python3 scripts/billetera.py estado     cómo va: valor, posiciones, ganancia y comparación con solo guardar BTC
     python3 scripts/billetera.py pausar     no decide nada más hasta reanudar
     python3 scripts/billetera.py reanudar
@@ -48,8 +50,15 @@ CARPETA = Path(os.environ.get("BILLETERA_CARPETA", RAIZ / "boveda" / "outputs" /
 COINGECKO = "https://api.coingecko.com/api/v3/coins/markets"
 
 
+# Las grandes de CoinGecko. En Bitso solo entran las que tienen libro en la moneda de la cuenta (se revisa en
+# cada ronda, así una moneda que Bitso abre después aparece sola).
+ACTIVOS = ("bitcoin:BTC,ethereum:ETH,solana:SOL,ripple:XRP,cardano:ADA,dogecoin:DOGE,litecoin:LTC,"
+           "chainlink:LINK,avalanche-2:AVAX,polkadot:DOT,tron:TRX,bitcoin-cash:BCH,stellar:XLM,shiba-inu:SHIB,"
+           "uniswap:UNI,polygon-ecosystem-token:POL,pepe:PEPE,the-sandbox:SAND,decentraland:MANA,aave:AAVE")
+
+
 def ajustes():
-    activos = os.environ.get("BILLETERA_ACTIVOS", "bitcoin:BTC,ethereum:ETH,solana:SOL")
+    activos = os.environ.get("BILLETERA_ACTIVOS", ACTIVOS)
     return {
         "activos": dict(par.split(":")[::-1] for par in activos.split(",") if ":" in par),  # BTC -> bitcoin
         "tope": float(os.environ.get("BILLETERA_TOPE_OPERACION", "25")),
@@ -59,6 +68,9 @@ def ajustes():
         # Si responden menos IAs que esto, no se opera: una sola no decide por todas.
         "quorum": int(os.environ.get("BILLETERA_QUORUM", "2")),
         "perdida_max": float(os.environ.get("BILLETERA_PERDIDA_MAX", "30")),
+        # El vigilante convoca una ronda de emergencia si una moneda se movió esto desde la última ronda.
+        "anomalia": float(os.environ.get("BILLETERA_ANOMALIA", "5")),
+        "emergencias_max": int(os.environ.get("BILLETERA_EMERGENCIAS_MAX", "4")),
     }
 
 
@@ -186,6 +198,7 @@ SISTEMA = ("Eres una de varias IAs que manejan juntas una cartera {tipo} de crip
 def pregunta_de(estado, p, aj):
     total = valor(estado, p)
     lineas = [f"Fecha: {time.strftime('%Y-%m-%d %H:%M')} (día {dia_del_experimento(estado)} de {estado['dias']}).",
+              *([f"RONDA DE EMERGENCIA convocada por el vigilante: {estado['alerta']}"] if estado.get("alerta") else []),
               f"Valor total: {total:.2f} {mon(estado)} (le dieron {estado['saldo_inicial']:.2f}).",
               f"Efectivo: {estado['efectivo']:.2f} {mon(estado)}.", "Posiciones:"]
     for s, c in estado["posiciones"].items():
@@ -371,12 +384,12 @@ def ronda(_args):
         print("La billetera está en pausa.")
         return 0
     aj = ajustes()
-    if estado.get("activos"):          # en Bitso, solo las monedas que tienen libro en la moneda de la cuenta
-        aj["activos"] = {s: i for s, i in aj["activos"].items() if s in estado["activos"]}
+    aj["activos"] = activos_de(estado, aj)
     if time.time() >= estado["fin"]:
         return terminar(None)
     try:
         p = precios(aj["activos"], mon(estado))
+        aj["activos"] = {s: i for s, i in aj["activos"].items() if s in p}     # sin precio no se vota
         if estado["modo"] == "real":
             ajustar_tope(estado, p)
     except RuntimeError as e:
@@ -412,7 +425,9 @@ def ronda(_args):
         resumen = f"mantener ({decision['votos']} de {len(votos)} votos)" + (
             f"; se quería {decision['accion']} {decision['activo']} pero {decision['bloqueo']}"
             if decision.get("bloqueo") else "")
-    estado["historial"].append({"fecha": fecha, "resumen": resumen, "operacion": operacion, "valor": round(total, 2)})
+    estado["historial"].append({"fecha": fecha, "resumen": resumen, "operacion": operacion, "valor": round(total, 2),
+                                **({"emergencia": estado.pop("alerta")} if estado.get("alerta") else {})})
+    estado["ultima_ronda"] = {"hora": time.time(), "precios": {s: d["precio"] for s, d in p.items()}}
     guardar_estado(estado)
     if estado["modo"] == "real" and total < estado["saldo_inicial"] * (1 - aj["perdida_max"] / 100):
         # Freno de emergencia: con dinero real, perder demasiado pausa todo hasta que David decida.
@@ -436,6 +451,58 @@ def ronda(_args):
     diario("\n".join(lineas))
     print(resumen)
     return 0
+
+
+def activos_de(estado, aj):
+    """Las monedas con las que se puede operar ahora. En Bitso, las que tienen libro en la moneda de la cartera
+    (si Bitso no responde, las de la ronda anterior); siempre las que ya se tienen, para poder venderlas."""
+    activos = dict(aj["activos"])
+    if estado["modo"] == "real":
+        try:
+            import bitso
+            abiertos = bitso.libros()
+            activos = {s: i for s, i in activos.items() if libro(estado, s) in abiertos}
+        except RuntimeError:
+            activos = {s: i for s, i in activos.items() if s in estado.get("activos", activos)}
+    tengo = {s for s, c in estado["posiciones"].items() if c > 0}
+    activos.update({s: i for s, i in aj["activos"].items() if s in tengo})
+    estado["activos"] = list(activos)
+    return activos
+
+
+def vigilar(_args):
+    """Cada media hora y sin IAs (gratis): si alguna moneda se movió mucho desde la última ronda, convoca una
+    ronda de emergencia. Como mucho BILLETERA_EMERGENCIAS_MAX al día, y nunca a menos de 30 min de otra."""
+    estado = leer_estado()
+    if not estado or estado.get("terminado") or pausada():
+        return 0
+    aj = ajustes()
+    ultima = estado.get("ultima_ronda")
+    if not ultima or time.time() - ultima["hora"] < 1800:
+        return 0
+    hoy = time.strftime("%Y-%m-%d")
+    if sum(1 for h in estado["historial"] if h["fecha"].startswith(hoy) and h.get("emergencia")) >= aj["emergencias_max"]:
+        return 0
+    try:
+        p = precios(activos_de(estado, aj), mon(estado))
+    except RuntimeError as e:
+        print(e)
+        return 1
+    movidas = []
+    for s, d in p.items():
+        antes = ultima["precios"].get(s)
+        if antes:
+            delta = (d["precio"] / antes - 1) * 100
+            if abs(delta) >= aj["anomalia"]:
+                movidas.append((abs(delta), f"{s} {'subió' if delta > 0 else 'bajó'} {abs(delta):.1f} %"))
+    if not movidas:
+        return 0
+    motivo = ", ".join(m for _, m in sorted(movidas, reverse=True)) + " desde la última ronda"
+    diario(f"## {time.strftime('%H:%M')} · alerta\nEl vigilante vio que {motivo}. Convoca una ronda de emergencia.",
+           evento="alerta")
+    estado["alerta"] = motivo
+    guardar_estado(estado)
+    return ronda(None)
 
 
 def cambio(ahora, antes):
@@ -628,10 +695,20 @@ def main():
     i.add_argument("--moneda", default=os.environ.get("BILLETERA_MONEDA", "COP"),
                    help="real: moneda de la cuenta de Bitso (COP, pesos colombianos, por defecto)")
     i.add_argument("--confirmo", help='real: David repite el monto que calcula el script, p. ej. "500000.00 COP"')
-    for nombre in ("ronda", "estado", "pausar", "reanudar", "terminar"):
+    for nombre in ("ronda", "vigilar", "estado", "pausar", "reanudar", "terminar"):
         sub.add_parser(nombre)
     args = a.parse_args()
-    return {"iniciar": iniciar, "ronda": ronda, "estado": estado_cmd, "pausar": pausar,
+    if args.orden in ("ronda", "vigilar"):
+        # Una ronda a la vez: el vigilante y el cron nunca operan al mismo tiempo con dinero real.
+        import fcntl
+        CARPETA.mkdir(parents=True, exist_ok=True)
+        candado = open(CARPETA / ".candado", "w")
+        try:
+            fcntl.flock(candado, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print("Ya hay una ronda en marcha.")
+            return 0
+    return {"iniciar": iniciar, "ronda": ronda, "vigilar": vigilar, "estado": estado_cmd, "pausar": pausar,
             "reanudar": reanudar, "terminar": terminar}[args.orden](args)
 
 
