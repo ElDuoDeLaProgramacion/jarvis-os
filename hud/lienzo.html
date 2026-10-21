@@ -268,7 +268,7 @@ function procesar(resultado) {
 
 // La voz de Orión usa la misma cámara para los gestos. Mientras el lienzo esté abierto le
 // avisamos cada 2 s para que la suelte, y si aún la tiene ocupada reintentamos unos segundos.
-const pedirCamara = () => fetch('/api/lienzo/camara', { method: 'POST' }).catch(() => {})
+const pedirCamara = () => fetch('/api/lienzo/camara', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {})
 pedirCamara()
 setInterval(pedirCamara, 2000)
 

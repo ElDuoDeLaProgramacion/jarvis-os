@@ -114,6 +114,17 @@ class Billetera(unittest.TestCase):
         billetera.ronda(None)
         self.assertEqual(len(billetera.leer_estado()["historial"]), 1)
 
+    def test_pausa_durante_la_votacion_frena_la_orden(self):
+        def votar(estado, p, aj):
+            billetera.pausar(None)                     # David pausa mientras las IAs piensan
+            return [("ia-0", billetera.leer_voto('{"accion":"comprar","activo":"BTC","porcentaje":10}',
+                                                 aj["activos"], aj["tope"]), "")]
+        billetera.votar = votar
+        billetera.ronda(None)
+        e = billetera.leer_estado()
+        self.assertEqual(e["efectivo"], 1000.0)
+        self.assertIn("pausó durante la ronda", e["historial"][-1]["resumen"])
+
     def test_termina_solo_y_deja_informe(self):
         e = billetera.leer_estado()
         e["fin"] = time.time() - 1
@@ -138,7 +149,8 @@ class BitsoFalso:
         m = types.ModuleType("bitso")
         m.configurado = lambda: True
         m.libros = lambda: set(self.libros)
-        m.ultimo = lambda libro: self.DOLAR
+        m.ultimo = lambda libro: self.precio(libro.split("_")[0])
+        m.Rechazo = type("Rechazo", (RuntimeError,), {})
         m.saldos = lambda: dict(self.saldo)
         m.comprar = self.comprar
         m.vender = self.vender
@@ -244,6 +256,42 @@ class Real(unittest.TestCase):
         self.assertIn("Bitso falló", e["historial"][-1]["resumen"])
 
 
+    def test_orden_sin_respuesta_cuenta_y_se_cuadra_con_bitso(self):
+        """Bitso no contestó pero la orden se llenó: la cripto vuelve a la cartera y cuenta para el tope del día."""
+        self.iniciar("2000.00 COP")
+        comprar = self.bitso.comprar
+        def tarde(*a):
+            comprar(*a)
+            raise RuntimeError("no pude hablar con Bitso: timed out")
+        sys.modules["bitso"].comprar = tarde
+        self.votos = ['{"accion":"comprar","activo":"ETH","porcentaje":10}']
+        billetera.ronda(None)
+        e = billetera.leer_estado()
+        self.assertTrue(e["historial"][-1]["incierta"])
+        self.assertAlmostEqual(e["posiciones"]["ETH"], self.bitso.saldo["eth"])
+        self.assertAlmostEqual(e["efectivo"], self.bitso.saldo["cop"])
+        self.assertEqual(billetera.operaciones_de_hoy(e), 1)
+
+    def test_rechazo_de_bitso_no_cuenta(self):
+        self.iniciar("2000.00 COP")
+        def no(*a):
+            raise sys.modules["bitso"].Rechazo("Bitso respondió 400: saldo insuficiente")
+        sys.modules["bitso"].comprar = no
+        self.votos = ['{"accion":"comprar","activo":"ETH","porcentaje":10}']
+        billetera.ronda(None)
+        e = billetera.leer_estado()
+        self.assertNotIn("incierta", e["historial"][-1])
+        self.assertEqual(billetera.operaciones_de_hoy(e), 0)
+
+    def test_precio_de_bitso_muy_distinto_no_opera(self):
+        self.iniciar("2000.00 COP")
+        sys.modules["bitso"].ultimo = lambda libro: PRECIOS["BTC"]["precio"] * 1.05
+        self.votos = ['{"accion":"comprar","activo":"BTC","porcentaje":10}']
+        billetera.ronda(None)
+        self.assertEqual(self.bitso.ordenes, [])
+        self.assertIn("se aleja", billetera.leer_estado()["historial"][-1]["resumen"])
+
+
 class PuenteDolares(unittest.TestCase):
     """La cuenta de David en Colombia: solo hay usd_cop, y las criptos se compran en dólares."""
     def setUp(self):
@@ -298,3 +346,48 @@ class PuenteDolares(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OrdenesBitso(unittest.TestCase):
+    """scripts/bitso.py: si el POST de la orden se queda sin respuesta, se busca por origin_id."""
+    def setUp(self):
+        sys.modules.pop("bitso", None)
+        import bitso
+        self.bitso = bitso
+        self.dormir, bitso.time.sleep = bitso.time.sleep, lambda s: None
+        self.llamadas = []
+
+    def tearDown(self):
+        self.bitso.time.sleep = self.dormir
+        sys.modules.pop("bitso", None)
+
+    def falso(self, post_falla):
+        def pedir(metodo, ruta, cuerpo=None):
+            self.llamadas.append((metodo, ruta, cuerpo))
+            if metodo == "POST":
+                if post_falla:
+                    raise post_falla
+                return {"oid": "abc"}
+            if ruta.startswith("/v3/orders/?origin_ids="):
+                return [{"oid": "abc"}]
+            return [{"major": "0.001", "minor": "-100", "fees_amount": "0.5", "fees_currency": "usd"}]
+        self.bitso.pedir = pedir
+
+    def test_manda_origin_id(self):
+        self.falso(None)
+        o = self.bitso.comprar("btc_usd", 100)
+        self.assertEqual(o["oid"], "abc")
+        self.assertRegex(self.llamadas[0][2]["origin_id"], r"^[A-Za-z0-9_-]{1,40}$")
+
+    def test_sin_respuesta_la_busca_por_origin_id(self):
+        self.falso(RuntimeError("no pude hablar con Bitso: timed out"))
+        o = self.bitso.comprar("btc_usd", 100)
+        self.assertEqual((o["oid"], o["mayor"]), ("abc", 0.001))
+        origen = self.llamadas[0][2]["origin_id"]
+        self.assertIn(("GET", f"/v3/orders/?origin_ids={origen}", None), self.llamadas)
+
+    def test_rechazo_no_busca(self):
+        self.falso(self.bitso.Rechazo("Bitso respondió 400: no"))
+        with self.assertRaises(self.bitso.Rechazo):
+            self.bitso.comprar("btc_usd", 100)
+        self.assertEqual(len(self.llamadas), 1)

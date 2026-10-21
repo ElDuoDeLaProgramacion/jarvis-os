@@ -605,7 +605,23 @@ def estado_completo():
     }
 
 
+LOCALES = ("localhost", "127.0.0.1")
+
+
 class Manejador(BaseHTTPRequestHandler):
+    def _de_aqui(self, post=False):
+        """Solo la propia página del HUD (o un programa del PC). Frena dos ataques desde cualquier web abierta en el
+        navegador: mandar pedidos a la cola (CSRF) y leer la bóveda con un dominio que apunta a 127.0.0.1 (DNS
+        rebinding). Un POST además tiene que ser JSON, que otra web no puede mandar sin permiso del navegador."""
+        if self.headers.get("Host", "").rsplit(":", 1)[0] not in LOCALES:
+            return False
+        origen = self.headers.get("Origin", "")
+        if origen and urlparse(origen).hostname not in LOCALES:
+            return False
+        if self.headers.get("Sec-Fetch-Site", "") == "cross-site":
+            return False
+        return not post or self.headers.get("Content-Type", "").startswith("application/json")
+
     def _json(self, datos, codigo=200):
         cuerpo = json.dumps(datos, ensure_ascii=False).encode("utf-8")
         self.send_response(codigo)
@@ -626,6 +642,8 @@ class Manejador(BaseHTTPRequestHandler):
         self.wfile.write(cuerpo)
 
     def do_GET(self):
+        if not self._de_aqui():
+            return self._json({"error": "no permitido"}, 403)
         url = urlparse(self.path)
         paginas = {"/": "index.html", "/index.html": "index.html", "/lienzo": "lienzo.html",
                    "/propuestas": "propuestas.html", "/billetera": "billetera.html"}
@@ -663,6 +681,8 @@ class Manejador(BaseHTTPRequestHandler):
             self._json({"error": "no existe"}, 404)
 
     def do_POST(self):
+        if not self._de_aqui(post=True):
+            return self._json({"error": "no permitido"}, 403)
         ruta = urlparse(self.path).path
         if ruta == "/api/analizar":
             return self._analizar()
@@ -690,12 +710,6 @@ class Manejador(BaseHTTPRequestHandler):
         self._json({"ok": ok, "via": "cola"}, 200 if ok else 400)
 
     def _borrar_propuestas(self):
-        # Solo la propia página del HUD: JSON (otra web no puede mandarlo sin permiso del navegador)
-        # y, si el navegador dice de dónde viene, que sea de aquí.
-        origen = self.headers.get("Origin", "")
-        if not self.headers.get("Content-Type", "").startswith("application/json") or \
-                (origen and urlparse(origen).hostname not in ("localhost", "127.0.0.1")):
-            return self._json({"error": "no permitido"}, 403)
         try:
             largo = int(self.headers.get("Content-Length", 0))
             if not 0 <= largo <= 200000:

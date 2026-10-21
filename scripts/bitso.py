@@ -15,12 +15,17 @@ import os
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 BASE = os.environ.get("BITSO_BASE", "https://api.bitso.com")
 
 
 def configurado():
     return bool(os.environ.get("BITSO_API_KEY") and os.environ.get("BITSO_API_SECRET"))
+
+
+class Rechazo(RuntimeError):
+    """Bitso contestó y dijo que no: la orden seguro no existe."""
 
 
 def pedir(metodo, ruta, cuerpo=None):
@@ -42,11 +47,13 @@ def pedir(metodo, ruta, cuerpo=None):
             detalle = json.load(e).get("error", {})
         except ValueError:
             detalle = {}
-        raise RuntimeError(f"Bitso respondió {e.code}: {detalle.get('message', '')}"[:300]) from None
+        # Un 4xx es un no; un 5xx (o un tiempo agotado) no dice si la orden entró.
+        error = Rechazo if e.code < 500 else RuntimeError
+        raise error(f"Bitso respondió {e.code}: {detalle.get('message', '')}"[:300]) from None
     except (OSError, ValueError) as e:
         raise RuntimeError(f"no pude hablar con Bitso: {e}") from None
     if not respuesta.get("success"):
-        raise RuntimeError(f"Bitso rechazó la orden: {respuesta.get('error', {}).get('message', respuesta)}"[:300])
+        raise Rechazo(f"Bitso rechazó la orden: {respuesta.get('error', {}).get('message', respuesta)}"[:300])
     return respuesta["payload"]
 
 
@@ -83,10 +90,36 @@ def _cifra(monto, decimales):
     return f"{math.floor(monto * 10 ** decimales) / 10 ** decimales:.{decimales}f}"
 
 
+def _buscar(origen):
+    """El oid de la orden con nuestro origin_id, o None si Bitso no la tiene."""
+    ordenes = pedir("GET", f"/v3/orders/?origin_ids={origen}")
+    return ordenes[0]["oid"] if ordenes else None
+
+
 def _orden(libro, lado, campo, monto):
-    oid = pedir("POST", "/v3/orders/", {"book": libro, "side": lado, "type": "market", campo: _cifra(monto, 2 if campo == "minor" else 8)})["oid"]
+    # Cada orden lleva un id propio (origin_id): si Bitso tarda en contestar, se busca por ese id antes de
+    # darla por fallida, porque pudo llenarse igual.
+    origen = f"orion-{uuid.uuid4().hex[:24]}"
+    cuerpo = {"book": libro, "side": lado, "type": "market", campo: _cifra(monto, 2 if campo == "minor" else 8),
+              "origin_id": origen}
+    try:
+        oid = pedir("POST", "/v3/orders/", cuerpo)["oid"]
+    except Rechazo:
+        raise
+    except RuntimeError as e:
+        oid = None
+        for _ in range(3):
+            time.sleep(2)
+            try:
+                oid = _buscar(origen)
+            except RuntimeError:
+                continue
+            if oid:
+                break
+        if not oid:
+            raise RuntimeError(f"{e}; no encontré la orden {origen} en Bitso (revisa la cuenta)") from None
     # Una orden de mercado se llena casi al instante; se suman sus operaciones para saber cuánto fue de verdad.
-    for _ in range(5):
+    for _ in range(15):
         time.sleep(1)
         trades = pedir("GET", f"/v3/order_trades/{oid}/")
         if trades:
