@@ -70,6 +70,18 @@ function log(...partes) {
   } catch {}
 }
 
+// libsignal (dentro de Baileys) escribe con console.info/warn/error el objeto entero de la sesión de
+// cifrado ("Closing session: SessionEntry {...}"): llaves privadas y números al journal. Esas líneas no
+// sirven para seguir al puente; de warn/error solo queda el texto, nunca los objetos.
+const SESION_SIGNAL = /^(Closing|Opening|Removing old closed|Migrating) session/
+for (const nivel of ['info', 'warn', 'error']) {
+  const original = console[nivel].bind(console)
+  console[nivel] = (...args) => {
+    if (typeof args[0] === 'string' && SESION_SIGNAL.test(args[0])) return
+    original(...args.map((a) => a instanceof Error ? a.message : a).filter((a) => typeof a !== 'object' || a === null))
+  }
+}
+
 const hoy = (d = new Date()) => d.toLocaleDateString('sv-SE')
 const hora = (d = new Date()) => d.toTimeString().slice(0, 5)
 
@@ -310,14 +322,30 @@ async function iniciar() {
     if (c.id && (c.name || c.notify)) anotarContacto(c.id, { nombre: c.name || c.notify })
   }))
 
-  async function responder(jid, texto) {
-    for (const trozo of partir(texto)) {
-      const m = await sock.sendMessage(jid, { text: trozo })
-      if (m?.key?.id) {
-        enviados.set(m.key.id, m.message)
-        if (enviados.size > 500) enviados.delete(enviados.keys().next().value)
+  /**
+   * Envía y, si falla (p. ej. justo cuando libsignal renueva la sesión de cifrado), lo dice en el log y
+   * reintenta una vez a los 3 s. Si el segundo intento también falla, lanza el error.
+   */
+  async function enviar(jid, contenido) {
+    for (let intento = 1; ; intento++) {
+      try {
+        const m = await sock.sendMessage(jid, contenido)
+        if (m?.key?.id) {
+          enviados.set(m.key.id, m.message)
+          if (enviados.size > 500) enviados.delete(enviados.keys().next().value)
+        }
+        if (intento > 1) log(`Enviado a ${chatDe(jid)} al reintentar.`)
+        return m
+      } catch (e) {
+        log(`No pude enviar a ${chatDe(jid)} (intento ${intento}): ${e?.message || e}`)
+        if (intento >= 2) throw e
+        await new Promise((r) => setTimeout(r, 3000))
       }
     }
+  }
+
+  async function responder(jid, texto) {
+    for (const trozo of partir(texto)) await enviar(jid, { text: trozo })
   }
 
   async function mostrarBorrador(jid) {
@@ -326,7 +354,11 @@ async function iniciar() {
 
   async function atender(jid, texto, adjuntos = []) {
     ocupado = true
-    try { await atenderOrden(jid, texto, adjuntos) } finally { ocupado = false }
+    try { await atenderOrden(jid, texto, adjuntos) } finally {
+      ocupado = false
+      // Que el "escribiendo..." no se quede colgado si la orden o el envío fallaron.
+      try { await sock.sendPresenceUpdate('paused', jid) } catch {}
+    }
   }
 
   /** Baja la foto o el documento que David mandó y devuelve dónde quedó (o null). */
@@ -356,10 +388,9 @@ async function iniciar() {
       if (tamano > 60 * 1024 * 1024) { await responder(jid, `${PREFIJO}${f} pesa demasiado para WhatsApp.`); continue }
       const datos = readFileSync(ruta)
       const tipo = tipoDe(f)
-      const m = tipo.startsWith('image/') && tipo !== 'image/gif'
-        ? await sock.sendMessage(jid, { image: datos, mimetype: tipo, caption: PREFIJO.trim() })
-        : await sock.sendMessage(jid, { document: datos, mimetype: tipo, fileName: f, caption: PREFIJO.trim() })
-      if (m?.key?.id) enviados.set(m.key.id, m.message)
+      await enviar(jid, tipo.startsWith('image/') && tipo !== 'image/gif'
+        ? { image: datos, mimetype: tipo, caption: PREFIJO.trim() }
+        : { document: datos, mimetype: tipo, fileName: f, caption: PREFIJO.trim() })
       log(`Archivo enviado: ${f}`)
     }
     rmSync(carpeta, { recursive: true, force: true })
@@ -381,7 +412,7 @@ async function iniciar() {
       if (esSi(texto) || n >= 0) {
         borrador = null
         const mensaje = n >= 0 ? b.opciones[n] : b.texto
-        await sock.sendMessage(b.para, { text: mensaje })
+        await enviar(b.para, { text: mensaje })
         log(`Enviado a ${nombreDe(b.para)}: ${mensaje}`)   // el registro de chats lo anota al llegar el eco
         registrar(texto, `Enviado a ${nombreDe(b.para)}: ${mensaje}`)
         return responder(jid, `${PREFIJO}Enviado a ${nombreDe(b.para)}.`)
@@ -427,6 +458,7 @@ async function iniciar() {
     log(`Orión: ${respuesta}`)
     registrar(texto, respuesta)
     await responder(jid, PREFIJO + respuesta)
+    log('Respuesta enviada.')
     await enviarArchivos(jid, salida)
 
     borrador = r.codigo === 0 ? leerBorrador() : null
@@ -518,6 +550,9 @@ async function iniciar() {
         const grupo = isJidGroup(chat)
         const pnChat = k.remoteJidAlt || chat
         const conmigo = !grupo && k.fromMe && (chat === yoPn || chat === yoLid || jidNormalizedUser(pnChat) === yoPn)
+        // Al chat contigo mismo se responde siempre por el número (jid PN), no por el @lid: es el mismo
+        // destino que usan los avisos y evita que la respuesta se pierda en el chat "lid" propio.
+        const destino = conmigo ? yoPn : chat
         const remitente = numeroDe(pnChat)
 
         if (!grupo && !k.fromMe) anotarContacto(chat, { nombre: msg.pushName, numero: remitente })
@@ -532,7 +567,7 @@ async function iniciar() {
           if (dicho) texto = `(nota de voz) ${dicho}`
         }
         if (esOrden) {
-          // Las respuestas de JARVIS también llegan a este chat: esas no son órdenes.
+          // Las respuestas de JARVIS también llegan a este destino: esas no son órdenes.
           // Los archivos que manda Orión llevan su prefijo como pie: "(foto) *Orión:*".
           const sinEtiqueta = texto.replace(/^\([^)]*\)\s*/, '')
           if (enviados.has(k.id) || [texto, sinEtiqueta].some((t) => t.startsWith(PREFIJO.trim()) || t.startsWith(PREFIJO_VIEJO.trim()))) continue
@@ -542,31 +577,31 @@ async function iniciar() {
           // es la orden; sin pie, Orión pregunta qué hacer y el archivo acompaña la siguiente orden.
           let adjunto = null
           try { adjunto = await bajarAdjunto(msg, contenido) } catch (e) {
-            await responder(chat, `${PREFIJO}No pude bajar ese archivo: ${e.message}.`)
+            await responder(destino, `${PREFIJO}No pude bajar ese archivo: ${e.message}.`)
             continue
           }
           if (adjunto) {
-            const p = pendientes.get(chat)
+            const p = pendientes.get(destino)
             const lista = [...(p && Date.now() < p.hasta ? p.rutas : []), adjunto]
             orden = contenido.imageMessage?.caption || contenido.documentMessage?.caption ||
               contenido.documentWithCaptionMessage?.message?.documentMessage?.caption
             if (!orden) {
-              pendientes.set(chat, { rutas: lista, hasta: Date.now() + SEGUIR_MIN * 60000 })
-              if (!p || Date.now() >= p.hasta) await responder(chat, `${PREFIJO}Recibido. ¿Qué hago con ${lista.length > 1 ? 'esto' : 'eso'}?`)
+              pendientes.set(destino, { rutas: lista, hasta: Date.now() + SEGUIR_MIN * 60000 })
+              if (!p || Date.now() >= p.hasta) await responder(destino, `${PREFIJO}Recibido. ¿Qué hago con ${lista.length > 1 ? 'esto' : 'eso'}?`)
               continue
             }
-            pendientes.delete(chat)
-            cadena = cadena.then(() => atender(chat, orden, lista)).catch((e) => log('Error atendiendo una orden:', e.message))
+            pendientes.delete(destino)
+            cadena = cadena.then(() => atender(destino, orden, lista)).catch((e) => log('Error atendiendo una orden:', e.message))
             continue
           }
           if (!orden) {
-            await responder(chat, `${PREFIJO}${contenido.audioMessage ? 'No pude entender la nota de voz. ¿Me la escribes?' : 'Por ahora entiendo texto, notas de voz, fotos y documentos.'}`)
+            await responder(destino, `${PREFIJO}${contenido.audioMessage ? 'No pude entender la nota de voz. ¿Me la escribes?' : 'Por ahora entiendo texto, notas de voz, fotos y documentos.'}`)
             continue
           }
-          const p = pendientes.get(chat)
+          const p = pendientes.get(destino)
           const lista = p && Date.now() < p.hasta ? p.rutas : []
-          pendientes.delete(chat)
-          cadena = cadena.then(() => atender(chat, orden, lista)).catch((e) => log('Error atendiendo una orden:', e.message))
+          pendientes.delete(destino)
+          cadena = cadena.then(() => atender(destino, orden, lista)).catch((e) => log('Error atendiendo una orden:', e.message))
           continue
         }
 
