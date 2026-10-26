@@ -4,7 +4,7 @@
 #
 #   scripts/seguridad.sh local                    auditoría de este equipo (SSH, puertos, cortafuegos, updates...)
 #   scripts/seguridad.sh puertos <host>           puertos abiertos y versiones (nmap, sin scripts intrusivos)
-#   scripts/seguridad.sh web <https://host[/..]>  cabeceras de seguridad, certificado y versiones de TLS
+#   scripts/seguridad.sh web <https://host[/..]>  QA web: cabeceras, TLS, cookies, CORS, HTTP sin cifrar y rutas expuestas
 #   scripts/seguridad.sh dependencias <carpeta>   vulnerabilidades conocidas en las dependencias de un proyecto
 #   scripts/seguridad.sh codigo <carpeta>         análisis estático del código y secretos olvidados (bandit, semgrep, gitleaks)
 #   scripts/seguridad.sh objetivos                los sistemas que se pueden probar (para auditar varios a la vez)
@@ -25,7 +25,7 @@ permitido() {
   done
   echo "Objetivo no permitido: $1"
   echo "Solo se prueban los sistemas de David. Para añadir uno, David lo pone a mano en .env:"
-  echo "  JARVIS_OBJETIVOS_SEGURIDAD=1-2-3-4.sslip.io,79.143.88.182"
+  echo "  JARVIS_OBJETIVOS_SEGURIDAD=ubuntulabs.co,www.ubuntulabs.co,api.ubuntulabs.co,cuenta.ubuntulabs.co,79.143.88.182"
   exit 2
 }
 
@@ -107,15 +107,18 @@ web() {
   local url="$1" host
   host=$(echo "$url" | sed -E 's#^[a-z]+://##; s#[/:].*##')
   permitido "$host"
+
   titulo "Cabeceras de seguridad de $url"
   cab=$(curl -sS -I -L --max-time 15 "$url" 2>&1)
   echo "$cab" | grep -iE '^(HTTP/|server:|x-powered-by:)'
   for h in Strict-Transport-Security Content-Security-Policy X-Frame-Options X-Content-Type-Options Referrer-Policy Permissions-Policy; do
     echo "$cab" | grep -qi "^$h:" && echo "OK     $h" || echo "FALTA  $h"
   done
+
   titulo "Certificado TLS"
   echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null \
     | openssl x509 -noout -subject -issuer -dates 2>/dev/null || echo "Sin TLS en el puerto 443"
+
   titulo "Versiones de TLS aceptadas"
   for v in tls1 tls1_1 tls1_2 tls1_3; do
     if echo | openssl s_client -connect "$host:443" -servername "$host" "-$v" >/dev/null 2>&1; then
@@ -124,6 +127,50 @@ web() {
       echo "$v: rechazada"
     fi
   done
+
+  titulo "Cookies de sesión"
+  # Set-Cookie puede venir en la respuesta; miramos las flags de cada una (solo lectura).
+  cookies=$(echo "$cab" | grep -i '^set-cookie:')
+  if [ -n "$cookies" ]; then
+    echo "$cookies" | while IFS= read -r c; do
+      nombre=$(echo "$c" | sed -E 's/^[Ss]et-[Cc]ookie:[[:space:]]*([^=]+)=.*/\1/')
+      faltan=""
+      echo "$c" | grep -qi 'Secure'   || faltan="$faltan Secure"
+      echo "$c" | grep -qi 'HttpOnly' || faltan="$faltan HttpOnly"
+      echo "$c" | grep -qi 'SameSite' || faltan="$faltan SameSite"
+      if [ -n "$faltan" ]; then echo "  $nombre: le faltan ->$faltan"; else echo "  $nombre: ok (Secure/HttpOnly/SameSite)"; fi
+    done
+  else
+    echo "  (sin Set-Cookie en la respuesta inicial)"
+  fi
+
+  titulo "CORS"
+  # Solo lectura: enviamos un Origin de prueba y miramos qué refleja el servidor. No tocamos datos.
+  acao=$(curl -sS -I -L --max-time 15 -H "Origin: https://prueba-cors.invalid" "$url" 2>&1 | grep -i '^access-control-allow-origin:')
+  if [ -n "$acao" ]; then
+    echo "  $acao"
+    echo "$acao" | grep -qiE '(\*|prueba-cors\.invalid)' && echo "  AVISO: CORS permisivo (usa * o refleja cualquier origen)"
+  else
+    echo "  Sin Access-Control-Allow-Origin (no expone CORS abierto)"
+  fi
+
+  titulo "HTTP sin cifrar"
+  # Un login servido por http:// viaja en claro. Comprobamos que http redirige a https.
+  red=$(curl -sS -o /dev/null -w '%{http_code} -> %{redirect_url}' --max-time 15 "http://$host" 2>/dev/null)
+  echo "  http://$host : $red"
+  echo "$red" | grep -qiE '^(301|302|307|308) .*https://' || echo "  AVISO: http:// no redirige a https (contenido/login en claro)"
+
+  titulo "Rutas sensibles expuestas (solo GET, no toca datos)"
+  # Pedimos cada ruta con GET y solo miramos el código. No enviamos formularios ni credenciales.
+  for ruta in /.git/config /.env /.env.local /backup.zip /backup.sql /config.php.bak /.DS_Store /server-status /phpinfo.php /.well-known/security.txt; do
+    code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "https://$host$ruta" 2>/dev/null)
+    case "$ruta:$code" in
+      /.well-known/security.txt:200) echo "  OK        $ruta  (security.txt publicado)";;
+      *:200) echo "  EXPUESTA  $ruta  (HTTP 200 — revisa si debería ser accesible)";;
+      *:301|*:302|*:401|*:403) echo "  $code      $ruta";;
+    esac
+  done
+  echo "  (solo se listan 200/301/302/401/403; 404 = no existe, se omite)"
 }
 
 dependencias() {
