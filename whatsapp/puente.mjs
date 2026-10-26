@@ -567,7 +567,7 @@ async function iniciar() {
           if (dicho) texto = `(nota de voz) ${dicho}`
         }
         if (esOrden) {
-          // Las respuestas de JARVIS también llegan a este destino: esas no son órdenes.
+          // Las respuestas de JARVIS también llegan a este chat: esas no son órdenes.
           // Los archivos que manda Orión llevan su prefijo como pie: "(foto) *Orión:*".
           const sinEtiqueta = texto.replace(/^\([^)]*\)\s*/, '')
           if (enviados.has(k.id) || [texto, sinEtiqueta].some((t) => t.startsWith(PREFIJO.trim()) || t.startsWith(PREFIJO_VIEJO.trim()))) continue
