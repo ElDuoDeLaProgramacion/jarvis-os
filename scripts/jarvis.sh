@@ -51,8 +51,12 @@ permitidas=(
   "Bash(date:*)" "Bash(mkdir:*)" "Bash(ls:*)" "Bash(mv:*)"
   "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git init:*)" "Bash(git checkout -b:*)"
   "Bash(git add:*)" "Bash(git commit:*)" "Bash(npm test:*)" "Bash(npm ci:*)" "Bash(npm run build:*)" "Bash(python3:*)" "Bash(pdftotext:*)"
-  # Pruebas de seguridad: el script solo revisa (no cambia nada) y solo los sistemas de David.
+  # Pruebas de seguridad (QA de solo lectura): el script solo revisa (no cambia nada) y solo apunta a
+  # los sistemas de David (allowlist JARVIS_OBJETIVOS_SEGURIDAD, que el propio script comprueba). Se
+  # permiten las cuatro formas de invocarlo para que Orión pueda lanzar el QA por cualquier canal
+  # —WhatsApp incluido, donde no hay forma de aprobar un permiso a mano— sin quedarse trabado.
   "Bash(scripts/seguridad.sh:*)" "Bash(./scripts/seguridad.sh:*)"
+  "Bash(bash scripts/seguridad.sh:*)" "Bash(bash ./scripts/seguridad.sh:*)"
   # IAs externas (Gemini, OpenRouter) para una segunda opinión; ya entra en python3, se nombra por claridad.
   "Bash(python3 scripts/ia_externa.py:*)"
   "Bash(python3 scripts/cerebro.py:*)"
