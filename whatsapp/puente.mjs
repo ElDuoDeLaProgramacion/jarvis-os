@@ -151,6 +151,12 @@ function jarvis(args) {
     const reloj = setTimeout(() => p.kill('SIGTERM'), 15 * 60 * 1000)
     p.stdout.on('data', (d) => { out += d })
     p.stderr.on('data', (d) => { err += d })
+    // Sin esto, un fallo al lanzar jarvis.sh (p. ej. EACCES si perdió el permiso de ejecución) tumba el puente.
+    p.on('error', (e) => {
+      clearTimeout(reloj)
+      log(`No pude ejecutar scripts/jarvis.sh: ${e.code || e.message}`)
+      resolve({ codigo: -1, out: '', sesion: null })
+    })
     p.on('close', (codigo) => {
       clearTimeout(reloj)
       const sesion = err.split('\n').find((l) => l.startsWith('SESION='))?.slice(7).trim() || null
