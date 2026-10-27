@@ -29,7 +29,7 @@ class Base(unittest.TestCase):
         for attr, val in (("PERSONAS", self.dir / "personas"), ("ADMIN", self.dir / "admin.json"),
                           ("SESIONES", self.dir / "sesiones.json"), ("AUTOR", self.dir / "autorizaciones"),
                           ("ALERTAS", self.dir / "alertas.jsonl"), ("INFORMES", self.dir / "informes"),
-                          ("PAUSA", self.dir / "PAUSA")):
+                          ("BLOQUEADOS", self.dir / "bloqueados"), ("PAUSA", self.dir / "PAUSA")):
             setattr(servidor, attr, val)
         servidor.PERSONAS.write_text("ana\t" + seguridad.cifrar_clave("clave-de-ana") + "\n"
                                      "luis\t" + seguridad.cifrar_clave("clave-de-luis") + "\n")
@@ -156,6 +156,39 @@ class Panel(Base):
         self.assertEqual(self.pedir("POST", "/api/pedir", {"texto": "x"}, cookie=ap)[0], 409)
         self.assertTrue(self.pedir("POST", "/panel/api/quitar", {"nombre": "luis"}, cookie=ck)[1]["ok"])
         self.assertNotIn("luis", servidor.leer_personas())
+
+    def test_bloquear_impide_entrar(self):
+        ck = self.entrar_panel()
+        # Bloqueada: la cuenta sigue, pero no puede entrar.
+        self.assertTrue(self.pedir("POST", "/panel/api/bloquear", {"nombre": "ana", "activar": True}, cookie=ck)[1]["bloqueado"])
+        self.assertIn("ana", servidor.leer_bloqueados())
+        self.assertEqual(self.pedir("POST", "/api/entrar", {"usuario": "ana", "clave": "clave-de-ana"})[0], 403)
+        # Desbloqueada: vuelve a entrar.
+        self.assertFalse(self.pedir("POST", "/panel/api/bloquear", {"nombre": "ana", "activar": False}, cookie=ck)[1]["bloqueado"])
+        self.assertIsNotNone(self.entrar_persona("ana", "clave-de-ana"))
+
+    def test_avisar_aparece_en_la_sala(self):
+        ck = self.entrar_panel()
+        self.assertTrue(self.pedir("POST", "/panel/api/avisar", {"nombre": "ana", "texto": "revisa el login"}, cookie=ck)[1]["ok"])
+        self.assertEqual(self.pedir("POST", "/panel/api/avisar", {"nombre": "ana", "texto": ""}, cookie=ck)[0], 400)
+        ap = self.entrar_persona("ana", "clave-de-ana")
+        _, sala, _ = self.pedir("GET", "/api/sala?desde=0", cookie=ap)
+        self.assertTrue(any("revisa el login" in m["texto"] for m in sala["mensajes"]))
+
+    def test_empezar_arranca_la_sesion(self):
+        ck = self.entrar_panel()
+        self.assertTrue(self.pedir("POST", "/panel/api/empezar", cookie=ck)[1]["ok"])
+        ap = self.entrar_persona("ana", "clave-de-ana")
+        import time
+        for _ in range(100):
+            _, sala, _ = self.pedir("GET", "/api/sala?desde=0", cookie=ap)
+            if any("Arrancamos" in m["texto"] for m in sala["mensajes"]):
+                break
+            time.sleep(0.05)
+        self.assertTrue(any("Arrancamos" in m["texto"] for m in sala["mensajes"]))
+        # En pausa no deja empezar.
+        self.pedir("POST", "/panel/api/pausa", {"activar": True}, cookie=ck)
+        self.assertEqual(self.pedir("POST", "/panel/api/empezar", cookie=ck)[0], 409)
 
 
 if __name__ == "__main__":

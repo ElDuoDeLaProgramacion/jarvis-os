@@ -38,6 +38,7 @@ SALA_JSON = Path(os.environ.get("ORION_EQUIPO_SALA", CASA / "sala" / "sala.json"
 AUTOR = CASA / "autorizaciones"
 ALERTAS = CASA / "alertas.jsonl"
 INFORMES = CASA / "informes"
+BLOQUEADOS = CASA / "bloqueados"
 ESPACIO = Path(os.environ.get("ORION_EQUIPO_ESPACIO", CASA / "espacio"))
 PAUSA = CASA / "PAUSA"
 
@@ -136,6 +137,28 @@ def leer_personas(archivo=None):
 def persona_correcta(usuario, clave):
     h = leer_personas().get(str(usuario or "").strip())
     return bool(h) and seguridad.clave_correcta(str(clave or ""), h)
+
+
+def leer_bloqueados():
+    """Nombres a los que David bloqueó la entrada (reversible, no borra su cuenta)."""
+    try:
+        return {l.strip() for l in BLOQUEADOS.read_text(encoding="utf-8").splitlines() if l.strip()}
+    except OSError:
+        return set()
+
+
+def bloquear_persona(nombre, activar):
+    nombre = str(nombre or "").strip()
+    actuales = leer_bloqueados()
+    if activar:
+        actuales.add(nombre)
+    else:
+        actuales.discard(nombre)
+    BLOQUEADOS.write_text("".join(n + "\n" for n in sorted(actuales)), encoding="utf-8")
+    try:
+        BLOQUEADOS.chmod(0o600)
+    except OSError:
+        pass
 
 
 # ---------- sesiones (cookie) ----------
@@ -311,6 +334,28 @@ class Sala:
             with self.cerrojo:
                 self.ocupado -= 1
 
+    # Botón "Empezar" del panel: Orión saluda y reparte los roles del trabajo de hoy.
+    ARRANQUE = ("David dio inicio a la sesión de hoy. Saluda al equipo con energía pero breve, y "
+                "reparte los roles del trabajo de seguridad sobre los objetivos autorizados: di quién "
+                "se encarga del reconocimiento, quién revisa cabeceras/TLS/puertos, quién prepara las "
+                "pruebas activas (recuerda que esas requieren la autorización de David) y quién arma el "
+                "informe. Si no conoces los nombres del equipo, pide que cada quien diga en qué quiere ir.")
+
+    def arrancar(self):
+        with self.cerrojo:
+            self.ocupado += 1
+        n = self.anotar("David", "¡Arrancamos! Vamos a empezar con el trabajo de hoy.")
+        threading.Thread(target=self._arrancar_bg, args=(n,), daemon=True).start()
+        return n
+
+    def _arrancar_bg(self, n):
+        try:
+            with self.turno:
+                self.anotar("orion", self._orion("David", self.ARRANQUE), para=n)
+        finally:
+            with self.cerrojo:
+                self.ocupado -= 1
+
     def _orion(self, nombre, pedido):
         args = []
         s = self.sesion
@@ -435,11 +480,16 @@ class Manejador(BaseHTTPRequestHandler):
             return self._sala_get(ruta, url)
         self._json({"error": "no existe"}, 404)
 
+    def _quien_sala(self):
+        """Quién está en la sala por su cookie; None si no entró o si David lo bloqueó."""
+        quien = self.sesiones.quien(self._cookie("oe_sesion"), "persona")
+        return quien if quien and quien not in leer_bloqueados() else None
+
     def _sala_get(self, ruta, url):
         if ruta == "/api/yo":
-            quien = self.sesiones.quien(self._cookie("oe_sesion"), "persona")
+            quien = self._quien_sala()
             return self._json({"nombre": quien} if quien else {"error": "entra"}, 200 if quien else 401)
-        quien = self.sesiones.quien(self._cookie("oe_sesion"), "persona")
+        quien = self._quien_sala()
         if not quien:
             return self._json({"error": "entra", "salir": True}, 401)
         if ruta == "/api/sala":
@@ -472,6 +522,7 @@ class Manejador(BaseHTTPRequestHandler):
             hoy = self.sala.cuenta if self.sala.cuenta.get("dia") == datetime.now().strftime("%Y-%m-%d") else {}
             return self._json({"pausa": PAUSA.exists(),
                                "personas": sorted(leer_personas().keys()),
+                               "bloqueados": sorted(leer_bloqueados()),
                                "pendientes": len(pendientes()),
                                "pedidos_hoy": {k: v for k, v in hoy.items() if k != "dia"},
                                "hallazgos_url": os.environ.get("ORION_EQUIPO_HALLAZGOS_URL", "")})
@@ -524,12 +575,14 @@ class Manejador(BaseHTTPRequestHandler):
                 return self._json({"error": "demasiados intentos, espera unos minutos"}, 429)
             j = self._cuerpo() or {}
             if persona_correcta(j.get("usuario"), j.get("clave")):
+                if str(j["usuario"]).strip() in leer_bloqueados():
+                    return self._json({"error": "tu entrada está bloqueada; habla con David"}, 403)
                 t = self.sesiones.crear(str(j["usuario"]).strip(), "persona")
                 return self._json({"ok": True}, cookie=self._set_cookie("oe_sesion", t, "/"))
             self.fallos.anotar(ip)
             time.sleep(0.4)
             return self._json({"error": "usuario o contraseña incorrectos"}, 401)
-        quien = self.sesiones.quien(self._cookie("oe_sesion"), "persona")
+        quien = self._quien_sala()
         if not quien:
             return self._json({"error": "entra", "salir": True}, 401)
         if not self._csrf():
@@ -610,6 +663,30 @@ class Manejador(BaseHTTPRequestHandler):
                 self.sesiones.borrar_persona(nombre)
                 anotar_alerta("quitada", nombre, f"David quitó a {nombre} del equipo.")
             return self._json({"ok": quitado})
+        if ruta == "/panel/api/bloquear":
+            nombre = str(j.get("nombre") or "").strip()
+            activar = bool(j.get("activar", True))
+            bloquear_persona(nombre, activar)
+            if activar:
+                self.sesiones.borrar_persona(nombre)   # lo saca al instante
+                anotar_alerta("bloqueada", nombre, f"David bloqueó la entrada de {nombre}.")
+            else:
+                anotar_alerta("desbloqueada", nombre, f"David desbloqueó a {nombre}.")
+            return self._json({"ok": True, "bloqueado": activar})
+        if ruta == "/panel/api/avisar":
+            nombre = str(j.get("nombre") or "").strip()
+            texto = str(j.get("texto") or "").strip()[:500]
+            if not nombre or not texto:
+                return self._json({"error": "falta a quién o el mensaje"}, 400)
+            self.sala.anotar("David", f"Aviso para {nombre}: {texto}")
+            anotar_alerta("aviso", nombre, f"David avisó a {nombre}: {texto}")
+            return self._json({"ok": True})
+        if ruta == "/panel/api/empezar":
+            if PAUSA.exists():
+                return self._json({"error": "está en pausa; reanuda antes de empezar"}, 409)
+            self.sala.arrancar()
+            anotar_alerta("empezar", "", "David dio inicio a la sesión; Orión reparte roles.")
+            return self._json({"ok": True})
         self._json({"error": "no existe"}, 404)
 
     @staticmethod

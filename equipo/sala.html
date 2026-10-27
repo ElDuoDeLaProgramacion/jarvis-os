@@ -191,9 +191,17 @@ function pintar(m) {
 }
 
 function bienvenida() {
-  $("mensajes").innerHTML =
-    '<div class="centro">Hola <b>' + nombre.replace(/[<>&]/g, "") + '</b>. Esta es la sala del equipo. ' +
-    'Pídele a Orión que te guíe o que revise algo; recuerda entregar <b>tu informe</b> al terminar.</div>';
+  // Saludo instantáneo de Orión (del lado del cliente, sin esperar al modelo).
+  $("mensajes").innerHTML = "";
+  const div = document.createElement("div");
+  div.className = "m orion";
+  const quien = document.createElement("small");
+  quien.textContent = "Orión";
+  const cuerpo = document.createElement("div");
+  cuerpo.textContent = "¡Hola, " + nombre + "! Soy Orión, tu senior de seguridad. Esta es la sala del equipo: " +
+    "pídeme que te guíe, que revise algo o que repartamos tareas. Cuando terminen, no olviden su informe.";
+  div.append(quien, cuerpo);
+  $("mensajes").append(div);
 }
 
 async function leer() {
@@ -201,7 +209,6 @@ async function leer() {
     const d = await api("/api/sala?desde=" + ultimo);
     const caja = $("mensajes");
     const abajo = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 90;
-    if (d.mensajes.length && ultimo === 0) caja.innerHTML = "";
     for (const m of d.mensajes) { pintar(m); ultimo = m.n; }
     if (d.mensajes.length && abajo) caja.scrollTop = caja.scrollHeight;
     $("pensando").textContent = d.ocupado ? "Orión está trabajando…" : "";
