@@ -38,6 +38,7 @@ sudo install -d -o "$(id -un)" -g "$(id -gn)" -m 755 "$sitios_dir"
 touch .env
 if ! grep -q '^JARVIS_SITIOS_URL=' .env; then echo "JARVIS_SITIOS_URL=https://sitios.$dominio" >> .env; fi
 
+sudo install -d -m 755 /etc/caddy/conf.d
 sudo tee /etc/caddy/Caddyfile >/dev/null <<EOF
 # Lo escribe servidor/publicar.sh. La API de Orión, publicada con HTTPS.
 $dominio {
@@ -65,6 +66,9 @@ sitios.$dominio {
 		-Server
 	}
 }
+
+# Otros sitios de este servidor (por ejemplo la sala de Orión Equipo, equipo/instalar.sh).
+import /etc/caddy/conf.d/*.caddy
 EOF
 sudo systemctl restart jarvis-app 2>/dev/null || true   # para que la API lea JARVIS_SITIOS_URL
 sudo systemctl enable caddy >/dev/null 2>&1 || true
