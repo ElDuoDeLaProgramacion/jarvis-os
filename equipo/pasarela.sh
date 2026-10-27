@@ -5,15 +5,18 @@
 #   OPENROUTER_API_KEY=sk-or-... ./equipo/pasarela.sh                                           # modelo gratis
 #   OPENROUTER_API_KEY=sk-or-... ./equipo/pasarela.sh openrouter/anthropic/claude-sonnet-4.5    # otro modelo
 #
-# Por defecto usa un modelo GRATIS de OpenRouter (sin gasto). Los modelos gratis responden rápido pero
-# son más flojos usando herramientas; si Orión necesita más músculo para pentest, pásale uno de pago
-# como argumento. Deja un servicio orion-equipo-gw escuchando SOLO en 127.0.0.2:8788 (una dirección que el
+# Por defecto usa el "enrutador de modelos gratis" de OpenRouter (openrouter/free): él escoge uno de los
+# modelos gratis que estén disponibles en ese momento y que sirvan para herramientas. Así no se cae cuando
+# OpenRouter quita el plan gratis de un modelo suelto (como pasó con DeepSeek). Son modelos gratis, más
+# flojos con herramientas que Claude; si Orión necesita músculo para pentest, pásale uno de pago como
+# argumento. Deja un servicio orion-equipo-gw escuchando SOLO en 127.0.0.2:8788 (una dirección que el
 # servicio encerrado de Orión Equipo sí puede alcanzar; la API privada de David en 127.0.0.1 sigue
 # bloqueada), y configura el .env del equipo para que el motor use esa pasarela.
 set -euo pipefail
 CASA=/home/equipo
-# Gratis por defecto (David se quedó sin presupuesto). Lista de gratis: https://openrouter.ai/models?max_price=0
-MODELO="${1:-openrouter/deepseek/deepseek-chat-v3-0324:free}"
+# Gratis y resistente por defecto: el enrutador de modelos gratis de OpenRouter (https://openrouter.ai/openrouter/free).
+# En formato LiteLLM es "openrouter/" + el id "openrouter/free". Para fijar uno concreto, pásalo como argumento.
+MODELO="${1:-openrouter/openrouter/free}"
 paso() { echo; echo "== $* =="; }
 
 [ -n "${OPENROUTER_API_KEY:-}" ] || { echo "Falta OPENROUTER_API_KEY. Úsalo así: OPENROUTER_API_KEY=sk-or-... $0"; exit 1; }

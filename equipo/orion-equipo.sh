@@ -66,16 +66,42 @@ opciones=(-p "$pedido" --output-format json
   --model "${ORION_EQUIPO_MODELO:-sonnet}")
 [ -n "$reanudar" ] && opciones+=(--resume "$reanudar")
 
-salida=$(claude "${opciones[@]}" </dev/null)
+# No abortamos si claude falla: queremos ver su error, no quedarnos en silencio.
+cerr=$(mktemp 2>/dev/null) || cerr="logs/.err.$$"
+set +e
+salida=$(claude "${opciones[@]}" 2>"$cerr" </dev/null)
+codigo=$?
+set -e
+errc=$(cat "$cerr" 2>/dev/null); rm -f "$cerr" 2>/dev/null || true
+
+id_sesion=""; es_error="0"; respuesta=""
 if datos=$(printf '%s' "$salida" | python3 -c 'import json, sys
 d = json.load(sys.stdin)
 print(d.get("session_id") or "")
+print("1" if d.get("is_error") else "0")
 print(d.get("result") or "")' 2>/dev/null); then
-  id_sesion=$(printf '%s\n' "$datos" | head -n 1)
-  respuesta=$(printf '%s\n' "$datos" | tail -n +2)
+  id_sesion=$(printf '%s\n' "$datos" | sed -n 1p)
+  es_error=$(printf '%s\n' "$datos" | sed -n 2p)
+  respuesta=$(printf '%s\n' "$datos" | sed -n '3,$p')
 else
-  id_sesion=""; respuesta="$salida"
+  respuesta="$salida"
 fi
-[ -n "$id_sesion" ] && echo "SESION=$id_sesion" >&2
-echo "$(date -Iseconds) < $respuesta" >> logs/orion.log
-echo "$respuesta"
+
+# ¿Hubo respuesta de verdad?
+if [ "$codigo" -eq 0 ] && [ "$es_error" != "1" ] && [ -n "${respuesta//[[:space:]]/}" ]; then
+  [ -n "$id_sesion" ] && echo "SESION=$id_sesion" >&2
+  echo "$(date -Iseconds) < $respuesta" >> logs/orion.log
+  echo "$respuesta"
+  exit 0
+fi
+
+# Falló: saca a la luz el motivo real (el "result" de claude, o su stderr), no un "sin detalle".
+if [ -n "${respuesta//[[:space:]]/}" ]; then
+  motivo="$respuesta"
+else
+  motivo=$(printf '%s' "$errc" | grep -viE '^[[:space:]]*$' | tail -n 2 | tr '\n' ' ')
+fi
+[ -n "$motivo" ] || motivo="el motor no respondió (código $codigo); revisa: sudo journalctl -u orion-equipo-gw -n 30"
+echo "$(date -Iseconds) ! $motivo" >> logs/orion.log
+echo "$motivo" >&2
+exit 1
