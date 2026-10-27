@@ -13,6 +13,7 @@ agenda, WhatsApp, billetera): solo pasa los pedidos a equipo/orion-equipo.sh. So
 """
 
 import argparse
+import html
 import json
 import os
 import re
@@ -21,6 +22,7 @@ import subprocess
 import threading
 import time
 from datetime import datetime
+from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -44,6 +46,74 @@ LIMITE_SEG = 15 * 60
 MAX_MENSAJES = 300
 MAX_TEXTO = 4000
 HORAS_SESION = 12
+
+
+# ---------- informe: limpiar el HTML que escribe el equipo ----------
+# El informe es un documento que el estudiante edita (texto e imágenes) y David lee en su panel.
+# Como es contenido escrito por otra persona, antes de guardarlo dejamos solo una lista blanca de
+# etiquetas y quitamos scripts, estilos y cualquier atributo peligroso. Las imágenes solo pueden ser
+# data:image incrustadas (nada de URLs externas), así el informe es autocontenido y no filtra nada.
+
+_ETIQUETAS_OK = {"p", "br", "b", "strong", "i", "em", "u", "h3", "ul", "ol", "li", "a", "img", "div", "span"}
+_ATRIBUTOS_OK = {"a": {"href"}, "img": {"src"}}
+_IMG_OK = re.compile(r"^data:image/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=\s]+$")
+_SOLO_CIERRE = {"br", "img"}
+
+
+class _LimpiadorHTML(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.partes = []
+
+    def _atributos(self, tag, attrs):
+        permitidos = _ATRIBUTOS_OK.get(tag, set())
+        salida = []
+        for k, v in attrs:
+            k = (k or "").lower()
+            if k not in permitidos or not v:
+                continue
+            v = v.strip()
+            if tag == "img" and k == "src":
+                if not _IMG_OK.match(v):
+                    return None  # imagen inválida: se descarta la etiqueta entera
+                salida.append(("src", v))
+            elif tag == "a" and k == "href" and v.lower().startswith(("http://", "https://")):
+                salida.append(("href", v))
+        return salida
+
+    def _abrir(self, tag, attrs, cierre_propio=False):
+        tag = tag.lower()
+        if tag not in _ETIQUETAS_OK:
+            return
+        a = self._atributos(tag, attrs)
+        if tag == "img" and not a:
+            return
+        att = "".join(' {}="{}"'.format(k, html.escape(v, quote=True)) for k, v in (a or []))
+        if tag in _SOLO_CIERRE:
+            self.partes.append("<{}{}>".format(tag, att))
+        else:
+            self.partes.append("<{}{}>".format(tag, att))
+
+    def handle_starttag(self, tag, attrs):
+        self._abrir(tag, attrs)
+
+    def handle_startendtag(self, tag, attrs):
+        self._abrir(tag, attrs, cierre_propio=True)
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if tag in _ETIQUETAS_OK and tag not in _SOLO_CIERRE:
+            self.partes.append("</{}>".format(tag))
+
+    def handle_data(self, data):
+        self.partes.append(html.escape(data))
+
+
+def limpiar_informe(texto, maximo=8_000_000):
+    p = _LimpiadorHTML()
+    p.feed(str(texto)[:maximo])
+    p.close()
+    return "".join(p.partes)
 
 
 # ---------- personas (usuario + contraseña) ----------
@@ -379,7 +449,18 @@ class Manejador(BaseHTTPRequestHandler):
                 n = 0
             mensajes, ocupado = self.sala.desde(n)
             return self._json({"mensajes": mensajes, "ocupado": ocupado, "pausa": PAUSA.exists()})
+        if ruta == "/api/informe":
+            arch = INFORMES / self._nombre_informe(quien)
+            try:
+                return self._json({"html": limpiar_informe(arch.read_text(encoding="utf-8"))})
+            except OSError:
+                return self._json({"html": ""})
         self._json({"error": "no existe"}, 404)
+
+    @staticmethod
+    def _nombre_informe(quien):
+        limpio = re.sub(r"[^a-z0-9_-]", "", quien.lower()) or "equipo"
+        return f"{datetime.now().strftime('%Y-%m-%d')}-{limpio}.html"
 
     def _panel_get(self, ruta, url):
         if ruta == "/panel/api/sesion":
@@ -392,7 +473,8 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"pausa": PAUSA.exists(),
                                "personas": sorted(leer_personas().keys()),
                                "pendientes": len(pendientes()),
-                               "pedidos_hoy": {k: v for k, v in hoy.items() if k != "dia"}})
+                               "pedidos_hoy": {k: v for k, v in hoy.items() if k != "dia"},
+                               "hallazgos_url": os.environ.get("ORION_EQUIPO_HALLAZGOS_URL", "")})
         if ruta == "/panel/api/alertas":
             return self._json({"alertas": alertas_recientes()})
         if ruta == "/panel/api/autorizaciones":
@@ -406,7 +488,7 @@ class Manejador(BaseHTTPRequestHandler):
         """Informes de los estudiantes (CASA/informes) y los de Orión (su bóveda)."""
         archivos = []
         try:
-            archivos += list(INFORMES.glob("*.md"))
+            archivos += list(INFORMES.glob("*.md")) + list(INFORMES.glob("*.html"))
         except OSError:
             pass
         try:
@@ -416,9 +498,14 @@ class Manejador(BaseHTTPRequestHandler):
         filas = []
         for f in sorted(archivos, key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)[:n]:
             try:
-                filas.append({"archivo": f.name, "texto": f.read_text(encoding="utf-8")[:4000]})
+                contenido = f.read_text(encoding="utf-8")
             except OSError:
-                pass
+                continue
+            if f.suffix == ".html":
+                # Ya viene saneado desde que se guardó; lo limpiamos otra vez por si acaso.
+                filas.append({"archivo": f.name, "html": limpiar_informe(contenido)})
+            else:
+                filas.append({"archivo": f.name, "texto": contenido[:4000]})
         return filas
 
     # ------------------------------------------------ POST
@@ -463,15 +550,16 @@ class Manejador(BaseHTTPRequestHandler):
                 return self._json({"error": "llegaste al tope de pedidos de hoy; mañana sigues"}, 429)
             return self._json({"ok": True, "n": self.sala.pedir(quien, texto)}, 202)
         if ruta == "/api/informe":
-            j = self._cuerpo(maximo=40000) or {}
-            texto = str(j.get("texto", "")).strip()
-            if len(texto) < 20:
+            j = self._cuerpo(maximo=8_000_000)
+            if j is None:
+                return self._json({"error": "el informe pesa demasiado; usa menos imágenes"}, 413)
+            limpio = limpiar_informe(j.get("html", ""))
+            plano = html.unescape(re.sub(r"<[^>]+>", "", limpio)).strip()
+            if len(plano) < 20 and "<img" not in limpio:
                 return self._json({"error": "el informe está muy corto"}, 400)
             INFORMES.mkdir(parents=True, exist_ok=True)
-            nombre = f"{datetime.now().strftime('%Y-%m-%d')}-{re.sub(r'[^a-z0-9_-]', '', quien.lower())}.md"
-            (INFORMES / nombre).write_text(f"# Informe de {quien} — {datetime.now():%d/%m/%Y %H:%M}\n\n{texto}\n",
-                                           encoding="utf-8")
-            anotar_alerta("informe", quien, f"{quien} entregó su informe de seguridad de la sesión.")
+            (INFORMES / self._nombre_informe(quien)).write_text(limpio + "\n", encoding="utf-8")
+            anotar_alerta("informe", quien, f"{quien} guardó su informe de seguridad de la sesión.")
             return self._json({"ok": True})
         self._json({"error": "no existe"}, 404)
 

@@ -70,7 +70,8 @@ Entras con la clave de `./equipo/admin.sh` y, si lo activaste, el código de 6 d
 - **Alertas**: lo que pasó, incluido si alguien pidió un objetivo fuera de la lista o algo activo.
 - **Equipo**: quién está y cuántos pedidos lleva hoy; botón para quitar a alguien.
 - **Pausa**: frena todas las pruebas activas de golpe.
-- **Informes**: el de Orión y el de cada estudiante por sesión.
+- **Informes**: el de Orión y el de cada estudiante por sesión (texto e imágenes; se ven aquí mismo).
+- **Switcher de proyectos**: arriba hay un botón **Hallazgos Viales** para saltar a tu otro panel. A dónde lleva lo pones con `ORION_EQUIPO_HALLAZGOS_URL` en `~equipo/.env` (por defecto `https://api.ubuntulabs.co/panel`); si lo dejas vacío, el botón solo muestra un aviso. (El camino de vuelta, el botón "Orión Equipo" dentro del panel de Hallazgos, se activa con `PANEL_ORION_URL` en el `.env` de ese servidor.)
 
 ## Pentest y autorización
 

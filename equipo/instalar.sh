@@ -71,6 +71,8 @@ JARVIS_OBJETIVOS_SEGURIDAD=
 # Pedidos por persona y por día (0 = sin tope).
 ORION_EQUIPO_LIMITE_DIA=40
 ORION_EQUIPO_URL=https://$dominio
+# Botón "Hallazgos Viales" del switcher de tu panel. Vacío = solo muestra un aviso.
+ORION_EQUIPO_HALLAZGOS_URL=https://api.ubuntulabs.co/panel
 EOF
 fi
 # Frase secreta del servidor (firma los tokens de sesión y las contraseñas): se crea una vez.
@@ -155,7 +157,7 @@ sudo tee /etc/caddy/conf.d/orion-equipo.caddy >/dev/null <<EOF
 $dominio {
 	encode gzip
 	request_body {
-		max_size 64KB
+		max_size 8MB
 	}
 	header {
 		Strict-Transport-Security "max-age=31536000"
