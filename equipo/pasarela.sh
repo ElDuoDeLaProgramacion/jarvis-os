@@ -31,25 +31,29 @@ if ! sudo grep -q '^ORION_GW_TOKEN=.\+' "$CASA/.env"; then
 fi
 sudo sed -i '/^OPENROUTER_API_KEY=/d' "$CASA/.env"
 echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" | sudo tee -a "$CASA/.env" >/dev/null
-# El motor del equipo usa la pasarela (orion-equipo.sh ya acepta estas dos variables).
-for par in "ANTHROPIC_BASE_URL=http://127.0.0.2:8788" "ANTHROPIC_AUTH_TOKEN=\${ORION_GW_TOKEN}" "ORION_EQUIPO_MODELO=orion"; do
+# El motor del equipo usa la pasarela (orion-equipo.sh ya acepta estas variables).
+# Claude Code valida el nombre del modelo, así que le pasamos uno que reconoce ("sonnet"); la
+# pasarela lo enruta a OpenRouter con el comodín de abajo. (Un nombre inventado da
+# [claude-code:unrecognized_model].)
+for par in "ANTHROPIC_BASE_URL=http://127.0.0.2:8788" "ANTHROPIC_AUTH_TOKEN=\${ORION_GW_TOKEN}" "ORION_EQUIPO_MODELO=sonnet"; do
   clave=${par%%=*}
   sudo sed -i "/^$clave=/d" "$CASA/.env"
 done
 {
   echo 'ANTHROPIC_BASE_URL=http://127.0.0.2:8788'
   echo 'ANTHROPIC_AUTH_TOKEN=${ORION_GW_TOKEN}'   # systemd EnvironmentFile no expande esto; se resuelve abajo
-  echo 'ORION_EQUIPO_MODELO=orion'
+  echo 'ORION_EQUIPO_MODELO=sonnet'
 } | sudo tee -a "$CASA/.env" >/dev/null
 # EnvironmentFile no expande variables; fijamos ANTHROPIC_AUTH_TOKEN al valor real del token.
 tok=$(sudo grep -oP '^ORION_GW_TOKEN=\K.*' "$CASA/.env")
 sudo sed -i "s|^ANTHROPIC_AUTH_TOKEN=.*|ANTHROPIC_AUTH_TOKEN=$tok|" "$CASA/.env"
 sudo chown equipo:equipo "$CASA/.env"; sudo chmod 600 "$CASA/.env"
 
-# Config de LiteLLM: el nombre "orion" (el que pide Orión Equipo) -> el modelo de OpenRouter que elijas.
+# Config de LiteLLM: comodín "*" = cualquier modelo que pida Claude Code (sonnet, haiku...) lo manda
+# al modelo de OpenRouter que elijas. Así no importa el id exacto que resuelva Claude Code.
 como tee "$CASA/pasarela.yaml" >/dev/null <<YAML
 model_list:
-  - model_name: orion
+  - model_name: "*"
     litellm_params:
       model: $MODELO
       api_key: os.environ/OPENROUTER_API_KEY
