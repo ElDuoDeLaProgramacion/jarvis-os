@@ -1,7 +1,8 @@
 """
 Sala de Orión Equipo + panel del dueño (equipo/README.md).
 
-- La sala (/) es el chat compartido del equipo. Cada persona entra con usuario y contraseña.
+- La sala (/) tiene dos pestañas: el chat grupal del equipo (lo ven todos) y el chat privado de
+  cada persona con Orión (uno a uno). Cada persona entra con usuario y contraseña.
 - El panel (/panel) es solo de David: ve alertas, aprueba o rechaza las pruebas activas que pide el
   equipo, quita a alguien y pausa todo. Entra con su clave y el código de 6 dígitos de su app.
 
@@ -13,6 +14,7 @@ agenda, WhatsApp, billetera): solo pasa los pedidos a equipo/orion-equipo.sh. So
 """
 
 import argparse
+import hashlib
 import html
 import json
 import os
@@ -35,6 +37,8 @@ PERSONAS = Path(os.environ.get("ORION_EQUIPO_PERSONAS", CASA / "personas"))
 ADMIN = CASA / "admin.json"
 SESIONES = CASA / "sesiones.json"
 SALA_JSON = Path(os.environ.get("ORION_EQUIPO_SALA", CASA / "sala" / "sala.json"))
+# El chat privado de cada persona con Orión (uno a uno), aparte del grupal.
+PRIVADO = Path(os.environ.get("ORION_EQUIPO_PRIVADO", CASA / "sala" / "privado"))
 AUTOR = CASA / "autorizaciones"
 ALERTAS = CASA / "alertas.jsonl"
 INFORMES = CASA / "informes"
@@ -408,6 +412,20 @@ class Manejador(BaseHTTPRequestHandler):
     sala = None
     sesiones = None
     fallos = None
+    privadas = {}                     # chat privado por persona, creado al vuelo
+    priv_cerrojo = threading.Lock()
+
+    def _sala_de(self, quien, privado):
+        """La sala grupal, o la privada uno-a-uno de esta persona (con su propia sesión de Orión)."""
+        if not privado:
+            return self.sala
+        slug = re.sub(r"[^A-Za-z0-9_-]", "_", quien)[:40] + "-" + hashlib.sha1(quien.encode()).hexdigest()[:8]
+        with Manejador.priv_cerrojo:
+            s = Manejador.privadas.get(quien)
+            if s is None:
+                s = Sala(PRIVADO / f"{slug}.json", guion=self.sala.guion, limite_dia=0)
+                Manejador.privadas[quien] = s
+            return s
 
     def end_headers(self):
         self.send_header("X-Frame-Options", "DENY")
@@ -493,11 +511,13 @@ class Manejador(BaseHTTPRequestHandler):
         if not quien:
             return self._json({"error": "entra", "salir": True}, 401)
         if ruta == "/api/sala":
+            q = parse_qs(url.query)
             try:
-                n = int(parse_qs(url.query).get("desde", ["0"])[0])
+                n = int(q.get("desde", ["0"])[0])
             except ValueError:
                 n = 0
-            mensajes, ocupado = self.sala.desde(n)
+            sala = self._sala_de(quien, q.get("privado", ["0"])[0] == "1")
+            mensajes, ocupado = sala.desde(n)
             return self._json({"mensajes": mensajes, "ocupado": ocupado, "pausa": PAUSA.exists()})
         if ruta == "/api/informe":
             arch = INFORMES / self._nombre_informe(quien)
@@ -599,9 +619,11 @@ class Manejador(BaseHTTPRequestHandler):
                 return self._json({"error": "vacío"}, 400)
             if len(texto) > MAX_TEXTO:
                 return self._json({"error": f"máximo {MAX_TEXTO} caracteres"}, 413)
+            # El tope diario es por persona y se comparte entre el grupal y el privado.
             if not self.sala.gastar(quien):
                 return self._json({"error": "llegaste al tope de pedidos de hoy; mañana sigues"}, 429)
-            return self._json({"ok": True, "n": self.sala.pedir(quien, texto)}, 202)
+            sala = self._sala_de(quien, bool(j.get("privado")))
+            return self._json({"ok": True, "n": sala.pedir(quien, texto)}, 202)
         if ruta == "/api/informe":
             j = self._cuerpo(maximo=8_000_000)
             if j is None:
