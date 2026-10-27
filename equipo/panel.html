@@ -145,7 +145,8 @@
 
     <section class="panel">
       <div class="cab"><h2>Estado</h2><span class="sp"></span><span id="estado-chip"></span></div>
-      <div class="fila"><span class="crece" id="resumen">…</span><button class="btn mal" id="pausa"></button></div>
+      <div class="fila"><span class="crece" id="resumen">…</span><button class="btn prim" id="empezar">Empezar la sesión</button><button class="btn mal" id="pausa"></button></div>
+      <p class="nota">“Empezar” hace que Orión salude al equipo, diga que arrancan y reparta los roles del día.</p>
     </section>
 
     <section class="panel">
@@ -207,6 +208,11 @@ async function cargar() {
     $("pausa").textContent = est.pausa ? "Reanudar" : "Pausar todo";
     $("pausa").className = est.pausa ? "btn prim" : "btn mal lleno";
     $("pausa").onclick = async () => { await api("/panel/api/pausa", { method: "POST", body: JSON.stringify({ activar: !est.pausa }) }); cargar(); };
+    $("empezar").disabled = est.pausa;
+    $("empezar").onclick = async () => {
+      if (!confirm("¿Arrancar la sesión? Orión saludará al equipo y repartirá los roles.")) return;
+      try { await api("/panel/api/empezar", { method: "POST" }); } catch (e) { alert(e.message || "No pude empezar."); }
+    };
 
     $("autorizaciones").innerHTML = aut.pendientes.length ? "" : '<div class="vacio">Nada pendiente.</div>';
     for (const p of aut.pendientes) {
@@ -222,13 +228,28 @@ async function cargar() {
       $("autorizaciones").append(d);
     }
 
+    const bloqueados = new Set(est.bloqueados || []);
     $("personas").innerHTML = est.personas.length ? "" : '<div class="vacio">Nadie todavía. Agrégalos con ./equipo/persona.sh</div>';
     for (const nombre of est.personas) {
       const d = document.createElement("div");
       d.className = "fila";
       const hoy = est.pedidos_hoy[nombre] || 0;
-      d.innerHTML = `<span class="crece">${esc(nombre)} <span class="tenue">· ${hoy} pedido(s) hoy</span></span><button class="btn mal sm">Quitar</button>`;
-      d.querySelector("button").onclick = async () => {
+      const bloq = bloqueados.has(nombre);
+      const marca = bloq ? ' <span class="chip alta">Bloqueado</span>' : "";
+      d.innerHTML = `<span class="crece">${esc(nombre)}${marca} <span class="tenue">· ${hoy} pedido(s) hoy</span></span>` +
+        `<button class="btn sm" data-a="avisar">Aviso</button>` +
+        `<button class="btn mal sm ${bloq ? "lleno" : ""}" data-a="bloquear">${bloq ? "Desbloquear" : "Bloquear"}</button>` +
+        `<button class="btn mal sm" data-a="quitar">Quitar</button>`;
+      const b = (a) => d.querySelector(`[data-a="${a}"]`);
+      b("avisar").onclick = async () => {
+        const texto = prompt("Aviso para " + nombre + ":");
+        if (!texto || !texto.trim()) return;
+        await api("/panel/api/avisar", { method: "POST", body: JSON.stringify({ nombre, texto }) }); cargar();
+      };
+      b("bloquear").onclick = async () => {
+        await api("/panel/api/bloquear", { method: "POST", body: JSON.stringify({ nombre, activar: !bloq }) }); cargar();
+      };
+      b("quitar").onclick = async () => {
         if (!confirm("¿Quitar a " + nombre + "? Dejará de entrar al instante.")) return;
         await api("/panel/api/quitar", { method: "POST", body: JSON.stringify({ nombre }) }); cargar();
       };

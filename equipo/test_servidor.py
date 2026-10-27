@@ -29,6 +29,7 @@ class Base(unittest.TestCase):
         for attr, val in (("PERSONAS", self.dir / "personas"), ("ADMIN", self.dir / "admin.json"),
                           ("SESIONES", self.dir / "sesiones.json"), ("AUTOR", self.dir / "autorizaciones"),
                           ("ALERTAS", self.dir / "alertas.jsonl"), ("INFORMES", self.dir / "informes"),
+                          ("BLOQUEADOS", self.dir / "bloqueados"), ("PRIVADO", self.dir / "privado"),
                           ("PAUSA", self.dir / "PAUSA")):
             setattr(servidor, attr, val)
         servidor.PERSONAS.write_text("ana\t" + seguridad.cifrar_clave("clave-de-ana") + "\n"
@@ -37,6 +38,7 @@ class Base(unittest.TestCase):
         servidor.Manejador.sala = servidor.Sala(self.dir / "sala.json", guion=str(guion), limite_dia=3)
         servidor.Manejador.sesiones = servidor.Sesiones(self.dir / "sesiones.json")
         servidor.Manejador.fallos = servidor.Fallos()
+        servidor.Manejador.privadas = {}   # chats privados en caché (atributo de clase): no filtrar entre pruebas
         self.http = ThreadingHTTPServer(("127.0.0.1", 0), servidor.Manejador)
         threading.Thread(target=self.http.serve_forever, daemon=True).start()
         self.puerto = self.http.server_address[1]
@@ -89,6 +91,25 @@ class Sala(Base):
             time.sleep(0.05)
         self.assertEqual(sala["mensajes"][1]["de"], "orion")
         self.assertIn("Hola ana", sala["mensajes"][1]["texto"])
+
+    def test_chat_privado_separado_del_grupal(self):
+        import time
+        ck = self.entrar_persona("ana", "clave-de-ana")
+        self.assertEqual(self.pedir("POST", "/api/pedir", {"texto": "solo tú y yo", "privado": True}, cookie=ck)[0], 202)
+        for _ in range(100):
+            _, priv, _ = self.pedir("GET", "/api/sala?privado=1&desde=0", cookie=ck)
+            if len(priv["mensajes"]) >= 2 and not priv["ocupado"]:
+                break
+            time.sleep(0.05)
+        self.assertTrue(any("solo tú y yo" in m["texto"] for m in priv["mensajes"]))
+        self.assertTrue(any(m["de"] == "orion" for m in priv["mensajes"]))
+        # El grupal no vio nada de ese chat privado.
+        _, grupo, _ = self.pedir("GET", "/api/sala?desde=0", cookie=ck)
+        self.assertEqual(grupo["mensajes"], [])
+        # El privado de otra persona tampoco comparte mensajes.
+        ck2 = self.entrar_persona("luis", "clave-de-luis")
+        _, priv2, _ = self.pedir("GET", "/api/sala?privado=1&desde=0", cookie=ck2)
+        self.assertEqual(priv2["mensajes"], [])
 
     def test_csrf_y_tope(self):
         ck = self.entrar_persona("ana", "clave-de-ana")
@@ -156,6 +177,39 @@ class Panel(Base):
         self.assertEqual(self.pedir("POST", "/api/pedir", {"texto": "x"}, cookie=ap)[0], 409)
         self.assertTrue(self.pedir("POST", "/panel/api/quitar", {"nombre": "luis"}, cookie=ck)[1]["ok"])
         self.assertNotIn("luis", servidor.leer_personas())
+
+    def test_bloquear_impide_entrar(self):
+        ck = self.entrar_panel()
+        # Bloqueada: la cuenta sigue, pero no puede entrar.
+        self.assertTrue(self.pedir("POST", "/panel/api/bloquear", {"nombre": "ana", "activar": True}, cookie=ck)[1]["bloqueado"])
+        self.assertIn("ana", servidor.leer_bloqueados())
+        self.assertEqual(self.pedir("POST", "/api/entrar", {"usuario": "ana", "clave": "clave-de-ana"})[0], 403)
+        # Desbloqueada: vuelve a entrar.
+        self.assertFalse(self.pedir("POST", "/panel/api/bloquear", {"nombre": "ana", "activar": False}, cookie=ck)[1]["bloqueado"])
+        self.assertIsNotNone(self.entrar_persona("ana", "clave-de-ana"))
+
+    def test_avisar_aparece_en_la_sala(self):
+        ck = self.entrar_panel()
+        self.assertTrue(self.pedir("POST", "/panel/api/avisar", {"nombre": "ana", "texto": "revisa el login"}, cookie=ck)[1]["ok"])
+        self.assertEqual(self.pedir("POST", "/panel/api/avisar", {"nombre": "ana", "texto": ""}, cookie=ck)[0], 400)
+        ap = self.entrar_persona("ana", "clave-de-ana")
+        _, sala, _ = self.pedir("GET", "/api/sala?desde=0", cookie=ap)
+        self.assertTrue(any("revisa el login" in m["texto"] for m in sala["mensajes"]))
+
+    def test_empezar_arranca_la_sesion(self):
+        ck = self.entrar_panel()
+        self.assertTrue(self.pedir("POST", "/panel/api/empezar", cookie=ck)[1]["ok"])
+        ap = self.entrar_persona("ana", "clave-de-ana")
+        import time
+        for _ in range(100):
+            _, sala, _ = self.pedir("GET", "/api/sala?desde=0", cookie=ap)
+            if any("Arrancamos" in m["texto"] for m in sala["mensajes"]):
+                break
+            time.sleep(0.05)
+        self.assertTrue(any("Arrancamos" in m["texto"] for m in sala["mensajes"]))
+        # En pausa no deja empezar.
+        self.pedir("POST", "/panel/api/pausa", {"activar": True}, cookie=ck)
+        self.assertEqual(self.pedir("POST", "/panel/api/empezar", cookie=ck)[0], 409)
 
 
 if __name__ == "__main__":

@@ -55,6 +55,10 @@
     border: 1px solid var(--borde); color: var(--texto); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
   .chip .punto { width: 8px; height: 8px; box-shadow: 0 0 8px var(--ok); background: var(--ok); }
   header button { padding: 8px 13px; font-size: 13px; }
+  #tabs { display: flex; gap: 6px; padding: 8px 16px; border-bottom: 1px solid var(--borde); background: var(--fondo2); }
+  .tab { background: transparent; color: var(--tenue); border: 1px solid var(--borde); padding: 7px 14px; font-size: 13px; border-radius: 999px; }
+  .tab:hover { color: var(--texto); border-color: var(--borde2); }
+  .tab.activo { background: var(--acento); color: var(--acento-t); border-color: var(--acento); font-weight: 650; }
 
   #mensajes { flex: 1; overflow-y: auto; padding: 18px 16px; display: flex; flex-direction: column; gap: 12px; }
   #mensajes .centro { margin: auto; text-align: center; color: var(--tenue); max-width: 440px; }
@@ -132,6 +136,11 @@
     <button class="fantasma" id="salir">Salir</button>
   </header>
 
+  <nav id="tabs" role="tablist" aria-label="Chats">
+    <button id="tab-grupo" class="tab activo" role="tab" aria-selected="true">Equipo</button>
+    <button id="tab-privado" class="tab" role="tab" aria-selected="false">Privado con Orión</button>
+  </nav>
+
   <div id="mensajes"></div>
 
   <div id="estado-barra">
@@ -172,7 +181,9 @@
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
-let nombre = "", ultimo = 0, timer = null;
+let nombre = "", timer = null, privado = false;
+const ultimos = { grupo: 0, privado: 0 };
+const clave = () => (privado ? "privado" : "grupo");
 
 async function api(ruta, opciones = {}) {
   const r = await fetch(ruta, { ...opciones, headers: { "Content-Type": "application/json", "X-OE": "1" } });
@@ -191,18 +202,30 @@ function pintar(m) {
 }
 
 function bienvenida() {
-  $("mensajes").innerHTML =
-    '<div class="centro">Hola <b>' + nombre.replace(/[<>&]/g, "") + '</b>. Esta es la sala del equipo. ' +
-    'Pídele a Orión que te guíe o que revise algo; recuerda entregar <b>tu informe</b> al terminar.</div>';
+  // Saludo instantáneo de Orión (del lado del cliente, sin esperar al modelo).
+  $("mensajes").innerHTML = "";
+  const div = document.createElement("div");
+  div.className = "m orion";
+  const quien = document.createElement("small");
+  quien.textContent = "Orión";
+  const cuerpo = document.createElement("div");
+  cuerpo.textContent = privado
+    ? "¡Hola, " + nombre + "! Este es tu chat privado conmigo: aquí solo estamos tú y yo, nadie más del " +
+      "equipo lo ve. Pregúntame lo que quieras, practica o pídeme que revisemos algo con calma."
+    : "¡Hola, " + nombre + "! Soy Orión, tu senior de seguridad. Esta es la sala del equipo (la ven todos): " +
+      "pídeme que te guíe, que revise algo o que repartamos tareas. Cuando terminen, no olviden su informe.";
+  div.append(quien, cuerpo);
+  $("mensajes").append(div);
 }
 
 async function leer() {
   try {
-    const d = await api("/api/sala?desde=" + ultimo);
+    const k = clave();
+    const d = await api("/api/sala?privado=" + (privado ? 1 : 0) + "&desde=" + ultimos[k]);
+    if (clave() !== k) return;   // cambió de pestaña mientras pedía
     const caja = $("mensajes");
     const abajo = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 90;
-    if (d.mensajes.length && ultimo === 0) caja.innerHTML = "";
-    for (const m of d.mensajes) { pintar(m); ultimo = m.n; }
+    for (const m of d.mensajes) { pintar(m); ultimos[k] = m.n; }
     if (d.mensajes.length && abajo) caja.scrollTop = caja.scrollHeight;
     $("pensando").textContent = d.ocupado ? "Orión está trabajando…" : "";
     $("aviso-pausa").style.display = d.pausa ? "block" : "none";
@@ -211,6 +234,22 @@ async function leer() {
   }
 }
 
+async function cambiarTab(priv) {
+  if (privado === priv) return;
+  privado = priv;
+  ultimos[clave()] = 0;
+  $("tab-grupo").classList.toggle("activo", !priv);
+  $("tab-grupo").setAttribute("aria-selected", String(!priv));
+  $("tab-privado").classList.toggle("activo", priv);
+  $("tab-privado").setAttribute("aria-selected", String(priv));
+  $("pensando").textContent = "";
+  bienvenida();
+  await leer();
+  $("mensajes").scrollTop = $("mensajes").scrollHeight;
+}
+$("tab-grupo").onclick = () => cambiarTab(false);
+$("tab-privado").onclick = () => cambiarTab(true);
+
 function mostrarSala() {
   document.body.dataset.estado = "dentro";
   $("yo").textContent = nombre;
@@ -218,8 +257,11 @@ function mostrarSala() {
 }
 
 function salir() {
-  nombre = ""; ultimo = 0;
+  nombre = ""; ultimos.grupo = 0; ultimos.privado = 0;
   if (timer) { clearInterval(timer); timer = null; }
+  privado = false;   // vuelve a la pestaña de equipo
+  $("tab-grupo").classList.add("activo"); $("tab-grupo").setAttribute("aria-selected", "true");
+  $("tab-privado").classList.remove("activo"); $("tab-privado").setAttribute("aria-selected", "false");
   document.body.dataset.estado = "fuera";
   $("mensajes").innerHTML = "";
   $("capa").classList.remove("abierta");
@@ -265,7 +307,7 @@ $("compositor").onsubmit = async (e) => {
   const texto = $("texto").value.trim();
   if (!texto) return;
   try {
-    await api("/api/pedir", { method: "POST", body: JSON.stringify({ texto }) });
+    await api("/api/pedir", { method: "POST", body: JSON.stringify({ texto, privado }) });
     $("texto").value = ""; $("texto").style.height = "50px";
     leer();
   } catch (err) {
