@@ -24,9 +24,16 @@ done
 [ $# -gt 0 ] || { echo "Uso: $0 [--reanudar ID] -- \"petición\"" >&2; exit 1; }
 pedido="$*"
 
-# ~/.env: ANTHROPIC_API_KEY (clave propia del equipo, con tope de gasto) y JARVIS_OBJETIVOS_SEGURIDAD.
+# ~/.env: cómo autenticar el motor + JARVIS_OBJETIVOS_SEGURIDAD.
 if [ -f "$HOME/.env" ]; then set -a; . "$HOME/.env"; set +a; fi
-[ -n "${ANTHROPIC_API_KEY:-}" ] || { echo "Falta ANTHROPIC_API_KEY en $HOME/.env" >&2; exit 1; }
+# El motor acepta cualquiera de las formas de Claude Code, no solo la API key de Anthropic (ver equipo/MOTOR.md):
+#   ANTHROPIC_API_KEY · CLAUDE_CODE_OAUTH_TOKEN (suscripción) · ANTHROPIC_BASE_URL+ANTHROPIC_AUTH_TOKEN (pasarela)
+#   · CLAUDE_CODE_USE_BEDROCK / CLAUDE_CODE_USE_VERTEX · o una sesión ya iniciada (~/.claude/.credentials.json).
+if [ -z "${ANTHROPIC_API_KEY:-}${CLAUDE_CODE_OAUTH_TOKEN:-}${ANTHROPIC_AUTH_TOKEN:-}${CLAUDE_CODE_USE_BEDROCK:-}${CLAUDE_CODE_USE_VERTEX:-}" ] \
+   && [ ! -f "$HOME/.claude/.credentials.json" ]; then
+  echo "Falta configurar el motor (ver equipo/MOTOR.md): una API key, un token de suscripción o una pasarela." >&2
+  exit 1
+fi
 # Los conectores de claude.ai (Gmail, Calendar, Drive, Spotify...) son de una cuenta: aquí no se cargan.
 export ENABLE_CLAUDEAI_MCP_SERVERS=false
 # scripts/seguridad.sh: ni "local" ni localhost, solo la lista de objetivos del equipo.

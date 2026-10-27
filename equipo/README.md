@@ -10,7 +10,7 @@ No es una "partición" del Orión de David, es otra instancia. Una partición de
 |---|---|---|
 | Usuario Linux | `david` | `equipo` (sin sudo, sin SSH) |
 | Código | tu copia del repo | `/opt/orion-equipo`: solo `equipo/` y `scripts/seguridad.sh`, de root, solo lectura. Sin tu bóveda ni tus habilidades. |
-| Cuenta de Claude | la tuya (con Gmail, Calendar, Spotify...) | una **clave de API** propia del equipo con tope de gasto; los conectores de claude.ai se apagan |
+| Motor / cuenta | la tuya (con Gmail, Calendar, Spotify...) | del equipo: API key con tope, o suscripción/Bedrock/Vertex/pasarela (`MOTOR.md`); los conectores de claude.ai se apagan |
 | Bóveda | `boveda/` personal | `~equipo/espacio/boveda`, vacía al empezar |
 | Correo, agenda, WhatsApp, billetera, Spotify, IAs externas, publicar sitios | sí | no existen aquí |
 | Herramientas | muchas | leer/escribir en su espacio, web, `seguridad.sh` (pasivo) y `pentest.sh` (activo con tu autorización) |
@@ -44,7 +44,7 @@ sudo systemctl restart orion-equipo
 
 Tu panel queda en `https://equipo.tudominio.com/panel`. Para poner además un login de Cloudflare delante, ver `equipo/CLOUDFLARE.md`.
 
-- **Clave de API**: en console.anthropic.com crea un workspace "Orión Equipo", ponle un tope de gasto mensual y saca una clave ahí. No uses tu cuenta de Claude: compartirla con otras personas no está permitido y le daría al equipo tus conectores.
+- **Motor (cómo paga/autentica)**: por defecto una API key de Anthropic del equipo con tope de gasto (console.anthropic.com). Si prefieres no usar API key de Anthropic, hay alternativas (suscripción de una cuenta de Claude del equipo, Bedrock/Vertex, o una pasarela a tu OpenRouter): están en `equipo/MOTOR.md`. Nunca tu cuenta personal: le daría al equipo tus conectores.
 - **Objetivos**: solo dominios/IP tuyos del proyecto, separados por comas, por ejemplo `JARVIS_OBJETIVOS_SEGURIDAD=midominio.co,www.midominio.co,api.midominio.co`. Ni el equipo ni Orión pueden cambiarla.
 - **Código para auditar**: `sudo cp -r <carpeta> /home/equipo/espacio/proyectos/ && sudo chown -R equipo: /home/equipo/espacio/proyectos` (sin `.env` ni secretos dentro).
 - **Contexto del proyecto**: edita `/home/equipo/espacio/boveda/wiki/proyecto.md`.

@@ -60,8 +60,12 @@ paso "Claves del equipo (~equipo/.env)"
 if ! sudo test -f "$CASA/.env"; then
   como tee "$CASA/.env" >/dev/null <<EOF
 # Orión Equipo. Nada de esto es de David: claves propias del equipo.
-# Clave de la API de Anthropic SOLO para el equipo, en un workspace con tope de gasto (console.anthropic.com).
+# Cómo autenticar el motor (elige UNA; ver equipo/MOTOR.md para las alternativas sin API key de Anthropic):
+#  - API key de Anthropic SOLO del equipo, con tope de gasto (console.anthropic.com):
 ANTHROPIC_API_KEY=
+#  - o suscripción de una cuenta de Claude del equipo:   CLAUDE_CODE_OAUTH_TOKEN=   ('claude setup-token')
+#  - o Bedrock/Vertex:   CLAUDE_CODE_USE_BEDROCK=1   /   CLAUDE_CODE_USE_VERTEX=1
+#  - o pasarela (p. ej. OpenRouter):   ANTHROPIC_BASE_URL=   y   ANTHROPIC_AUTH_TOKEN=
 # Lo único que el equipo puede probar (dominios/IP de David, separados por coma). Lo editas tú a mano.
 JARVIS_OBJETIVOS_SEGURIDAD=
 # Pedidos por persona y por día (0 = sin tope).
@@ -166,7 +170,10 @@ echo
 echo "Listo."
 echo "  Sala del equipo: https://$dominio"
 echo "  Tu panel:        https://$dominio/panel"
-sudo grep -q '^ANTHROPIC_API_KEY=.\+' "$CASA/.env" || echo "  Falta: pon ANTHROPIC_API_KEY en $CASA/.env  (sudo nano $CASA/.env), luego sudo systemctl restart orion-equipo"
+if ! sudo grep -qE '^(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_AUTH_TOKEN|CLAUDE_CODE_USE_BEDROCK|CLAUDE_CODE_USE_VERTEX)=.+' "$CASA/.env" \
+   && ! sudo test -f "$CASA/.claude/.credentials.json"; then
+  echo "  Falta: configura el motor en $CASA/.env (API key, token de suscripción o pasarela). Ver equipo/MOTOR.md, luego sudo systemctl restart orion-equipo"
+fi
 sudo grep -q '^JARVIS_OBJETIVOS_SEGURIDAD=.\+' "$CASA/.env" || echo "  Falta: los objetivos autorizados en JARVIS_OBJETIVOS_SEGURIDAD del mismo archivo"
 sudo test -f "$CASA/admin.json" || echo "  Falta: configura tu panel con  ./equipo/admin.sh  (clave + código de 6 dígitos)"
 echo "  Dar entrada a alguien:  ./equipo/persona.sh agregar ana"
