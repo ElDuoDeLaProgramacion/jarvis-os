@@ -136,7 +136,9 @@ InaccessiblePaths=-/srv -/var/lib/caddy -/etc/sudoers.d -/var/log
 # Red: internet sí; la red local no (la API de David en 127.0.0.1:7788, Syncthing, Tailscale,
 # la nube 169.254.169.254). Solo el DNS local para resolver nombres. Caddy le llega por el socket.
 IPAddressDeny=localhost link-local multicast 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10 fc00::/7
-IPAddressAllow=127.0.0.53/32
+# Solo el DNS local (127.0.0.53) y, si usas la pasarela de OpenRouter, su dirección dedicada 127.0.0.2.
+# La regla más específica gana: 127.0.0.1 (la API privada de David) sigue bloqueada.
+IPAddressAllow=127.0.0.53/32 127.0.0.2/32
 
 [Install]
 WantedBy=multi-user.target
