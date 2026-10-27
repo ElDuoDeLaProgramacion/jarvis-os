@@ -15,9 +15,15 @@ read -rsp "Escríbela otra vez: " c2; echo
 read -rp "¿Añadir código de 6 dígitos (2 pasos)? Muy recomendado [S/n]: " dos
 dos=${dos:-s}
 
-sudo -u equipo python3 - "$c1" "$dos" <<PY
+# El Python corre como el usuario equipo (para escribir admin.json en su carpeta), y el usuario
+# equipo no puede leer tu carpeta personal; por eso importamos seguridad.py de la copia instalada
+# (/opt/orion-equipo), legible por él. Si aún no está instalado, caemos a la copia del repo.
+INSTALADO=/opt/orion-equipo/equipo
+sudo -u equipo python3 - "$c1" "$dos" "$INSTALADO" "$CODIGO/equipo" <<PY
 import sys, json, os
-sys.path.insert(0, "$CODIGO/equipo")
+for _p in (sys.argv[3], sys.argv[4]):
+    if os.path.isfile(os.path.join(_p, "seguridad.py")):
+        sys.path.insert(0, _p); break
 import seguridad
 clave, dos = sys.argv[1], sys.argv[2].lower()
 reg = {"clave": seguridad.cifrar_clave(clave), "totp": ""}
