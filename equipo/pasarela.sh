@@ -2,15 +2,18 @@
 # Pasarela para usar OpenRouter (u otro proveedor) como motor de Orión Equipo, sin API key de Anthropic.
 # Claude Code solo habla el formato de Anthropic; esta pasarela (LiteLLM) lo traduce a OpenRouter.
 # Lo corre David en el servidor, después de ./equipo/instalar.sh:
-#   OPENROUTER_API_KEY=sk-or-... ./equipo/pasarela.sh
-#   OPENROUTER_API_KEY=sk-or-... ./equipo/pasarela.sh openrouter/anthropic/claude-sonnet-4.5   # elegir modelo
+#   OPENROUTER_API_KEY=sk-or-... ./equipo/pasarela.sh                                           # modelo gratis
+#   OPENROUTER_API_KEY=sk-or-... ./equipo/pasarela.sh openrouter/anthropic/claude-sonnet-4.5    # otro modelo
 #
-# Deja un servicio orion-equipo-gw escuchando SOLO en 127.0.0.2:8788 (una dirección que el servicio
-# encerrado de Orión Equipo sí puede alcanzar; la API privada de David en 127.0.0.1 sigue bloqueada),
-# y configura el .env del equipo para que el motor use esa pasarela.
+# Por defecto usa un modelo GRATIS de OpenRouter (sin gasto). Los modelos gratis responden rápido pero
+# son más flojos usando herramientas; si Orión necesita más músculo para pentest, pásale uno de pago
+# como argumento. Deja un servicio orion-equipo-gw escuchando SOLO en 127.0.0.2:8788 (una dirección que el
+# servicio encerrado de Orión Equipo sí puede alcanzar; la API privada de David en 127.0.0.1 sigue
+# bloqueada), y configura el .env del equipo para que el motor use esa pasarela.
 set -euo pipefail
 CASA=/home/equipo
-MODELO="${1:-openrouter/anthropic/claude-sonnet-4.5}"   # ver modelos en https://openrouter.ai/models
+# Gratis por defecto (David se quedó sin presupuesto). Lista de gratis: https://openrouter.ai/models?max_price=0
+MODELO="${1:-openrouter/deepseek/deepseek-chat-v3-0324:free}"
 paso() { echo; echo "== $* =="; }
 
 [ -n "${OPENROUTER_API_KEY:-}" ] || { echo "Falta OPENROUTER_API_KEY. Úsalo así: OPENROUTER_API_KEY=sk-or-... $0"; exit 1; }
