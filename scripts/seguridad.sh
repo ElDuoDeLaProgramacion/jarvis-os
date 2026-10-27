@@ -17,10 +17,14 @@ if [ -f .env ]; then set -a; . ./.env; set +a; fi
 titulo() { printf '\n## %s\n' "$*"; }
 falta() { echo "(no está instalado $1: sudo apt install -y $2)"; }
 
+# Orión Equipo (equipo/README.md) pone JARVIS_SEGURIDAD_SIN_LOCAL=1: esa instancia comparte servidor
+# con el Orión de David, así que ni "local" ni localhost; solo los objetivos de su propia lista.
+sin_local=0; [ "${JARVIS_SEGURIDAD_SIN_LOCAL:-0}" = 1 ] && sin_local=1
+propios() { [ $sin_local = 1 ] || echo localhost 127.0.0.1 ::1 "$(hostname)" "$(hostname -f 2>/dev/null)"; }
+
 permitido() {
   local h="${1,,}"
-  for o in localhost 127.0.0.1 ::1 "$(hostname)" "$(hostname -f 2>/dev/null)" \
-           $(echo "${JARVIS_OBJETIVOS_SEGURIDAD:-}" | tr ',;' '  '); do
+  for o in $(propios) $(echo "${JARVIS_OBJETIVOS_SEGURIDAD:-}" | tr ',;' '  '); do
     [ -n "$o" ] && [ "$h" = "${o,,}" ] && return 0
   done
   echo "Objetivo no permitido: $1"
@@ -226,12 +230,13 @@ codigo() {
 }
 
 objetivos() {
-  echo "localhost ($(hostname))"
+  [ $sin_local = 1 ] || echo "localhost ($(hostname))"
   echo "${JARVIS_OBJETIVOS_SEGURIDAD:-}" | tr ',;' '\n\n' | sed 's/^ *//; /^$/d'
 }
 
 case "${1:-}" in
-  local) local_ ;;
+  local) if [ $sin_local = 1 ]; then echo "Aquí no se audita este equipo: solo los objetivos autorizados."; exit 2; fi
+         local_ ;;
   puertos) [ -n "${2:-}" ] || { echo "Falta el host"; exit 1; }; puertos "$2" ;;
   web) [ -n "${2:-}" ] || { echo "Falta la dirección"; exit 1; }; web "$2" ;;
   dependencias) [ -n "${2:-}" ] || { echo "Falta la carpeta"; exit 1; }; dependencias "$2" ;;
