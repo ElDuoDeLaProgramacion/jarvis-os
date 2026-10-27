@@ -111,6 +111,7 @@ async function cargar() {
     const [est, aut, ale, inf] = await Promise.all([
       api("/panel/api/estado"), api("/panel/api/autorizaciones"),
       api("/panel/api/alertas"), api("/panel/api/informes")]);
+    ponerHallazgos(est.hallazgos_url);
     $("resumen").innerHTML = `${est.personas.length} en el equipo · ${est.pendientes} pendiente(s) de autorizar · ` +
       (est.pausa ? '<b style="color:var(--error)">EN PAUSA</b>' : 'funcionando');
     $("pausa").textContent = est.pausa ? "Reanudar" : "Pausar todo";
@@ -180,8 +181,14 @@ $("login").onsubmit = async (e) => {
   }
 };
 $("salir").onclick = async () => { try { await api("/panel/api/salir", { method: "POST" }); } catch (e) {} mostrarLogin(); };
-// El switcher de proyectos: el enlace al panel de Hallazgos lo pone David (ver equipo/README.md).
-$("ir-hallazgos").onclick = (e) => { e.preventDefault(); alert("Pon aquí el enlace de tu panel de Hallazgos (api.ubuntulabs.co/panel). Ver equipo/README.md."); };
+// El switcher de proyectos: el enlace al panel de Hallazgos lo pone David con la variable
+// ORION_EQUIPO_HALLAZGOS_URL en ~equipo/.env (ver equipo/README.md). Si no está puesta, avisa.
+function ponerHallazgos(url) {
+  const a = $("ir-hallazgos");
+  if (url) { a.href = url; a.onclick = null; }
+  else { a.onclick = (e) => { e.preventDefault(); alert("Pon el enlace de tu panel de Hallazgos en ORION_EQUIPO_HALLAZGOS_URL de ~equipo/.env (p. ej. https://api.ubuntulabs.co/panel). Ver equipo/README.md."); }; }
+}
+ponerHallazgos("");
 
 api("/panel/api/sesion").then((s) => s.dentro ? mostrarApp() : mostrarLogin()).catch(mostrarLogin);
 </script>

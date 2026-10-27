@@ -473,7 +473,8 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"pausa": PAUSA.exists(),
                                "personas": sorted(leer_personas().keys()),
                                "pendientes": len(pendientes()),
-                               "pedidos_hoy": {k: v for k, v in hoy.items() if k != "dia"}})
+                               "pedidos_hoy": {k: v for k, v in hoy.items() if k != "dia"},
+                               "hallazgos_url": os.environ.get("ORION_EQUIPO_HALLAZGOS_URL", "")})
         if ruta == "/panel/api/alertas":
             return self._json({"alertas": alertas_recientes()})
         if ruta == "/panel/api/autorizaciones":
