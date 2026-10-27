@@ -4,91 +4,168 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#05121c">
+<meta name="robots" content="noindex, nofollow">
 <title>Panel · Orión Equipo</title>
 <style>
   :root {
-    --fondo: #05121c; --panel: #0b2131; --borde: #17405a; --texto: #d8f3ff; --tenue: #7aa6bd;
-    --acento: #2ad4ff; --ok: #4ade80; --error: #ff7a7a; --aviso: #ffcf5c;
+    --fondo: #05121c; --fondo2: #081a28; --tarjeta: #0b2131; --tarjeta2: #0e2a3d;
+    --borde: #17405a; --borde2: #225d7e; --texto: #d8f3ff; --suave: #a9cfe2; --tenue: #7aa6bd;
+    --acento: #2ad4ff; --acento-osc: #7ee4ff; --sobre-acento: #04202c; --acento-suave: #0d3346;
+    --ok: #5ce39a; --ok-f: #0e2c20; --aviso: #ffcf5c; --aviso-f: #2c2410; --error: #ff8a8a; --error-f: #2c1417;
+    --sombra: 0 1px 2px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.22);
+    --sombra-lg: 0 24px 50px -12px rgba(0,0,0,.6);
+    --r: 14px;
   }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; min-height: 100%; background: var(--fondo); color: var(--texto);
-    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  body { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
-  header { padding: 12px 16px; border-bottom: 1px solid var(--borde); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  header b { color: var(--acento); letter-spacing: .04em; }
-  header .sw { margin-left: auto; display: flex; gap: 6px; }
-  header .sw a { font-size: 13px; padding: 5px 10px; border: 1px solid var(--borde); border-radius: 8px;
-    color: var(--texto); text-decoration: none; }
-  header .sw a.activo { background: var(--acento); color: #04202c; border-color: var(--acento); font-weight: 600; }
-  main { max-width: 820px; margin: 0 auto; padding: 16px; }
-  section { background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
-  h2 { font-size: 15px; margin: 0 0 10px; color: var(--acento); }
-  .fila { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--borde); }
-  .fila:first-of-type { border-top: 0; }
-  .crece { flex: 1; min-width: 160px; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { min-height: 100%; background: var(--fondo); color: var(--texto);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding-bottom: env(safe-area-inset-bottom); }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+  .oculto { display: none !important; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px;
+    padding: 8px 14px; border-radius: 10px; border: 1px solid var(--borde); background: var(--tarjeta2);
+    color: var(--texto); font-weight: 600; cursor: pointer; white-space: nowrap;
+    transition: background-color .15s, border-color .15s, filter .15s; }
+  .btn:hover { border-color: var(--borde2); background: #11384f; }
+  .btn.prim { background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); }
+  .btn.prim:hover { filter: brightness(1.08); background: var(--acento); }
+  .btn.mal { color: #ffd7dc; border-color: color-mix(in srgb, var(--error) 45%, var(--borde)); }
+  .btn.mal:hover { background: var(--error-f); }
+  .btn.mal.lleno { background: #5a1f2a; }
+  .btn.sm { min-height: 34px; padding: 6px 11px; font-size: 13px; }
+
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; white-space: nowrap; border: 1px solid transparent; }
+  .chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .chip.ok { color: var(--ok); background: var(--ok-f); }
+  .chip.activa { color: var(--aviso); background: var(--aviso-f); }
+  .chip.alta { color: var(--error); background: var(--error-f); }
+  .chip.pausa { color: var(--error); background: var(--error-f); }
+
+  /* ---- barra ---- */
+  .barra { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--fondo2) 90%, transparent);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--borde); }
+  .barra .cont { display: flex; align-items: center; gap: 14px; height: 60px; max-width: 920px; margin: 0 auto; padding: 0 18px; }
+  .marca { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .04em; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; background: var(--acento-suave);
+    border: 1px solid var(--borde2); display: grid; place-items: center; color: var(--acento); }
+  .logo svg { width: 20px; height: 20px; }
+  .marca .txt b { color: var(--acento); } .marca .txt { font-size: 15px; }
+  .sw { margin-left: auto; display: flex; gap: 6px; background: var(--fondo); border: 1px solid var(--borde);
+    border-radius: 12px; padding: 4px; }
+  .sw a { font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px; color: var(--suave);
+    text-decoration: none; transition: background-color .15s; }
+  .sw a:hover { background: var(--tarjeta2); color: var(--texto); }
+  .sw a.activo { background: var(--acento); color: var(--sobre-acento); }
+
+  /* ---- layout ---- */
+  main { max-width: 920px; margin: 0 auto; padding: 22px 18px 40px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+  .stat { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--r); padding: 16px; box-shadow: var(--sombra); }
+  .stat b { display: block; font-size: 28px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--suave); font-size: 13px; font-weight: 600; }
+  .stat.aviso b { color: var(--aviso); } .stat.mal b { color: var(--error); }
+
+  .panel { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--r);
+    padding: 18px; margin-bottom: 16px; box-shadow: var(--sombra); }
+  .panel > .cab { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .panel h2 { font-size: 14px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--acento-osc); }
+  .panel .cab .sp { flex: 1; }
+
+  .fila { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--borde); }
+  .fila:first-child { border-top: 0; padding-top: 0; }
+  .crece { flex: 1; min-width: 170px; }
   .tenue { color: var(--tenue); font-size: 13px; }
-  button, input, select { font: inherit; }
-  button { border: 0; border-radius: 8px; padding: 7px 12px; background: var(--acento); color: #04202c; font-weight: 600; cursor: pointer; }
-  button.gris { background: #1b3b50; color: var(--texto); }
-  button.rojo { background: #5a1f2a; color: #ffd7dc; }
-  input, select { padding: 10px; border-radius: 8px; border: 1px solid var(--borde); background: #07192485; color: var(--texto); }
-  #login { max-width: 340px; margin: 10vh auto; }
-  #login input { width: 100%; margin: 8px 0; }
-  #login button { width: 100%; padding: 12px; }
-  .error { color: var(--error); min-height: 1.3em; font-size: 14px; }
-  .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--borde); }
-  .pill.activa { color: var(--aviso); border-color: var(--aviso); }
-  .pill.alta { color: var(--error); border-color: var(--error); }
-  .vacio { color: var(--tenue); font-size: 14px; padding: 6px 0; }
-  pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #07192480; padding: 10px; border-radius: 8px; font-size: 13px; }
-  .doc-informe { background: #07192480; padding: 12px 14px; border-radius: 8px; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+  .vacio { color: var(--tenue); font-size: 14px; padding: 4px 0; }
+  .nota { color: var(--tenue); font-size: 13px; margin-top: 10px; }
+  select { padding: 8px 10px; border-radius: 9px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); min-height: 34px; }
+
+  details { border: 1px solid var(--borde); border-radius: 10px; overflow: hidden; margin-top: 8px; background: var(--fondo); }
+  summary { cursor: pointer; padding: 10px 12px; font-weight: 600; font-size: 14px; }
+  summary:hover { background: var(--tarjeta2); }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--fondo); padding: 12px; font-size: 13px; margin: 0 12px 12px; border-radius: 8px; }
+  .doc-informe { padding: 4px 14px 14px; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
   .doc-informe img { max-width: 100%; border-radius: 8px; display: block; margin: 8px 0; }
   .doc-informe h3 { color: var(--acento); font-size: 15px; margin: 10px 0 4px; }
+
+  /* ---- login ---- */
+  #login { min-height: 100dvh; display: grid; place-items: center; padding: 24px;
+    background: radial-gradient(1200px 600px at 50% -10%, #0d2c40 0%, var(--fondo) 60%); }
+  #login form { width: min(380px, 100%); background: var(--tarjeta); border: 1px solid var(--borde);
+    border-radius: 18px; padding: 32px 28px; box-shadow: var(--sombra-lg); }
+  #login .marca { justify-content: center; margin-bottom: 4px; }
+  #login h1 { font-size: 20px; color: var(--acento); letter-spacing: .05em; margin: 0; }
+  #login p.sub { text-align: center; color: var(--tenue); font-size: 14px; margin: 6px 0 20px; }
+  #login label { display: block; font-size: 12px; color: var(--tenue); margin: 12px 0 6px; }
+  #login input { width: 100%; padding: 13px 14px; border-radius: 11px; border: 1px solid var(--borde);
+    background: var(--fondo2); color: var(--texto); }
+  #login input:focus { outline: 0; border-color: var(--acento); box-shadow: 0 0 0 3px #2ad4ff26; }
+  #login button { width: 100%; margin-top: 18px; }
+  .error { color: var(--error); min-height: 1.3em; font-size: 14px; text-align: center; margin-top: 12px; }
+
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .marca .txt { display: none; }
+    .barra .cont { gap: 8px; padding: 0 12px; }
+    main { padding: 16px 12px 32px; }
+  }
 </style>
 </head>
 <body>
-<form id="login">
-  <h2>Panel de Orión Equipo</h2>
-  <input id="clave" type="password" placeholder="Clave del panel" autocomplete="current-password">
-  <input id="codigo" inputmode="numeric" placeholder="Código de 6 dígitos (si lo activaste)" autocomplete="one-time-code">
-  <button type="submit">Entrar</button>
-  <p id="login-error" class="error"></p>
-</form>
 
-<div id="app" hidden>
-  <header>
-    <b>ORIÓN · PANEL</b>
-    <nav class="sw">
-      <a class="activo" href="#">Orión Equipo</a>
+<!-- ======== LOGIN ======== -->
+<section id="login">
+  <form id="form-login" autocomplete="on">
+    <div class="marca"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/><ellipse cx="12" cy="12" rx="10" ry="4.5" stroke="currentColor" stroke-width="1.6"/></svg></span><span class="txt"><b>ORIÓN · EQUIPO</b></span></div>
+    <p class="sub">Panel del dueño. Entra con tu clave y el código de 6 dígitos.</p>
+    <label for="clave">Clave del panel</label>
+    <input id="clave" type="password" autocomplete="current-password" placeholder="tu clave">
+    <label for="codigo">Código de 6 dígitos (si lo activaste)</label>
+    <input id="codigo" inputmode="numeric" autocomplete="one-time-code" placeholder="000000">
+    <button type="submit" class="btn prim">Entrar</button>
+    <p id="login-error" class="error"></p>
+  </form>
+</section>
+
+<!-- ======== APP ======== -->
+<div id="app" class="oculto">
+  <header class="barra"><div class="cont">
+    <span class="marca"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/><ellipse cx="12" cy="12" rx="10" ry="4.5" stroke="currentColor" stroke-width="1.6"/></svg></span><span class="txt"><b>ORIÓN</b> · PANEL</span></span>
+    <nav class="sw" aria-label="Proyectos">
+      <a class="activo" href="#" aria-current="page">Orión Equipo</a>
       <a id="ir-hallazgos" href="#">Hallazgos Viales</a>
     </nav>
-    <button class="gris" id="salir">Salir</button>
-  </header>
+    <button class="btn sm" id="salir">Salir</button>
+  </div></header>
+
   <main>
-    <section>
-      <h2>Estado</h2>
-      <div class="fila"><span class="crece" id="resumen">…</span>
-        <button id="pausa"></button></div>
+    <section class="stats" id="stats" aria-label="Resumen"></section>
+
+    <section class="panel">
+      <div class="cab"><h2>Estado</h2><span class="sp"></span><span id="estado-chip"></span></div>
+      <div class="fila"><span class="crece" id="resumen">…</span><button class="btn mal" id="pausa"></button></div>
     </section>
 
-    <section>
-      <h2>Autorizaciones pendientes</h2>
+    <section class="panel">
+      <div class="cab"><h2>Autorizaciones pendientes</h2></div>
       <div id="autorizaciones"><div class="vacio">Nada pendiente.</div></div>
-      <p class="tenue">Son pruebas activas que el equipo quiere correr contra tus sistemas. Nada corre hasta que apruebes.</p>
+      <p class="nota">Son pruebas activas que el equipo quiere correr contra tus sistemas. Nada corre hasta que apruebes.</p>
     </section>
 
-    <section>
-      <h2>Equipo</h2>
+    <section class="panel">
+      <div class="cab"><h2>Equipo</h2></div>
       <div id="personas"></div>
     </section>
 
-    <section>
-      <h2>Alertas recientes</h2>
+    <section class="panel">
+      <div class="cab"><h2>Alertas recientes</h2></div>
       <div id="alertas"></div>
     </section>
 
-    <section>
-      <h2>Informes de la sesión</h2>
+    <section class="panel">
+      <div class="cab"><h2>Informes de la sesión</h2></div>
       <div id="informes"><div class="vacio">Todavía no hay informes.</div></div>
     </section>
   </main>
@@ -112,10 +189,23 @@ async function cargar() {
       api("/panel/api/estado"), api("/panel/api/autorizaciones"),
       api("/panel/api/alertas"), api("/panel/api/informes")]);
     ponerHallazgos(est.hallazgos_url);
-    $("resumen").innerHTML = `${est.personas.length} en el equipo · ${est.pendientes} pendiente(s) de autorizar · ` +
-      (est.pausa ? '<b style="color:var(--error)">EN PAUSA</b>' : 'funcionando');
+
+    const pedidosHoy = Object.values(est.pedidos_hoy || {}).reduce((a, b) => a + (b || 0), 0);
+    const tiles = [
+      [est.personas.length, "En el equipo", ""],
+      [est.pendientes, "Pendientes de autorizar", est.pendientes ? "aviso" : ""],
+      [pedidosHoy, "Pedidos hoy", ""],
+      [ale.alertas.length, "Alertas", ""],
+    ];
+    $("stats").innerHTML = tiles.map(([n, t, c]) =>
+      `<div class="stat ${c}"><b>${n}</b><span>${t}</span></div>`).join("");
+
+    $("estado-chip").innerHTML = est.pausa
+      ? '<span class="chip pausa">En pausa</span>'
+      : '<span class="chip ok">Funcionando</span>';
+    $("resumen").innerHTML = `${est.personas.length} en el equipo · ${est.pendientes} pendiente(s) de autorizar`;
     $("pausa").textContent = est.pausa ? "Reanudar" : "Pausar todo";
-    $("pausa").className = est.pausa ? "" : "rojo";
+    $("pausa").className = est.pausa ? "btn prim" : "btn mal lleno";
     $("pausa").onclick = async () => { await api("/panel/api/pausa", { method: "POST", body: JSON.stringify({ activar: !est.pausa }) }); cargar(); };
 
     $("autorizaciones").innerHTML = aut.pendientes.length ? "" : '<div class="vacio">Nada pendiente.</div>';
@@ -123,9 +213,9 @@ async function cargar() {
       const d = document.createElement("div");
       d.className = "fila";
       d.innerHTML = `<span class="crece"><b>${esc(p.persona)}</b> quiere <b>${esc(p.herramienta)}</b> ` +
-        `<span class="pill ${p.tipo}">${esc(p.tipo)}</span><br><span class="tenue">contra ${esc(p.objetivo)} ${esc(p.args || "")}</span></span>` +
+        `<span class="chip ${p.tipo}">${esc(p.tipo)}</span><br><span class="tenue">contra ${esc(p.objetivo)} ${esc(p.args || "")}</span></span>` +
         `<select><option value="2">2 h</option><option value="8" selected>8 h</option><option value="24">24 h</option></select>` +
-        `<button>Autorizar</button><button class="rojo">Rechazar</button>`;
+        `<button class="btn prim sm">Autorizar</button><button class="btn mal sm">Rechazar</button>`;
       const [sel, ok, no] = [d.querySelector("select"), ...d.querySelectorAll("button")];
       ok.onclick = async () => { await api("/panel/api/autorizar", { method: "POST", body: JSON.stringify({ id: p.id, horas: +sel.value }) }); cargar(); };
       no.onclick = async () => { await api("/panel/api/denegar", { method: "POST", body: JSON.stringify({ id: p.id }) }); cargar(); };
@@ -137,7 +227,7 @@ async function cargar() {
       const d = document.createElement("div");
       d.className = "fila";
       const hoy = est.pedidos_hoy[nombre] || 0;
-      d.innerHTML = `<span class="crece">${esc(nombre)} <span class="tenue">· ${hoy} pedido(s) hoy</span></span><button class="rojo">Quitar</button>`;
+      d.innerHTML = `<span class="crece">${esc(nombre)} <span class="tenue">· ${hoy} pedido(s) hoy</span></span><button class="btn mal sm">Quitar</button>`;
       d.querySelector("button").onclick = async () => {
         if (!confirm("¿Quitar a " + nombre + "? Dejará de entrar al instante.")) return;
         await api("/panel/api/quitar", { method: "POST", body: JSON.stringify({ nombre }) }); cargar();
@@ -166,10 +256,10 @@ async function cargar() {
   }
 }
 
-function mostrarApp() { $("login").hidden = true; $("app").hidden = false; cargar(); setInterval(cargar, 8000); }
-function mostrarLogin() { $("app").hidden = true; $("login").hidden = false; }
+function mostrarApp() { $("login").classList.add("oculto"); $("app").classList.remove("oculto"); cargar(); setInterval(cargar, 8000); }
+function mostrarLogin() { $("app").classList.add("oculto"); $("login").classList.remove("oculto"); }
 
-$("login").onsubmit = async (e) => {
+$("form-login").onsubmit = async (e) => {
   e.preventDefault();
   $("login-error").textContent = "";
   try {
@@ -181,6 +271,7 @@ $("login").onsubmit = async (e) => {
   }
 };
 $("salir").onclick = async () => { try { await api("/panel/api/salir", { method: "POST" }); } catch (e) {} mostrarLogin(); };
+
 // El switcher de proyectos: el enlace al panel de Hallazgos lo pone David con la variable
 // ORION_EQUIPO_HALLAZGOS_URL en ~equipo/.env (ver equipo/README.md). Si no está puesta, avisa.
 function ponerHallazgos(url) {
