@@ -36,9 +36,11 @@ cd "$ESPACIO"
 mkdir -p logs
 echo "$(date -Iseconds) > $pedido" >> logs/orion.log
 
-# Solo leer y escribir dentro del espacio, buscar en la web y el QA de solo lectura. Nada más:
-# en modo -p lo que no está en la lista se niega solo.
+# Leer y escribir dentro del espacio, buscar en la web, el QA de solo lectura y el harness de pentest.
+# Las pruebas activas del harness esperan la autorización de David (equipo/pentest.sh); el QA pasivo
+# corre ya. En modo -p lo que no está en esta lista se niega solo.
 seg="$CODIGO/scripts/seguridad.sh"
+pen="$CODIGO/equipo/pentest.sh"
 permitidas=(
   Skill "Read(./**)" Glob Grep "Write(./boveda/**)" "Edit(./boveda/**)"
   WebSearch WebFetch
@@ -46,6 +48,8 @@ permitidas=(
   # Código de los proyectos: David lo copia en ~/espacio/proyectos (seguridad.sh trabaja desde otra carpeta,
   # por eso la ruta va completa).
   "Bash($seg dependencias $ESPACIO/proyectos/:*)" "Bash($seg codigo $ESPACIO/proyectos/:*)"
+  # Harness de pentest: el propio script pone los dos candados (objetivo de David + autorización).
+  "Bash($pen:*)"
 )
 opciones=(-p "$pedido" --output-format json
   --allowedTools "$(IFS=,; echo "${permitidas[*]}")"

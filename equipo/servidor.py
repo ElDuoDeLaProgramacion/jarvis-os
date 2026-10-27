@@ -1,17 +1,18 @@
 """
-Sala de Orión Equipo: un chat web compartido para los amigos de ciberseguridad (equipo/README.md).
+Sala de Orión Equipo + panel del dueño (equipo/README.md).
 
-Cada persona entra con su propia clave (archivo ~/personas: "nombre clave" por línea, lo escribe
-equipo/persona.sh). Todos ven la misma sala; Orión atiende un pedido a la vez y sabe quién habla.
-No tiene nada del Orión de David: ni billetera, ni música, ni sitios, ni IAs externas; solo
-pasa los pedidos a equipo/orion-equipo.sh. Solo usa la biblioteca estándar de Python.
+- La sala (/) es el chat compartido del equipo. Cada persona entra con usuario y contraseña.
+- El panel (/panel) es solo de David: ve alertas, aprueba o rechaza las pruebas activas que pide el
+  equipo, quita a alguien y pausa todo. Entra con su clave y el código de 6 dígitos de su app.
 
-    python3 equipo/servidor.py                       ->  socket /run/orion-equipo/sala.sock (Caddy)
-    python3 equipo/servidor.py --puerto 7790         ->  http://127.0.0.1:7790 (pruebas)
+Orión atiende un pedido a la vez y sabe quién habla. No tiene nada del Orión de David (correo,
+agenda, WhatsApp, billetera): solo pasa los pedidos a equipo/orion-equipo.sh. Solo biblioteca estándar.
+
+    python3 equipo/servidor.py                 ->  socket /run/orion-equipo/sala.sock (Caddy)
+    python3 equipo/servidor.py --puerto 7790   ->  http://127.0.0.1:7790 (pruebas)
 """
 
 import argparse
-import hmac
 import json
 import os
 import re
@@ -24,55 +25,164 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import seguridad
+
 AQUI = Path(__file__).resolve().parent
-HOGAR = Path(os.environ.get("HOME", "/home/equipo"))
-PERSONAS = Path(os.environ.get("ORION_EQUIPO_PERSONAS", HOGAR / "personas"))
-SALA = Path(os.environ.get("ORION_EQUIPO_SALA", HOGAR / "sala" / "sala.json"))
-SEGUIR_MIN = 30           # minutos en que un pedido sigue la misma conversación
-LIMITE_SEG = 15 * 60      # tope de un pedido
+CASA = Path(os.environ.get("ORION_EQUIPO_CASA", os.environ.get("HOME", "/home/equipo")))
+PERSONAS = Path(os.environ.get("ORION_EQUIPO_PERSONAS", CASA / "personas"))
+ADMIN = CASA / "admin.json"
+SESIONES = CASA / "sesiones.json"
+SALA_JSON = Path(os.environ.get("ORION_EQUIPO_SALA", CASA / "sala" / "sala.json"))
+AUTOR = CASA / "autorizaciones"
+ALERTAS = CASA / "alertas.jsonl"
+INFORMES = CASA / "informes"
+ESPACIO = Path(os.environ.get("ORION_EQUIPO_ESPACIO", CASA / "espacio"))
+PAUSA = CASA / "PAUSA"
+
+SEGUIR_MIN = 30
+LIMITE_SEG = 15 * 60
 MAX_MENSAJES = 300
 MAX_TEXTO = 4000
+HORAS_SESION = 12
 
 
-def cargar_env(archivo=HOGAR / ".env"):
-    if not archivo.exists():
-        return
-    for linea in archivo.read_text(encoding="utf-8").splitlines():
-        m = re.match(r"^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$", linea)
-        if m and m.group(1) not in os.environ:
-            os.environ[m.group(1)] = m.group(2).strip("\"'")
-
+# ---------- personas (usuario + contraseña) ----------
 
 def leer_personas(archivo=None):
-    """{clave: nombre}. Se lee en cada pedido: agregar o quitar a alguien no pide reiniciar."""
+    """{nombre: hash_scrypt}. Se lee en cada acción: añadir o quitar no pide reiniciar."""
     personas = {}
     try:
-        archivo = archivo or PERSONAS
-        for linea in archivo.read_text(encoding="utf-8").splitlines():
-            partes = linea.split()
-            if len(partes) == 2 and not linea.startswith("#") and len(partes[1]) >= 24:
-                personas[partes[1]] = partes[0]
+        for linea in (archivo or PERSONAS).read_text(encoding="utf-8").splitlines():
+            if linea.startswith("#") or "\t" not in linea:
+                continue
+            nombre, h = linea.split("\t", 1)
+            if nombre and h:
+                personas[nombre.strip()] = h.strip()
     except OSError:
         pass
     return personas
 
 
-def quien(dado, personas):
-    """Nombre de la persona dueña de la clave, comparando en tiempo constante. None si no es de nadie."""
-    hallado = None
-    for clave, nombre in personas.items():
-        if hmac.compare_digest(dado.encode(), clave.encode()):
-            hallado = nombre
-    return hallado
+def persona_correcta(usuario, clave):
+    h = leer_personas().get(str(usuario or "").strip())
+    return bool(h) and seguridad.clave_correcta(str(clave or ""), h)
+
+
+# ---------- sesiones (cookie) ----------
+
+class Sesiones:
+    def __init__(self, archivo=SESIONES):
+        self.archivo = archivo
+        self.cerrojo = threading.Lock()
+        self.datos = {}
+        try:
+            self.datos = json.loads(archivo.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+
+    def _guardar(self):
+        self.archivo.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.archivo.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.datos), encoding="utf-8")
+        tmp.replace(self.archivo)
+
+    def crear(self, quien, rol):
+        t = seguridad.token()
+        with self.cerrojo:
+            self.datos[seguridad.huella(t)] = {"quien": quien, "rol": rol, "expira": time.time() + HORAS_SESION * 3600}
+            self._guardar()
+        return t
+
+    def quien(self, token, rol):
+        if not token:
+            return None
+        with self.cerrojo:
+            s = self.datos.get(seguridad.huella(token))
+            if not s or s["rol"] != rol or s["expira"] < time.time():
+                return None
+            return s["quien"]
+
+    def borrar(self, token):
+        if not token:
+            return
+        with self.cerrojo:
+            if self.datos.pop(seguridad.huella(token), None):
+                self._guardar()
+
+    def borrar_persona(self, nombre):
+        with self.cerrojo:
+            antes = len(self.datos)
+            self.datos = {k: v for k, v in self.datos.items() if not (v["rol"] == "persona" and v["quien"] == nombre)}
+            if len(self.datos) != antes:
+                self._guardar()
+
+
+# ---------- alertas y autorizaciones ----------
+
+def alertas_recientes(n=100):
+    filas = []
+    try:
+        for linea in ALERTAS.read_text(encoding="utf-8").splitlines()[-n:]:
+            try:
+                filas.append(json.loads(linea))
+            except ValueError:
+                pass
+    except OSError:
+        pass
+    return list(reversed(filas))
+
+
+def anotar_alerta(tipo, persona, texto):
+    ALERTAS.parent.mkdir(parents=True, exist_ok=True)
+    with open(ALERTAS, "a", encoding="utf-8") as f:
+        f.write(json.dumps({"hora": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"), "tipo": tipo,
+                            "persona": persona, "texto": texto}, ensure_ascii=False) + "\n")
+
+
+def pendientes():
+    carpeta = AUTOR / "pendientes"
+    filas = []
+    try:
+        for f in sorted(carpeta.glob("*.json")):
+            try:
+                filas.append(json.loads(f.read_text(encoding="utf-8")))
+            except ValueError:
+                pass
+    except OSError:
+        pass
+    return filas
+
+
+def aprobar(id_, horas):
+    f = AUTOR / "pendientes" / f"{id_}.json"
+    if not f.exists():
+        return False
+    d = json.loads(f.read_text(encoding="utf-8"))
+    (AUTOR / "aprobadas").mkdir(parents=True, exist_ok=True)
+    (AUTOR / "aprobadas" / f"{d['clave']}.json").write_text(json.dumps(
+        {"objetivo": d["objetivo"], "herramienta": d["herramienta"], "por": "David",
+         "hasta": time.time() + max(1, min(72, horas)) * 3600,
+         "creada": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}), encoding="utf-8")
+    f.unlink(missing_ok=True)
+    anotar_alerta("autorizada", d["persona"], f"David autorizó '{d['herramienta']}' contra {d['objetivo']} por {horas} h.")
+    return True
+
+
+def denegar(id_, motivo=""):
+    f = AUTOR / "pendientes" / f"{id_}.json"
+    if not f.exists():
+        return False
+    d = json.loads(f.read_text(encoding="utf-8"))
+    f.unlink(missing_ok=True)
+    anotar_alerta("denegada", d["persona"], f"David NO autorizó '{d['herramienta']}' contra {d['objetivo']}. {motivo}".strip())
+    return True
 
 
 # ---------- Sala ----------
 
 class Sala:
-    """Mensajes de todos y la conversación de Claude que los sigue. Un pedido a la vez."""
-
     def __init__(self, archivo=None, guion=None, limite_dia=40):
-        self.archivo = archivo or SALA
+        self.archivo = archivo or SALA_JSON
         self.guion = guion or str(AQUI / "orion-equipo.sh")
         self.limite_dia = limite_dia
         self.cerrojo = threading.Lock()
@@ -106,7 +216,6 @@ class Sala:
             return [m for m in self.mensajes if m["n"] > n], self.ocupado > 0
 
     def gastar(self, nombre):
-        """Cuenta un pedido de hoy. False si esa persona ya llegó al tope del día (cuida la clave de la API)."""
         hoy = datetime.now().strftime("%Y-%m-%d")
         with self.cerrojo:
             if self.cuenta.get("dia") != hoy:
@@ -127,19 +236,20 @@ class Sala:
     def _atender(self, nombre, texto, n):
         try:
             with self.turno:
-                self.anotar("orion", self._orion(f"{nombre}: {texto}"), para=n)
+                self.anotar("orion", self._orion(nombre, f"{nombre}: {texto}"), para=n)
         finally:
             with self.cerrojo:
                 self.ocupado -= 1
 
-    def _orion(self, pedido):
+    def _orion(self, nombre, pedido):
         args = []
         s = self.sesion
         if s and s.get("hasta", 0) > time.time():
             args += ["--reanudar", s["id"]]
+        entorno = {**os.environ, "ORION_EQUIPO_PERSONA": nombre}
         try:
             r = subprocess.run([self.guion, *args, "--", pedido], capture_output=True, text=True,
-                               timeout=LIMITE_SEG, stdin=subprocess.DEVNULL)
+                               timeout=LIMITE_SEG, stdin=subprocess.DEVNULL, env=entorno)
         except subprocess.TimeoutExpired:
             return "Se me acabó el tiempo con eso. Pídemelo otra vez, más concreto."
         respuesta = r.stdout.strip()
@@ -157,7 +267,6 @@ class Sala:
 # ---------- HTTP ----------
 
 class Fallos:
-    """Tras 5 claves malas en 10 minutos, esa IP espera 15 minutos."""
     MAXIMO, VENTANA, CASTIGO = 5, 600, 900
 
     def __init__(self):
@@ -182,6 +291,7 @@ class Fallos:
 class Manejador(BaseHTTPRequestHandler):
     timeout = 60
     sala = None
+    sesiones = None
     fallos = None
 
     def end_headers(self):
@@ -193,77 +303,238 @@ class Manejador(BaseHTTPRequestHandler):
                          "img-src 'self' data:; frame-ancestors 'none'")
         super().end_headers()
 
-    def _json(self, datos, codigo=200):
+    def _json(self, datos, codigo=200, cookie=None):
         cuerpo = json.dumps(datos, ensure_ascii=False).encode()
         self.send_response(codigo)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(cuerpo)))
         self.send_header("Cache-Control", "no-store")
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
+        self.end_headers()
+        self.wfile.write(cuerpo)
+
+    def _html(self, nombre):
+        cuerpo = (AQUI / nombre).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(cuerpo)))
+        self.send_header("Cache-Control", "no-cache")
         self.end_headers()
         self.wfile.write(cuerpo)
 
     def _ip(self):
-        # Por el socket de Caddy no hay IP: la real viene en X-Forwarded-For.
-        directa = self.client_address[0] if isinstance(self.client_address, tuple) else "local"
-        return self.headers.get("X-Forwarded-For", "").split(",")[-1].strip() or directa
+        return self.headers.get("X-Forwarded-For", "").split(",")[-1].strip() or (
+            self.client_address[0] if isinstance(self.client_address, tuple) else "local")
 
-    def _persona(self):
-        ip = self._ip()
-        if self.fallos.bloqueada(ip):
-            self._json({"error": "demasiados intentos, espera unos minutos"}, 429)
-            return None
-        dado = self.headers.get("Authorization", "")
-        nombre = quien(dado[7:].strip(), leer_personas()) if dado.startswith("Bearer ") else None
-        if not nombre:
-            self.fallos.anotar(ip)
-            self._json({"error": "clave"}, 401)
-        return nombre
+    def _cookie(self, nombre):
+        for parte in self.headers.get("Cookie", "").split(";"):
+            k, _, v = parte.strip().partition("=")
+            if k == nombre:
+                return v
+        return ""
 
-    def do_GET(self):
-        url = urlparse(self.path)
-        if url.path in ("/", "/index.html"):
-            cuerpo = (AQUI / "sala.html").read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(cuerpo)))
-            self.send_header("Cache-Control", "no-cache")
-            self.end_headers()
-            self.wfile.write(cuerpo)
-        elif url.path == "/api/yo":
-            nombre = self._persona()
-            if nombre:
-                self._json({"nombre": nombre})
-        elif url.path == "/api/sala":
-            if self._persona():
-                try:
-                    n = int(parse_qs(url.query).get("desde", ["0"])[0])
-                except ValueError:
-                    n = 0
-                mensajes, ocupado = self.sala.desde(n)
-                self._json({"mensajes": mensajes, "ocupado": ocupado})
-        else:
-            self._json({"error": "no existe"}, 404)
-
-    def do_POST(self):
-        if urlparse(self.path).path != "/api/pedir":
-            return self._json({"error": "no existe"}, 404)
-        nombre = self._persona()
-        if not nombre:
-            return
+    def _cuerpo(self, maximo=20000):
         try:
             largo = int(self.headers.get("Content-Length", 0))
-            if not 0 <= largo <= 20000:
-                return self._json({"error": "largo inválido"}, 413)
-            texto = str(json.loads(self.rfile.read(largo) or b"{}").get("texto", "")).strip()
+            if not 0 <= largo <= maximo:
+                return None
+            return json.loads(self.rfile.read(largo) or b"{}")
         except (ValueError, AttributeError):
-            return self._json({"error": "json"}, 400)
-        if not texto:
-            return self._json({"error": "vacío"}, 400)
-        if len(texto) > MAX_TEXTO:
-            return self._json({"error": f"máximo {MAX_TEXTO} caracteres"}, 413)
-        if not self.sala.gastar(nombre):
-            return self._json({"error": "llegaste al tope de pedidos de hoy; mañana sigues"}, 429)
-        self._json({"ok": True, "n": self.sala.pedir(nombre, texto)}, 202)
+            return None
+
+    def _csrf(self):
+        return self.headers.get("X-OE") == "1"
+
+    def _set_cookie(self, nombre, valor, path, borrar=False):
+        seguro = os.environ.get("ORION_EQUIPO_INSEGURO") != "1"
+        base = f"{nombre}={valor}; Path={path}; HttpOnly; SameSite=Strict" + ("; Secure" if seguro else "")
+        return base + ("; Max-Age=0" if borrar else f"; Max-Age={HORAS_SESION * 3600}")
+
+    # ------------------------------------------------ GET
+    def do_GET(self):
+        url = urlparse(self.path)
+        ruta = url.path
+        if ruta in ("/", "/index.html"):
+            return self._html("sala.html")
+        if ruta == "/panel":
+            return self._html("panel.html")
+        if ruta.startswith("/panel/api/"):
+            return self._panel_get(ruta, url)
+        if ruta.startswith("/api/"):
+            return self._sala_get(ruta, url)
+        self._json({"error": "no existe"}, 404)
+
+    def _sala_get(self, ruta, url):
+        if ruta == "/api/yo":
+            quien = self.sesiones.quien(self._cookie("oe_sesion"), "persona")
+            return self._json({"nombre": quien} if quien else {"error": "entra"}, 200 if quien else 401)
+        quien = self.sesiones.quien(self._cookie("oe_sesion"), "persona")
+        if not quien:
+            return self._json({"error": "entra", "salir": True}, 401)
+        if ruta == "/api/sala":
+            try:
+                n = int(parse_qs(url.query).get("desde", ["0"])[0])
+            except ValueError:
+                n = 0
+            mensajes, ocupado = self.sala.desde(n)
+            return self._json({"mensajes": mensajes, "ocupado": ocupado, "pausa": PAUSA.exists()})
+        self._json({"error": "no existe"}, 404)
+
+    def _panel_get(self, ruta, url):
+        if ruta == "/panel/api/sesion":
+            return self._json({"configurado": ADMIN.exists(),
+                               "dentro": bool(self.sesiones.quien(self._cookie("oe_panel"), "admin"))})
+        if not self.sesiones.quien(self._cookie("oe_panel"), "admin"):
+            return self._json({"error": "entra", "salir": True}, 401)
+        if ruta == "/panel/api/estado":
+            hoy = self.sala.cuenta if self.sala.cuenta.get("dia") == datetime.now().strftime("%Y-%m-%d") else {}
+            return self._json({"pausa": PAUSA.exists(),
+                               "personas": sorted(leer_personas().keys()),
+                               "pendientes": len(pendientes()),
+                               "pedidos_hoy": {k: v for k, v in hoy.items() if k != "dia"}})
+        if ruta == "/panel/api/alertas":
+            return self._json({"alertas": alertas_recientes()})
+        if ruta == "/panel/api/autorizaciones":
+            return self._json({"pendientes": pendientes()})
+        if ruta == "/panel/api/informes":
+            return self._json({"informes": self._informes_recientes()})
+        self._json({"error": "no existe"}, 404)
+
+    @staticmethod
+    def _informes_recientes(n=40):
+        """Informes de los estudiantes (CASA/informes) y los de Orión (su bóveda)."""
+        archivos = []
+        try:
+            archivos += list(INFORMES.glob("*.md"))
+        except OSError:
+            pass
+        try:
+            archivos += list((ESPACIO / "boveda" / "outputs" / "seguridad" / "sesiones").glob("*.md"))
+        except OSError:
+            pass
+        filas = []
+        for f in sorted(archivos, key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)[:n]:
+            try:
+                filas.append({"archivo": f.name, "texto": f.read_text(encoding="utf-8")[:4000]})
+            except OSError:
+                pass
+        return filas
+
+    # ------------------------------------------------ POST
+    def do_POST(self):
+        ruta = urlparse(self.path).path
+        if ruta.startswith("/panel/api/"):
+            return self._panel_post(ruta)
+        if ruta.startswith("/api/"):
+            return self._sala_post(ruta)
+        self._json({"error": "no existe"}, 404)
+
+    def _sala_post(self, ruta):
+        if ruta == "/api/entrar":
+            ip = self._ip()
+            if self.fallos.bloqueada(ip):
+                return self._json({"error": "demasiados intentos, espera unos minutos"}, 429)
+            j = self._cuerpo() or {}
+            if persona_correcta(j.get("usuario"), j.get("clave")):
+                t = self.sesiones.crear(str(j["usuario"]).strip(), "persona")
+                return self._json({"ok": True}, cookie=self._set_cookie("oe_sesion", t, "/"))
+            self.fallos.anotar(ip)
+            time.sleep(0.4)
+            return self._json({"error": "usuario o contraseña incorrectos"}, 401)
+        quien = self.sesiones.quien(self._cookie("oe_sesion"), "persona")
+        if not quien:
+            return self._json({"error": "entra", "salir": True}, 401)
+        if not self._csrf():
+            return self._json({"error": "pedido no válido"}, 403)
+        if ruta == "/api/salir":
+            self.sesiones.borrar(self._cookie("oe_sesion"))
+            return self._json({"ok": True}, cookie=self._set_cookie("oe_sesion", "x", "/", borrar=True))
+        if ruta == "/api/pedir":
+            if PAUSA.exists():
+                return self._json({"error": "David puso el equipo en pausa. Vuelve en un rato."}, 409)
+            j = self._cuerpo() or {}
+            texto = str(j.get("texto", "")).strip()
+            if not texto:
+                return self._json({"error": "vacío"}, 400)
+            if len(texto) > MAX_TEXTO:
+                return self._json({"error": f"máximo {MAX_TEXTO} caracteres"}, 413)
+            if not self.sala.gastar(quien):
+                return self._json({"error": "llegaste al tope de pedidos de hoy; mañana sigues"}, 429)
+            return self._json({"ok": True, "n": self.sala.pedir(quien, texto)}, 202)
+        if ruta == "/api/informe":
+            j = self._cuerpo(maximo=40000) or {}
+            texto = str(j.get("texto", "")).strip()
+            if len(texto) < 20:
+                return self._json({"error": "el informe está muy corto"}, 400)
+            INFORMES.mkdir(parents=True, exist_ok=True)
+            nombre = f"{datetime.now().strftime('%Y-%m-%d')}-{re.sub(r'[^a-z0-9_-]', '', quien.lower())}.md"
+            (INFORMES / nombre).write_text(f"# Informe de {quien} — {datetime.now():%d/%m/%Y %H:%M}\n\n{texto}\n",
+                                           encoding="utf-8")
+            anotar_alerta("informe", quien, f"{quien} entregó su informe de seguridad de la sesión.")
+            return self._json({"ok": True})
+        self._json({"error": "no existe"}, 404)
+
+    def _panel_post(self, ruta):
+        if ruta == "/panel/api/entrar":
+            ip = self._ip()
+            if self.fallos.bloqueada(ip):
+                return self._json({"error": "demasiados intentos, espera unos minutos"}, 429)
+            if not ADMIN.exists():
+                return self._json({"error": "El panel no está configurado. En el servidor: ./equipo/admin.sh"}, 400)
+            admin = json.loads(ADMIN.read_text(encoding="utf-8"))
+            j = self._cuerpo() or {}
+            clave_ok = seguridad.clave_correcta(str(j.get("clave") or ""), admin.get("clave", ""))
+            codigo_ok = (not admin.get("totp")) or seguridad.totp_correcto(admin["totp"], str(j.get("codigo") or ""))
+            if clave_ok and codigo_ok:
+                t = self.sesiones.crear("David", "admin")
+                return self._json({"ok": True}, cookie=self._set_cookie("oe_panel", t, "/panel"))
+            self.fallos.anotar(ip)
+            time.sleep(0.5)
+            return self._json({"error": "la clave o el código no son correctos"}, 401)
+        if not self.sesiones.quien(self._cookie("oe_panel"), "admin"):
+            return self._json({"error": "entra", "salir": True}, 401)
+        if not self._csrf():
+            return self._json({"error": "pedido no válido"}, 403)
+        if ruta == "/panel/api/salir":
+            self.sesiones.borrar(self._cookie("oe_panel"))
+            return self._json({"ok": True}, cookie=self._set_cookie("oe_panel", "x", "/panel", borrar=True))
+        j = self._cuerpo() or {}
+        if ruta == "/panel/api/autorizar":
+            horas = j.get("horas", 8)
+            try:
+                horas = int(horas)
+            except (TypeError, ValueError):
+                horas = 8
+            return self._json({"ok": aprobar(str(j.get("id") or ""), horas)})
+        if ruta == "/panel/api/denegar":
+            return self._json({"ok": denegar(str(j.get("id") or ""), str(j.get("motivo") or "")[:300])})
+        if ruta == "/panel/api/pausa":
+            if j.get("activar"):
+                PAUSA.write_text(datetime.now().isoformat(), encoding="utf-8")
+            else:
+                PAUSA.unlink(missing_ok=True)
+            return self._json({"ok": True, "pausa": PAUSA.exists()})
+        if ruta == "/panel/api/quitar":
+            nombre = str(j.get("nombre") or "").strip()
+            quitado = self._quitar_persona(nombre)
+            if quitado:
+                self.sesiones.borrar_persona(nombre)
+                anotar_alerta("quitada", nombre, f"David quitó a {nombre} del equipo.")
+            return self._json({"ok": quitado})
+        self._json({"error": "no existe"}, 404)
+
+    @staticmethod
+    def _quitar_persona(nombre):
+        try:
+            lineas = PERSONAS.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return False
+        nuevas = [l for l in lineas if not (l.split("\t", 1)[0].strip() == nombre and "\t" in l)]
+        if len(nuevas) == len(lineas):
+            return False
+        PERSONAS.write_text("\n".join(nuevas) + ("\n" if nuevas else ""), encoding="utf-8")
+        return True
 
     def log_message(self, formato, *args):
         pass
@@ -274,23 +545,21 @@ class ServidorUnix(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
 
 
 def main():
-    p = argparse.ArgumentParser(description="Sala web de Orión Equipo")
-    p.add_argument("--puerto", type=int, help="escuchar en 127.0.0.1:PUERTO en vez del socket")
+    p = argparse.ArgumentParser(description="Sala y panel de Orión Equipo")
+    p.add_argument("--puerto", type=int)
     p.add_argument("--socket", default=os.environ.get("ORION_EQUIPO_SOCKET", "/run/orion-equipo/sala.sock"))
     args = p.parse_args()
-    cargar_env()
     Manejador.sala = Sala(limite_dia=int(os.environ.get("ORION_EQUIPO_LIMITE_DIA", "40") or 0))
+    Manejador.sesiones = Sesiones()
     Manejador.fallos = Fallos()
     if args.puerto:
         servidor = ThreadingHTTPServer(("127.0.0.1", args.puerto), Manejador)
-        print(f"Sala de Orión Equipo en http://127.0.0.1:{args.puerto}/", flush=True)
+        print(f"Orión Equipo en http://127.0.0.1:{args.puerto}/  (panel en /panel)", flush=True)
     else:
-        # Un socket de archivo, no un puerto: así el servicio puede tener prohibida toda la red local
-        # (equipo/instalar.sh, IPAddressDeny) y aun así Caddy le llega.
         Path(args.socket).unlink(missing_ok=True)
         servidor = ServidorUnix(args.socket, Manejador)
         os.chmod(args.socket, 0o666)
-        print(f"Sala de Orión Equipo en {args.socket}", flush=True)
+        print(f"Orión Equipo en {args.socket}", flush=True)
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:

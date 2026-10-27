@@ -69,15 +69,25 @@ ORION_EQUIPO_LIMITE_DIA=40
 ORION_EQUIPO_URL=https://$dominio
 EOF
 fi
+# Frase secreta del servidor (firma los tokens de sesión y las contraseñas): se crea una vez.
+if ! sudo grep -q '^ORION_EQUIPO_SECRETO=.\+' "$CASA/.env"; then
+  sudo sed -i '/^ORION_EQUIPO_SECRETO=/d' "$CASA/.env"
+  echo "ORION_EQUIPO_SECRETO=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" | sudo tee -a "$CASA/.env" >/dev/null
+fi
 sudo sed -i "s|^ORION_EQUIPO_URL=.*|ORION_EQUIPO_URL=https://$dominio|" "$CASA/.env"
-sudo chmod 600 "$CASA/.env"
+sudo chown equipo:equipo "$CASA/.env"; sudo chmod 600 "$CASA/.env"
 sudo -u equipo touch "$CASA/personas"; sudo chmod 600 "$CASA/personas"
+# Carpetas de autorizaciones (lo que el equipo pide y David aprueba) e informes de cada sesión.
+sudo -u equipo mkdir -p "$CASA/autorizaciones/pendientes" "$CASA/autorizaciones/aprobadas" "$CASA/informes"
 
 paso "Claude Code para el usuario equipo"
 if ! sudo test -x "$CASA/.local/bin/claude"; then
   como bash -c 'cd ~ && curl -fsSL https://claude.ai/install.sh | bash'
 fi
-command -v nmap >/dev/null || sudo apt-get install -y -qq nmap >/dev/null
+# Herramientas de pentest (pentest.sh usa lo que haya; lo que falte lo dice al correr).
+sudo apt-get install -y -qq nmap whois dnsutils whatweb nikto >/dev/null 2>&1 || true
+# ffuf y sqlmap no siempre están en apt; si falta, pentest.sh dice cómo instalarlos.
+sudo apt-get install -y -qq ffuf sqlmap >/dev/null 2>&1 || true
 
 paso "Servicio orion-equipo (encerrado)"
 sudo tee /etc/systemd/system/orion-equipo.service >/dev/null <<UNIDAD
@@ -92,6 +102,8 @@ Group=equipo
 WorkingDirectory=$CASA
 Environment=HOME=$CASA
 Environment=PATH=$CASA/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Carga ANTHROPIC_API_KEY, JARVIS_OBJETIVOS_SEGURIDAD, ORION_EQUIPO_SECRETO y demás del .env del equipo.
+EnvironmentFile=-$CASA/.env
 ExecStart=/usr/bin/python3 $CODIGO/equipo/servidor.py
 Restart=always
 RestartSec=10
@@ -151,8 +163,12 @@ grep -q 'import /etc/caddy/conf.d/\*.caddy' /etc/caddy/Caddyfile \
 sudo systemctl reload caddy || sudo systemctl restart caddy
 
 echo
-echo "Listo. Sala: https://$dominio"
+echo "Listo."
+echo "  Sala del equipo: https://$dominio"
+echo "  Tu panel:        https://$dominio/panel"
 sudo grep -q '^ANTHROPIC_API_KEY=.\+' "$CASA/.env" || echo "  Falta: pon ANTHROPIC_API_KEY en $CASA/.env  (sudo nano $CASA/.env), luego sudo systemctl restart orion-equipo"
 sudo grep -q '^JARVIS_OBJETIVOS_SEGURIDAD=.\+' "$CASA/.env" || echo "  Falta: los objetivos autorizados en JARVIS_OBJETIVOS_SEGURIDAD del mismo archivo"
+sudo test -f "$CASA/admin.json" || echo "  Falta: configura tu panel con  ./equipo/admin.sh  (clave + código de 6 dígitos)"
 echo "  Dar entrada a alguien:  ./equipo/persona.sh agregar ana"
 echo "  Código de un proyecto para auditar:  sudo cp -r <carpeta> $CASA/espacio/proyectos/ && sudo chown -R equipo: $CASA/espacio/proyectos"
+echo "  Poner usuario y contraseña delante (Cloudflare Access): ver equipo/CLOUDFLARE.md"

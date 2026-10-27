@@ -1,30 +1,48 @@
 #!/usr/bin/env bash
-# Da o quita la entrada a la sala de Orión Equipo. Lo corre David en el servidor:
-#   ./equipo/persona.sh agregar ana     -> imprime el enlace con la clave de Ana (se lo pasas por privado)
-#   ./equipo/persona.sh quitar ana      -> Ana ya no entra (al instante, sin reiniciar)
+# Da o quita la entrada a la sala de Orión Equipo. Cada persona entra con su usuario y contraseña.
+# Lo corre David en el servidor:
+#   ./equipo/persona.sh agregar ana         -> crea a 'ana' con una contraseña al azar y te la muestra
+#   ./equipo/persona.sh clave ana           -> le pone una contraseña nueva (si se le olvidó)
+#   ./equipo/persona.sh quitar ana          -> ya no entra (al instante)
 #   ./equipo/persona.sh lista
 set -euo pipefail
-ARCHIVO=/home/equipo/personas
-accion=${1:-}; nombre=${2:-}
-como() { sudo -u equipo -H "$@"; }
+CODIGO="$(cd "$(dirname "$0")/.." && pwd)"
+CASA=/home/equipo
+ARCHIVO="$CASA/personas"
 
+cifrar() {
+  python3 - "$1" <<PY
+import sys; sys.path.insert(0, "$CODIGO/equipo")
+import seguridad
+print(seguridad.cifrar_clave(sys.argv[1]))
+PY
+}
+
+accion=${1:-}; nombre=${2:-}
 case "$accion" in
-  agregar)
-    [[ "$nombre" =~ ^[a-z0-9_-]{2,20}$ ]] || { echo "Nombre en minúscula, sin espacios (ej.: ana, luis_p)"; exit 1; }
-    como touch "$ARCHIVO"; sudo chmod 600 "$ARCHIVO"
-    if sudo grep -q "^$nombre " "$ARCHIVO"; then echo "$nombre ya tiene clave. Para cambiarla: quitar y agregar."; exit 1; fi
-    clave=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
-    echo "$nombre $clave" | como tee -a "$ARCHIVO" >/dev/null
-    url=$(sudo grep -oP '^ORION_EQUIPO_URL=\K.*' /home/equipo/.env 2>/dev/null || echo "https://<la dirección de la sala>")
-    echo "Enlace de $nombre (pásaselo por privado; quien lo tenga entra como $nombre):"
-    echo "  $url/#clave=$clave"
+  agregar|clave)
+    [[ "$nombre" =~ ^[a-z0-9_-]{2,20}$ ]] || { echo "Usuario en minúscula, sin espacios (ej.: ana, luis_p)"; exit 1; }
+    sudo -u equipo touch "$ARCHIVO"; sudo chmod 600 "$ARCHIVO"
+    existe=$(sudo grep -c "^$nombre	" "$ARCHIVO" || true)
+    if [ "$accion" = agregar ] && [ "$existe" != 0 ]; then echo "$nombre ya existe. Para cambiar su contraseña: ./equipo/persona.sh clave $nombre"; exit 1; fi
+    if [ "$accion" = clave ] && [ "$existe" = 0 ]; then echo "$nombre no existe todavía. Créalo con: agregar $nombre"; exit 1; fi
+    clave=$(python3 -c 'import secrets, string; print("".join(secrets.choice(string.ascii_letters+string.digits) for _ in range(12)))')
+    hash=$(cifrar "$clave")
+    sudo sed -i "/^$nombre	/d" "$ARCHIVO"
+    echo "$nombre	$hash" | sudo tee -a "$ARCHIVO" >/dev/null
+    url=$(sudo grep -oP '^ORION_EQUIPO_URL=\K.*' "$CASA/.env" 2>/dev/null || echo "https://<la dirección de la sala>")
+    echo "Listo. Pásale esto a $nombre por privado:"
+    echo "  Entra en: $url"
+    echo "  Usuario:  $nombre"
+    echo "  Clave:    $clave"
+    echo "(Dile que la cambie si tu Cloudflare Access lo permite; esta clave no la vuelves a ver.)"
     ;;
   quitar)
-    [ -n "$nombre" ] || { echo "Falta el nombre"; exit 1; }
-    sudo sed -i "/^$nombre /d" "$ARCHIVO" && echo "$nombre ya no entra."
+    [ -n "$nombre" ] || { echo "Falta el usuario"; exit 1; }
+    sudo sed -i "/^$nombre	/d" "$ARCHIVO" && echo "$nombre ya no entra."
     ;;
   lista)
-    sudo cut -d' ' -f1 "$ARCHIVO" 2>/dev/null || echo "(nadie todavía)"
+    sudo cut -f1 "$ARCHIVO" 2>/dev/null || echo "(nadie todavía)"
     ;;
-  *) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
