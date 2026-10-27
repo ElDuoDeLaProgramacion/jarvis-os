@@ -41,6 +41,9 @@
   .pill.alta { color: var(--error); border-color: var(--error); }
   .vacio { color: var(--tenue); font-size: 14px; padding: 6px 0; }
   pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #07192480; padding: 10px; border-radius: 8px; font-size: 13px; }
+  .doc-informe { background: #07192480; padding: 12px 14px; border-radius: 8px; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+  .doc-informe img { max-width: 100%; border-radius: 8px; display: block; margin: 8px 0; }
+  .doc-informe h3 { color: var(--acento); font-size: 15px; margin: 10px 0 4px; }
 </style>
 </head>
 <body>
@@ -152,7 +155,9 @@ async function cargar() {
     $("informes").innerHTML = inf.informes.length ? "" : '<div class="vacio">Todavía no hay informes.</div>';
     for (const f of inf.informes) {
       const det = document.createElement("details");
-      det.innerHTML = `<summary>${esc(f.archivo)}</summary><pre>${esc(f.texto)}</pre>`;
+      // f.html ya viene saneado desde el servidor (lista blanca de etiquetas, imágenes solo data:).
+      const cuerpo = f.html != null ? `<div class="doc-informe">${f.html}</div>` : `<pre>${esc(f.texto)}</pre>`;
+      det.innerHTML = `<summary>${esc(f.archivo)}</summary>${cuerpo}`;
       $("informes").append(det);
     }
   } catch (e) {

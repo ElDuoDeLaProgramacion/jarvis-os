@@ -155,7 +155,7 @@ sudo tee /etc/caddy/conf.d/orion-equipo.caddy >/dev/null <<EOF
 $dominio {
 	encode gzip
 	request_body {
-		max_size 64KB
+		max_size 8MB
 	}
 	header {
 		Strict-Transport-Security "max-age=31536000"

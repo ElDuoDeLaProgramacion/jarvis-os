@@ -99,8 +99,28 @@ class Sala(Base):
 
     def test_informe(self):
         ck = self.entrar_persona("ana", "clave-de-ana")
-        self.assertEqual(self.pedir("POST", "/api/informe", {"texto": "Encontré que falta HSTS en el login."}, cookie=ck)[0], 200)
-        self.assertTrue(any(f.name.endswith("-ana.md") for f in servidor.INFORMES.glob("*.md")))
+        cod, _, _ = self.pedir("POST", "/api/informe",
+                            {"html": "<p>Encontré que falta <b>HSTS</b> en el login.</p>"}, cookie=ck)
+        self.assertEqual(cod, 200)
+        self.assertTrue(any(f.name.endswith("-ana.html") for f in servidor.INFORMES.glob("*.html")))
+        # Al volver a abrirlo, se recupera para seguir editándolo.
+        cod, datos, _ = self.pedir("GET", "/api/informe", cookie=ck)
+        self.assertEqual(cod, 200)
+        self.assertIn("HSTS", datos["html"])
+
+    def test_informe_limpia_el_html(self):
+        ck = self.entrar_persona("ana", "clave-de-ana")
+        img_ok = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        peligroso = ('<p onclick="robar()">texto largo para pasar el minimo de longitud</p>'
+                     '<script>alert(1)</script>'
+                     f'<img src="{img_ok}">'
+                     '<img src="https://externo.example/x.png">')
+        self.assertEqual(self.pedir("POST", "/api/informe", {"html": peligroso}, cookie=ck)[0], 200)
+        guardado = next(servidor.INFORMES.glob("*-ana.html")).read_text(encoding="utf-8")
+        self.assertNotIn("<script", guardado)
+        self.assertNotIn("onclick", guardado)
+        self.assertIn("data:image/png;base64,", guardado)   # la imagen incrustada se conserva
+        self.assertNotIn("externo.example", guardado)        # la imagen externa se descarta
 
 
 class Panel(Base):

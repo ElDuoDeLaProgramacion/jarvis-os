@@ -7,54 +7,168 @@
 <title>Orión Equipo</title>
 <style>
   :root {
-    --fondo: #05121c; --panel: #0b2131; --borde: #17405a; --texto: #d8f3ff; --tenue: #7aa6bd;
-    --acento: #2ad4ff; --yo: #12405a; --otro: #0f2a3d; --error: #ff7a7a;
+    --fondo: #05121c; --fondo2: #081a28; --panel: #0b2131; --borde: #17405a; --borde2: #22506e;
+    --texto: #d8f3ff; --tenue: #7aa6bd; --acento: #2ad4ff; --acento-t: #04202c;
+    --yo: #123f58; --otro: #0f2a3d; --error: #ff8585; --ok: #58e0a0;
+    --sombra: 0 18px 50px rgba(0,0,0,.45);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--texto);
-    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  body { display: flex; flex-direction: column; height: 100dvh;
-    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
-  header { padding: 12px 16px; border-bottom: 1px solid var(--borde); display: flex; gap: 8px; align-items: baseline; }
-  header b { color: var(--acento); letter-spacing: .04em; }
-  header span { color: var(--tenue); font-size: 14px; margin-left: auto; }
-  header a { color: var(--tenue); font-size: 13px; text-decoration: none; }
-  #mensajes { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
-  .m { max-width: min(720px, 92%); padding: 8px 12px; border-radius: 12px; background: var(--otro);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { height: 100dvh; overflow: hidden; }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; }
+  .acento { background: var(--acento); color: var(--acento-t); font-weight: 650; }
+  .acento:hover { filter: brightness(1.07); }
+  .fantasma { background: transparent; color: var(--tenue); border: 1px solid var(--borde); }
+  .fantasma:hover { color: var(--texto); border-color: var(--borde2); }
+
+  /* ---- alternancia login / app ---- */
+  #login { display: none; }
+  #app { display: none; }
+  body[data-estado="fuera"] #login { display: flex; }
+  body[data-estado="dentro"] #app { display: flex; }
+
+  /* ---- login ---- */
+  #login { height: 100dvh; align-items: center; justify-content: center; padding: 24px;
+    background: radial-gradient(1200px 600px at 50% -10%, #0d2c40 0%, var(--fondo) 60%); }
+  .tarjeta { width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--borde);
+    border-radius: 18px; padding: 32px 28px; box-shadow: var(--sombra); }
+  .marca { display: flex; align-items: center; gap: 10px; justify-content: center; margin-bottom: 4px; }
+  .punto { width: 11px; height: 11px; border-radius: 50%; background: var(--acento); box-shadow: 0 0 14px var(--acento); }
+  .tarjeta h1 { margin: 0; font-size: 22px; letter-spacing: .06em; color: var(--acento); font-weight: 700; }
+  .tarjeta p.sub { margin: 6px 0 22px; text-align: center; color: var(--tenue); font-size: 14px; }
+  .campo { position: relative; margin: 12px 0; }
+  .campo label { display: block; font-size: 12px; color: var(--tenue); margin-bottom: 6px; letter-spacing: .02em; }
+  .campo input { width: 100%; padding: 13px 14px; border-radius: 11px; border: 1px solid var(--borde);
+    background: var(--fondo2); color: var(--texto); font: inherit; }
+  .campo input:focus { outline: 0; border-color: var(--acento); box-shadow: 0 0 0 3px #2ad4ff26; }
+  #login button[type=submit] { width: 100%; padding: 14px; margin-top: 16px; font-size: 16px; }
+  .error { color: var(--error); font-size: 14px; min-height: 1.3em; margin: 10px 2px 0; text-align: center; }
+
+  /* ---- app ---- */
+  #app { height: 100dvh; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    border-bottom: 1px solid var(--borde); background: var(--fondo2); }
+  header .b { color: var(--acento); font-weight: 700; letter-spacing: .05em; font-size: 15px; }
+  header .espacio { flex: 1; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; background: var(--panel);
+    border: 1px solid var(--borde); color: var(--texto); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+  .chip .punto { width: 8px; height: 8px; box-shadow: 0 0 8px var(--ok); background: var(--ok); }
+  header button { padding: 8px 13px; font-size: 13px; }
+
+  #mensajes { flex: 1; overflow-y: auto; padding: 18px 16px; display: flex; flex-direction: column; gap: 12px; }
+  #mensajes .centro { margin: auto; text-align: center; color: var(--tenue); max-width: 440px; }
+  #mensajes .centro b { color: var(--acento); }
+  .m { max-width: min(760px, 92%); padding: 10px 14px; border-radius: 14px; background: var(--otro);
     white-space: pre-wrap; overflow-wrap: anywhere; }
   .m.mio { align-self: flex-end; background: var(--yo); }
   .m.orion { border: 1px solid var(--borde); background: var(--panel); }
-  .m small { display: block; color: var(--tenue); font-size: 12px; margin-bottom: 2px; }
-  #aviso-pausa { display: none; color: var(--error); padding: 0 16px 6px; font-size: 14px; }
-  #pensando { color: var(--tenue); font-size: 14px; padding: 0 16px 6px; min-height: 1.4em; }
-  form { display: flex; gap: 8px; padding: 10px 16px 14px; border-top: 1px solid var(--borde); }
-  textarea { flex: 1; resize: none; height: 48px; border-radius: 10px; border: 1px solid var(--borde);
-    background: var(--panel); color: var(--texto); padding: 10px; font: inherit; }
-  button { border: 0; border-radius: 10px; padding: 0 16px; background: var(--acento); color: #04202c; font-weight: 600; cursor: pointer; }
-  #entrar { margin: auto; padding: 24px 16px; max-width: 360px; width: 100%; }
-  #entrar h1 { color: var(--acento); font-size: 20px; text-align: center; }
-  #entrar input { width: 100%; margin: 8px 0; padding: 12px; border-radius: 10px; border: 1px solid var(--borde);
-    background: var(--panel); color: var(--texto); font: inherit; }
-  #entrar button { width: 100%; padding: 12px; margin-top: 8px; }
-  .error { color: var(--error); min-height: 1.3em; font-size: 14px; }
+  .m small { display: block; color: var(--tenue); font-size: 12px; margin-bottom: 3px; }
+  #estado-barra { padding: 0 18px; min-height: 1.3em; }
+  #aviso-pausa { display: none; color: var(--error); font-size: 14px; padding-bottom: 6px; }
+  #pensando { color: var(--tenue); font-size: 14px; }
+  #compositor { display: flex; gap: 10px; padding: 12px 16px 16px; border-top: 1px solid var(--borde); background: var(--fondo2); }
+  #texto { flex: 1; resize: none; height: 50px; max-height: 160px; border-radius: 12px; border: 1px solid var(--borde);
+    background: var(--panel); color: var(--texto); padding: 13px; font: inherit; }
+  #texto:focus { outline: 0; border-color: var(--acento); }
+  #compositor button { padding: 0 20px; }
+
+  /* ---- editor de informe ---- */
+  #capa { position: fixed; inset: 0; display: none; background: #02101ad0; backdrop-filter: blur(2px);
+    align-items: center; justify-content: center; padding: 18px; z-index: 10; }
+  #capa.abierta { display: flex; }
+  .doc { width: 100%; max-width: 760px; max-height: 92dvh; display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--borde); border-radius: 16px; box-shadow: var(--sombra); overflow: hidden; }
+  .doc .cab { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--borde); }
+  .doc .cab h2 { margin: 0; font-size: 17px; color: var(--acento); }
+  .doc .cab .espacio { flex: 1; }
+  .barra-herr { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--borde); background: var(--fondo2); }
+  .barra-herr button { padding: 7px 11px; font-size: 13px; background: var(--panel); color: var(--texto); border: 1px solid var(--borde); }
+  .barra-herr button:hover { border-color: var(--borde2); }
+  #editor { flex: 1; overflow-y: auto; padding: 18px 20px; min-height: 220px; line-height: 1.6; outline: 0; }
+  #editor:empty::before { content: attr(data-vacio); color: var(--tenue); }
+  #editor img { max-width: 100%; border-radius: 10px; display: block; margin: 10px 0; }
+  #editor h3 { color: var(--acento); margin: 14px 0 6px; }
+  #editor ul { padding-left: 22px; }
+  .doc .pie { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--borde); background: var(--fondo2); }
+  .doc .pie .msg { flex: 1; font-size: 13px; color: var(--tenue); }
+  .doc .pie .msg.ok { color: var(--ok); }
+  .doc .pie .msg.err { color: var(--error); }
+
+  @media (max-width: 520px) {
+    .tarjeta { padding: 26px 20px; }
+    header .b { font-size: 13px; }
+    header button { padding: 7px 10px; }
+  }
 </style>
 </head>
-<body>
-<header hidden id="barra"><b>ORIÓN · EQUIPO</b><span id="yo"></span><a href="#" id="informe">Mi informe</a><a href="#" id="salir">Salir</a></header>
-<form id="entrar" autocomplete="on">
-  <h1>Orión Equipo</h1>
-  <input id="usuario" name="username" placeholder="Usuario" autocomplete="username" autocapitalize="none">
-  <input id="clave" name="password" type="password" placeholder="Contraseña" autocomplete="current-password">
-  <button type="submit">Entrar</button>
-  <p id="aviso" class="error"></p>
-</form>
-<div id="mensajes" hidden></div>
-<div id="aviso-pausa">Orión está en pausa (David lo detuvo). Vuelve en un rato.</div>
-<div id="pensando"></div>
-<form id="form" hidden>
-  <textarea id="texto" placeholder="Pregúntale a Orión. Enter envía, Shift+Enter baja de línea."></textarea>
-  <button type="submit">Enviar</button>
-</form>
+<body data-estado="fuera">
+
+<!-- ======== LOGIN ======== -->
+<section id="login">
+  <form class="tarjeta" id="form-entrar" autocomplete="on">
+    <div class="marca"><span class="punto"></span><h1>ORIÓN · EQUIPO</h1></div>
+    <p class="sub">Entra con tu usuario y contraseña para abrir la sala.</p>
+    <div class="campo">
+      <label for="usuario">Usuario</label>
+      <input id="usuario" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="tu usuario">
+    </div>
+    <div class="campo">
+      <label for="clave">Contraseña</label>
+      <input id="clave" name="password" type="password" autocomplete="current-password" placeholder="tu contraseña">
+    </div>
+    <button type="submit" class="acento">Entrar</button>
+    <p id="aviso" class="error"></p>
+  </form>
+</section>
+
+<!-- ======== APP ======== -->
+<div id="app">
+  <header>
+    <span class="b">ORIÓN · EQUIPO</span>
+    <span class="espacio"></span>
+    <span class="chip"><span class="punto"></span><span id="yo"></span></span>
+    <button class="fantasma" id="abrir-informe">Mi informe</button>
+    <button class="fantasma" id="salir">Salir</button>
+  </header>
+
+  <div id="mensajes"></div>
+
+  <div id="estado-barra">
+    <div id="aviso-pausa">Orión está en pausa (David lo detuvo). Vuelve en un rato.</div>
+    <div id="pensando"></div>
+  </div>
+
+  <form id="compositor">
+    <textarea id="texto" placeholder="Pregúntale a Orión. Enter envía, Shift+Enter baja de línea."></textarea>
+    <button type="submit" class="acento">Enviar</button>
+  </form>
+</div>
+
+<!-- ======== EDITOR DE INFORME ======== -->
+<div id="capa">
+  <div class="doc">
+    <div class="cab">
+      <h2>Mi informe de seguridad</h2>
+      <span class="espacio"></span>
+      <button class="fantasma" id="cerrar-informe">Cerrar</button>
+    </div>
+    <div class="barra-herr">
+      <button type="button" data-cmd="bold" title="Negrita"><b>N</b></button>
+      <button type="button" data-cmd="italic" title="Cursiva"><i>C</i></button>
+      <button type="button" data-bloque="h3" title="Título">Título</button>
+      <button type="button" data-cmd="insertUnorderedList" title="Lista">• Lista</button>
+      <button type="button" id="btn-imagen">Añadir imagen</button>
+      <input type="file" id="archivo-imagen" accept="image/*" multiple hidden>
+    </div>
+    <div id="editor" contenteditable="true" data-vacio="Escribe aquí: qué hiciste, qué encontraste, cómo lo comprobaste y qué aprendiste. Puedes pegar o añadir capturas."></div>
+    <div class="pie">
+      <span class="msg" id="informe-msg">Se guarda en el panel de David. Puedes volver y seguir editándolo.</span>
+      <button class="acento" id="guardar-informe">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
@@ -76,11 +190,18 @@ function pintar(m) {
   $("mensajes").append(div);
 }
 
+function bienvenida() {
+  $("mensajes").innerHTML =
+    '<div class="centro">Hola <b>' + nombre.replace(/[<>&]/g, "") + '</b>. Esta es la sala del equipo. ' +
+    'Pídele a Orión que te guíe o que revise algo; recuerda entregar <b>tu informe</b> al terminar.</div>';
+}
+
 async function leer() {
   try {
     const d = await api("/api/sala?desde=" + ultimo);
     const caja = $("mensajes");
-    const abajo = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 80;
+    const abajo = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 90;
+    if (d.mensajes.length && ultimo === 0) caja.innerHTML = "";
     for (const m of d.mensajes) { pintar(m); ultimo = m.n; }
     if (d.mensajes.length && abajo) caja.scrollTop = caja.scrollHeight;
     $("pensando").textContent = d.ocupado ? "Orión está trabajando…" : "";
@@ -91,19 +212,17 @@ async function leer() {
 }
 
 function mostrarSala() {
-  $("entrar").hidden = true;
-  $("barra").hidden = false;
-  $("mensajes").hidden = $("form").hidden = false;
+  document.body.dataset.estado = "dentro";
   $("yo").textContent = nombre;
+  bienvenida();
 }
 
 function salir() {
   nombre = ""; ultimo = 0;
   if (timer) { clearInterval(timer); timer = null; }
-  $("entrar").hidden = false;
-  $("barra").hidden = true;
-  $("mensajes").hidden = $("form").hidden = true;
+  document.body.dataset.estado = "fuera";
   $("mensajes").innerHTML = "";
+  $("capa").classList.remove("abierta");
 }
 
 async function arranque() {
@@ -116,7 +235,7 @@ async function arranque() {
   } catch (e) { salir(); }
 }
 
-$("entrar").onsubmit = async (e) => {
+$("form-entrar").onsubmit = async (e) => {
   e.preventDefault();
   $("aviso").textContent = "";
   try {
@@ -128,33 +247,112 @@ $("entrar").onsubmit = async (e) => {
     $("aviso").textContent = err.codigo === 429 ? "Demasiados intentos, espera unos minutos." : "Usuario o contraseña incorrectos.";
   }
 };
-$("informe").onclick = async (e) => {
-  e.preventDefault();
-  const texto = prompt("Tu informe de seguridad de la sesión (qué hiciste, qué encontraste, cómo lo comprobaste, qué aprendiste):");
-  if (!texto || texto.trim().length < 20) { if (texto !== null) alert("Escribe un poco más."); return; }
-  try { await api("/api/informe", { method: "POST", body: JSON.stringify({ texto: texto.trim() }) });
-    alert("Enviado. ¡Gracias!"); } catch (err) { alert("No se envió: " + err.message); }
-};
-$("salir").onclick = async (e) => {
-  e.preventDefault();
+
+$("salir").onclick = async () => {
   try { await api("/api/salir", { method: "POST" }); } catch (err) {}
   salir();
 };
+
 $("texto").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("form").requestSubmit(); }
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("compositor").requestSubmit(); }
 });
-$("form").onsubmit = async (e) => {
+$("texto").addEventListener("input", () => {
+  $("texto").style.height = "50px";
+  $("texto").style.height = Math.min($("texto").scrollHeight, 160) + "px";
+});
+$("compositor").onsubmit = async (e) => {
   e.preventDefault();
   const texto = $("texto").value.trim();
   if (!texto) return;
   try {
     await api("/api/pedir", { method: "POST", body: JSON.stringify({ texto }) });
-    $("texto").value = "";
+    $("texto").value = ""; $("texto").style.height = "50px";
     leer();
   } catch (err) {
     $("pensando").textContent = "No se envió: " + err.message;
   }
 };
+
+/* ---------- editor de informe ---------- */
+function msgInforme(t, clase) { const e = $("informe-msg"); e.textContent = t; e.className = "msg" + (clase ? " " + clase : ""); }
+
+async function abrirInforme() {
+  $("capa").classList.add("abierta");
+  msgInforme("Cargando…");
+  try {
+    const d = await api("/api/informe");
+    $("editor").innerHTML = d.html || "";
+    msgInforme(d.html ? "Puedes seguir editando y volver a guardar." : "Se guarda en el panel de David.");
+  } catch (err) {
+    $("editor").innerHTML = "";
+    msgInforme("Empieza a escribir tu informe.");
+  }
+  $("editor").focus();
+}
+function cerrarInforme() { $("capa").classList.remove("abierta"); }
+
+$("abrir-informe").onclick = abrirInforme;
+$("cerrar-informe").onclick = cerrarInforme;
+$("capa").addEventListener("click", (e) => { if (e.target === $("capa")) cerrarInforme(); });
+
+for (const b of document.querySelectorAll(".barra-herr [data-cmd]")) {
+  b.onclick = () => { $("editor").focus(); document.execCommand(b.dataset.cmd, false, null); };
+}
+for (const b of document.querySelectorAll(".barra-herr [data-bloque]")) {
+  b.onclick = () => { $("editor").focus(); document.execCommand("formatBlock", false, b.dataset.bloque); };
+}
+
+// Reducir la imagen antes de incrustarla, para que el informe no pese demasiado.
+function reducirImagen(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 1280;
+      let { width: w, height: h } = img;
+      if (w > max || h > max) { const f = max / Math.max(w, h); w = Math.round(w * f); h = Math.round(h * f); }
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL("image/jpeg", 0.72));
+    };
+    img.onerror = reject;
+    const fr = new FileReader();
+    fr.onload = () => { img.src = fr.result; };
+    fr.onerror = reject;
+    fr.readAsDataURL(file);
+  });
+}
+async function insertarImagenes(files) {
+  for (const f of files) {
+    if (!f.type.startsWith("image/")) continue;
+    try {
+      const url = await reducirImagen(f);
+      const img = document.createElement("img"); img.src = url;
+      $("editor").focus();
+      document.execCommand("insertHTML", false, img.outerHTML + "<p><br></p>");
+    } catch (e) { msgInforme("No pude añadir una imagen.", "err"); }
+  }
+}
+$("btn-imagen").onclick = () => $("archivo-imagen").click();
+$("archivo-imagen").onchange = (e) => { insertarImagenes(e.target.files); e.target.value = ""; };
+$("editor").addEventListener("paste", (e) => {
+  const imgs = [...(e.clipboardData?.items || [])].filter((i) => i.type.startsWith("image/")).map((i) => i.getAsFile());
+  if (imgs.length) { e.preventDefault(); insertarImagenes(imgs); }
+});
+
+$("guardar-informe").onclick = async () => {
+  const html = $("editor").innerHTML.trim();
+  if ($("editor").textContent.trim().length < 20 && !$("editor").querySelector("img")) {
+    return msgInforme("Escribe un poco más (o añade una captura) antes de guardar.", "err");
+  }
+  msgInforme("Guardando…");
+  try {
+    await api("/api/informe", { method: "POST", body: JSON.stringify({ html }) });
+    msgInforme("Guardado. ¡Gracias!", "ok");
+  } catch (err) {
+    msgInforme(err.codigo === 413 ? "El informe pesa demasiado; usa menos imágenes." : "No se guardó: " + err.message, "err");
+  }
+};
+
 arranque();
 </script>
 </body>
