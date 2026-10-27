@@ -32,7 +32,7 @@ CLAUDE_CODE_USE_VERTEX=1       # (y las credenciales de GCP del equipo)
 Claude Code solo habla el formato de Anthropic; `equipo/pasarela.sh` monta un traductor (LiteLLM) que
 lleva los pedidos a OpenRouter con **tu** clave (no la de Anthropic) y deja todo conectado:
 ```bash
-OPENROUTER_API_KEY=sk-or-... ./equipo/pasarela.sh
+OPENROUTER_API_KEY=sk-or-... ./equipo/pasarela.sh                                         # modelo GRATIS por defecto
 # o eligiendo modelo (lista en https://openrouter.ai/models):
 OPENROUTER_API_KEY=sk-or-... ./equipo/pasarela.sh openrouter/anthropic/claude-sonnet-4.5
 ```
@@ -40,10 +40,12 @@ Deja un servicio `orion-equipo-gw` escuchando solo en `127.0.0.2:8788` —una di
 encerrado de Orión Equipo sí puede alcanzar, mientras tu API privada en `127.0.0.1` sigue bloqueada— y
 pone en el `.env` del equipo `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` y el modelo. Cambiar de modelo
 = volver a correrlo con otro nombre.
-- **A favor:** usas la clave de OpenRouter que ya tienes y eliges el modelo.
-- **En contra:** el uso de herramientas/agente rinde mejor con modelos Claude, así que el modelo por
-  defecto es Claude Sonnet vía OpenRouter (buen comportamiento, facturado por OpenRouter). Un modelo
-  más barato puede fallar más en tareas con herramientas. Los modelos locales no caben en 2 GB.
+- **A favor:** usas la clave de OpenRouter que ya tienes y eliges el modelo. Por defecto usa un modelo
+  **gratis** (`deepseek/deepseek-chat-v3-0324:free`): sin gasto y responde rápido.
+- **En contra:** el uso de herramientas/agente rinde mejor con modelos Claude. Los modelos gratis
+  responden rápido pero fallan más en tareas con herramientas (pentest); si Orión necesita más músculo,
+  pásale uno de pago como argumento (p. ej. `openrouter/anthropic/claude-sonnet-4.5`). Los modelos
+  locales no caben en 2 GB.
 
 ## 4. API key de Anthropic con tope — lo más simple si el tema es el costo
 Si lo que te preocupa es gastar de más, no hace falta evitar la API key: en console.anthropic.com le
