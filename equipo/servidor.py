@@ -32,6 +32,7 @@ from urllib.parse import parse_qs, urlparse
 import seguridad
 
 AQUI = Path(__file__).resolve().parent
+FUENTES = ("PlusJakartaSans-latin.woff2", "PlusJakartaSans-latin-ext.woff2")
 CASA = Path(os.environ.get("ORION_EQUIPO_CASA", os.environ.get("HOME", "/home/equipo")))
 PERSONAS = Path(os.environ.get("ORION_EQUIPO_PERSONAS", CASA / "personas"))
 ADMIN = CASA / "admin.json"
@@ -456,6 +457,18 @@ class Manejador(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(cuerpo)
 
+    def _fuente(self, nombre):
+        # Plus Jakarta Sans servida desde aquí mismo (la CSP no deja cargar nada de fuera).
+        if nombre not in FUENTES:
+            return self._json({"error": "no existe"}, 404)
+        cuerpo = (AQUI / "fuentes" / nombre).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "font/woff2")
+        self.send_header("Content-Length", str(len(cuerpo)))
+        self.send_header("Cache-Control", "public, max-age=604800")
+        self.end_headers()
+        self.wfile.write(cuerpo)
+
     def _ip(self):
         return self.headers.get("X-Forwarded-For", "").split(",")[-1].strip() or (
             self.client_address[0] if isinstance(self.client_address, tuple) else "local")
@@ -492,6 +505,8 @@ class Manejador(BaseHTTPRequestHandler):
             return self._html("sala.html")
         if ruta == "/panel":
             return self._html("panel.html")
+        if ruta.startswith("/fuentes/"):
+            return self._fuente(ruta[len("/fuentes/"):])
         if ruta.startswith("/panel/api/"):
             return self._panel_get(ruta, url)
         if ruta.startswith("/api/"):

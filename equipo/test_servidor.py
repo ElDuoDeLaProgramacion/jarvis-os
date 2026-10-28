@@ -70,6 +70,18 @@ class Base(unittest.TestCase):
 
 
 class Sala(Base):
+    def test_fuentes_y_paginas(self):
+        c = http.client.HTTPConnection("127.0.0.1", self.puerto, timeout=5)
+        for ruta, tipo in (("/", "text/html"), ("/panel", "text/html"),
+                           ("/fuentes/PlusJakartaSans-latin.woff2", "font/woff2")):
+            c.request("GET", ruta)
+            r = c.getresponse()
+            r.read()
+            self.assertEqual((r.status, r.getheader("Content-Type").split(";")[0]), (200, tipo), ruta)
+        c.close()
+        self.assertEqual(self.pedir("GET", "/fuentes/../servidor.py")[0], 404)
+        self.assertEqual(self.pedir("GET", "/fuentes/OFL.txt")[0], 404)
+
     def test_login_usuario_contrasena(self):
         self.assertEqual(self.pedir("GET", "/api/yo")[0], 401)
         st, _, g = self.pedir("POST", "/api/entrar", {"usuario": "ana", "clave": "mala"})
