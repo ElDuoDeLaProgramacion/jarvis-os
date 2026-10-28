@@ -3,177 +3,314 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#05121c">
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1215" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <title>Orión Equipo</title>
 <style>
+  @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 400 800; font-display: swap;
+    src: url(/fuentes/PlusJakartaSans-latin.woff2) format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 400 800; font-display: swap;
+    src: url(/fuentes/PlusJakartaSans-latin-ext.woff2) format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+  /* Tokens de UbuntuLabs (mismo sistema que ubuntulabs.co y Hallazgos Viales). */
   :root {
-    --fondo: #05121c; --fondo2: #081a28; --panel: #0b2131; --borde: #17405a; --borde2: #22506e;
-    --texto: #d8f3ff; --tenue: #7aa6bd; --acento: #2ad4ff; --acento-t: #04202c;
-    --yo: #123f58; --otro: #0f2a3d; --error: #ff8585; --ok: #58e0a0;
-    --sombra: 0 18px 50px rgba(0,0,0,.45);
+    --fondo: #F8FAFC; --tarjeta: #FFFFFF; --borde: #E2E8F0; --borde2: #CBD5E1;
+    --texto: #0F172A; --suave: #475569; --tenue: #64748B;
+    --prim: #0F766E; --prim-osc: #115E59; --sobre-prim: #FFFFFF; --prim-suave: #F0FDFA;
+    --acento: #C2410C; --acento-osc: #9A3412; --sobre-acento: #FFFFFF;
+    --pill: #CCFBF1; --sobre-pill: #115E59; --suave-fondo: #F1F5F9;
+    --ok: #15803D; --ok-f: #F0FDF4; --aviso: #A16207; --aviso-f: #FEFCE8; --mal: #B91C1C; --mal-fondo: #FEF2F2;
+    --anillo: #0F766E;
+    --sombra: 0 1px 2px rgba(15,23,42,.05), 0 1px 3px rgba(15,23,42,.06);
+    --sombra-md: 0 4px 12px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.05);
+    --sombra-lg: 0 24px 48px -12px rgba(15,23,42,.18), 0 4px 12px rgba(15,23,42,.05);
+    --fuente: "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    --dur: 180ms;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fondo: #0B1215; --tarjeta: #111B1F; --borde: #23323A; --borde2: #36505B;
+      --texto: #E2E8F0; --suave: #A3B1C2; --tenue: #94A3B8;
+      --prim: #2DD4BF; --prim-osc: #5EEAD4; --sobre-prim: #042F2E; --prim-suave: #0F2A2A;
+      --acento: #FB923C; --acento-osc: #FDBA74; --sobre-acento: #1C0A00;
+      --pill: #134E4A; --sobre-pill: #CCFBF1; --suave-fondo: #16242A;
+      --ok: #4ADE80; --ok-f: #0F2A1A; --aviso: #FACC15; --aviso-f: #2A2410; --mal: #F87171; --mal-fondo: #2A1215;
+      --anillo: #5EEAD4;
+      --sombra: 0 1px 2px rgba(0,0,0,.4); --sombra-md: 0 4px 12px rgba(0,0,0,.35);
+      --sombra-lg: 0 24px 48px -12px rgba(0,0,0,.6);
+      color-scheme: dark;
+    }
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--texto);
-    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  body { height: 100dvh; overflow: hidden; }
-  button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; }
-  .acento { background: var(--acento); color: var(--acento-t); font-weight: 650; }
-  .acento:hover { filter: brightness(1.07); }
-  .fantasma { background: transparent; color: var(--tenue); border: 1px solid var(--borde); }
-  .fantasma:hover { color: var(--texto); border-color: var(--borde2); }
+  html, body { margin: 0; background: var(--fondo); color: var(--texto);
+    font: 16px/1.55 var(--fuente); -webkit-font-smoothing: antialiased; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--anillo); outline-offset: 2px; }
+  .i { width: 18px; height: 18px; flex: none; }
+  .solo-lectores { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  /* ---- alternancia login / app ---- */
-  #login { display: none; }
-  #app { display: none; }
-  body[data-estado="fuera"] #login { display: flex; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px;
+    padding: 10px 18px; border-radius: 10px; border: 1px solid transparent; font-weight: 600; cursor: pointer;
+    white-space: nowrap; text-decoration: none; transition: background-color var(--dur), border-color var(--dur), color var(--dur); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  .btn.prim { background: var(--acento); color: var(--sobre-acento); box-shadow: 0 1px 2px rgba(0,0,0,.08), inset 0 -2px 0 rgba(0,0,0,.12); }
+  .btn.prim:hover:not(:disabled) { background: var(--acento-osc); }
+  .btn.verde { background: var(--prim); color: var(--sobre-prim); }
+  .btn.verde:hover:not(:disabled) { background: var(--prim-osc); }
+  .btn.sec { background: var(--tarjeta); color: var(--texto); border-color: var(--borde); box-shadow: var(--sombra); }
+  .btn.sec:hover:not(:disabled) { border-color: var(--borde2); background: var(--suave-fondo); }
+  .btn.fantasma { background: transparent; color: var(--suave); }
+  .btn.fantasma:hover { background: var(--suave-fondo); color: var(--texto); }
+  .btn.mal { background: var(--tarjeta); color: var(--mal); border-color: color-mix(in srgb, var(--mal) 35%, var(--borde)); }
+  .btn.mal:hover:not(:disabled) { background: var(--mal-fondo); }
+  .btn.mal.lleno { background: var(--mal); color: #fff; border-color: var(--mal); }
+  @media (prefers-color-scheme: dark) { .btn.mal.lleno { color: #1C0A0A; } }
+  .btn.sm { min-height: 36px; padding: 6px 12px; font-size: 14px; border-radius: 9px; }
+
+  .logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none;
+    background: var(--prim); color: var(--sobre-prim); box-shadow: inset 0 -2px 0 rgba(0,0,0,.12); }
+  .logo svg { width: 20px; height: 20px; }
+  .marca { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
+  .marca small { display: block; font-size: 12px; font-weight: 600; color: var(--tenue); letter-spacing: 0; line-height: 1.2; }
+
+  /* ---- login (compartido) ---- */
+  .acceso { min-height: 100dvh; display: grid; place-items: center; padding: 24px; position: relative; overflow: hidden; }
+  .acceso::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(600px 300px at 50% 0%, color-mix(in srgb, var(--prim) 14%, transparent), transparent 70%),
+      linear-gradient(var(--borde) 1px, transparent 1px) 0 0 / 40px 40px,
+      linear-gradient(90deg, var(--borde) 1px, transparent 1px) 0 0 / 40px 40px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+            mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+    opacity: .7; }
+  .acceso form { width: min(400px, 100%); background: var(--tarjeta); border: 1px solid var(--borde);
+    border-radius: 16px; padding: 32px 28px; box-shadow: var(--sombra-lg); }
+  .acceso .marca { margin-bottom: 20px; }
+  .acceso h1 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin: 0; }
+  .acceso p.sub { color: var(--suave); font-size: 15px; margin: 6px 0 18px; }
+  .acceso label { display: block; font-size: 14px; font-weight: 600; color: var(--texto); margin: 14px 0 6px; }
+  .acceso input { width: 100%; min-height: 46px; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--borde2);
+    background: var(--tarjeta); transition: border-color var(--dur), box-shadow var(--dur); }
+  .acceso input:focus { outline: 0; border-color: var(--prim); box-shadow: 0 0 0 3px color-mix(in srgb, var(--prim) 22%, transparent); }
+  .acceso button[type=submit] { width: 100%; margin-top: 20px; min-height: 48px; font-size: 16px; }
+  .acceso .error { color: var(--mal); font-size: 14px; min-height: 1.4em; margin: 12px 0 0; text-align: center; }
+  .acceso .pie-marca { margin-top: 18px; text-align: center; font-size: 13px; color: var(--tenue); }
+
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+  /* ---- sala ---- */
+  body { height: 100dvh; overflow: hidden; }
+  #login, #app { display: none; }
+  body[data-estado="fuera"] #login { display: grid; }
   body[data-estado="dentro"] #app { display: flex; }
 
-  /* ---- login ---- */
-  #login { height: 100dvh; align-items: center; justify-content: center; padding: 24px;
-    background: radial-gradient(1200px 600px at 50% -10%, #0d2c40 0%, var(--fondo) 60%); }
-  .tarjeta { width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--borde);
-    border-radius: 18px; padding: 32px 28px; box-shadow: var(--sombra); }
-  .marca { display: flex; align-items: center; gap: 10px; justify-content: center; margin-bottom: 4px; }
-  .punto { width: 11px; height: 11px; border-radius: 50%; background: var(--acento); box-shadow: 0 0 14px var(--acento); }
-  .tarjeta h1 { margin: 0; font-size: 22px; letter-spacing: .06em; color: var(--acento); font-weight: 700; }
-  .tarjeta p.sub { margin: 6px 0 22px; text-align: center; color: var(--tenue); font-size: 14px; }
-  .campo { position: relative; margin: 12px 0; }
-  .campo label { display: block; font-size: 12px; color: var(--tenue); margin-bottom: 6px; letter-spacing: .02em; }
-  .campo input { width: 100%; padding: 13px 14px; border-radius: 11px; border: 1px solid var(--borde);
-    background: var(--fondo2); color: var(--texto); font: inherit; }
-  .campo input:focus { outline: 0; border-color: var(--acento); box-shadow: 0 0 0 3px #2ad4ff26; }
-  #login button[type=submit] { width: 100%; padding: 14px; margin-top: 16px; font-size: 16px; }
-  .error { color: var(--error); font-size: 14px; min-height: 1.3em; margin: 10px 2px 0; text-align: center; }
-
-  /* ---- app ---- */
   #app { height: 100dvh; flex-direction: column; }
-  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-    border-bottom: 1px solid var(--borde); background: var(--fondo2); }
-  header .b { color: var(--acento); font-weight: 700; letter-spacing: .05em; font-size: 15px; }
-  header .espacio { flex: 1; }
-  .chip { display: inline-flex; align-items: center; gap: 7px; background: var(--panel);
-    border: 1px solid var(--borde); color: var(--texto); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
-  .chip .punto { width: 8px; height: 8px; box-shadow: 0 0 8px var(--ok); background: var(--ok); }
-  header button { padding: 8px 13px; font-size: 13px; }
-  #tabs { display: flex; gap: 6px; padding: 8px 16px; border-bottom: 1px solid var(--borde); background: var(--fondo2); }
-  .tab { background: transparent; color: var(--tenue); border: 1px solid var(--borde); padding: 7px 14px; font-size: 13px; border-radius: 999px; }
-  .tab:hover { color: var(--texto); border-color: var(--borde2); }
-  .tab.activo { background: var(--acento); color: var(--acento-t); border-color: var(--acento); font-weight: 650; }
+  .barra { flex: none; background: color-mix(in srgb, var(--tarjeta) 88%, transparent); backdrop-filter: saturate(1.4) blur(10px);
+    border-bottom: 1px solid var(--borde); padding-top: env(safe-area-inset-top); }
+  .barra .cont { display: flex; align-items: center; gap: 12px; min-height: 64px; max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  .barra .espacio { flex: 1; }
 
-  #mensajes { flex: 1; overflow-y: auto; padding: 18px 16px; display: flex; flex-direction: column; gap: 12px; }
-  #mensajes .centro { margin: auto; text-align: center; color: var(--tenue); max-width: 440px; }
-  #mensajes .centro b { color: var(--acento); }
-  .m { max-width: min(760px, 92%); padding: 10px 14px; border-radius: 14px; background: var(--otro);
-    white-space: pre-wrap; overflow-wrap: anywhere; }
-  .m.mio { align-self: flex-end; background: var(--yo); }
-  .m.orion { border: 1px solid var(--borde); background: var(--panel); }
-  .m small { display: block; color: var(--tenue); font-size: 12px; margin-bottom: 3px; }
-  #estado-barra { padding: 0 18px; min-height: 1.3em; }
-  #aviso-pausa { display: none; color: var(--error); font-size: 14px; padding-bottom: 6px; }
-  #pensando { color: var(--tenue); font-size: 14px; }
-  #compositor { display: flex; gap: 10px; padding: 12px 16px 16px; border-top: 1px solid var(--borde); background: var(--fondo2); }
-  #texto { flex: 1; resize: none; height: 50px; max-height: 160px; border-radius: 12px; border: 1px solid var(--borde);
-    background: var(--panel); color: var(--texto); padding: 13px; font: inherit; }
-  #texto:focus { outline: 0; border-color: var(--acento); }
-  #compositor button { padding: 0 20px; }
+  .tabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--suave-fondo); border: 1px solid var(--borde); border-radius: 12px; }
+  .tab { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 6px 14px; border: 0; border-radius: 9px;
+    background: transparent; color: var(--suave); font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: background-color var(--dur), color var(--dur), box-shadow var(--dur); }
+  .tab .i { width: 16px; height: 16px; }
+  .tab:hover { color: var(--texto); }
+  .tab.activo { background: var(--tarjeta); color: var(--texto); box-shadow: var(--sombra); }
+  .tab.activo .i { color: var(--prim); }
+
+  .yo { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--suave); }
+  .yo .ava { width: 30px; height: 30px; font-size: 12px; }
+  .ava { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    font-size: 13px; font-weight: 700; text-transform: uppercase; background: var(--pill); color: var(--sobre-pill); }
+  .ava.orion { background: var(--prim); color: var(--sobre-prim); }
+  .ava.orion svg { width: 19px; height: 19px; }
+  .ava.c1 { background: #E0E7FF; color: #3730A3; } .ava.c2 { background: #FCE7F3; color: #9D174D; }
+  .ava.c3 { background: #FEF3C7; color: #92400E; } .ava.c4 { background: #E0F2FE; color: #075985; }
+  @media (prefers-color-scheme: dark) {
+    .ava.c1 { background: #312E81; color: #E0E7FF; } .ava.c2 { background: #831843; color: #FCE7F3; }
+    .ava.c3 { background: #78350F; color: #FEF3C7; } .ava.c4 { background: #0C4A6E; color: #E0F2FE; }
+  }
+
+  .contexto { flex: none; max-width: 1040px; width: 100%; margin: 0 auto; padding: 10px 16px 0; display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--tenue); }
+  .contexto .i { width: 15px; height: 15px; color: var(--prim); }
+
+  #mensajes { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+  #mensajes .lista { max-width: 860px; margin: 0 auto; padding: 18px 16px 8px; display: flex; flex-direction: column; gap: 14px; }
+  .m { display: flex; gap: 10px; align-items: flex-end; max-width: min(720px, 94%); }
+  .m .cuerpo { min-width: 0; }
+  .m .meta { display: flex; align-items: baseline; gap: 8px; font-size: 13px; margin: 0 4px 4px; }
+  .m .meta b { font-weight: 700; color: var(--texto); }
+  .m .meta time { color: var(--tenue); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .m .burbuja { padding: 11px 15px; border-radius: 16px 16px 16px 6px; background: var(--tarjeta); border: 1px solid var(--borde);
+    box-shadow: var(--sombra); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .m.orion .burbuja { background: var(--prim-suave); border-color: color-mix(in srgb, var(--prim) 22%, var(--borde)); }
+  .m.mio { align-self: flex-end; flex-direction: row-reverse; }
+  .m.mio .meta { justify-content: flex-end; }
+  .m.mio .burbuja { background: var(--prim); color: var(--sobre-prim); border-color: var(--prim); border-radius: 16px 16px 6px 16px; }
+  .m.nuevo { animation: entra 200ms ease-out; }
+  @keyframes entra { from { opacity: 0; transform: translateY(6px); } }
+
+  #estado-barra { flex: none; max-width: 860px; width: 100%; margin: 0 auto; padding: 0 16px; min-height: 30px; display: flex; flex-direction: column; justify-content: center; }
+  #aviso-pausa { display: none; align-items: center; gap: 8px; color: var(--mal); background: var(--mal-fondo); border: 1px solid color-mix(in srgb, var(--mal) 30%, transparent);
+    font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 10px; margin-bottom: 6px; }
+  #pensando { display: flex; align-items: center; gap: 10px; color: var(--tenue); font-size: 14px; }
+  #pensando:empty { display: none; }
+  .puntos { display: inline-flex; gap: 4px; }
+  .puntos span { width: 6px; height: 6px; border-radius: 50%; background: var(--prim); animation: salta 1.1s infinite ease-in-out; }
+  .puntos span:nth-child(2) { animation-delay: .15s; } .puntos span:nth-child(3) { animation-delay: .3s; }
+  @keyframes salta { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+
+  .compositor-envoltura { flex: none; padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); }
+  #compositor { max-width: 860px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 8px 8px 8px 14px;
+    background: var(--tarjeta); border: 1px solid var(--borde2); border-radius: 16px; box-shadow: var(--sombra-md);
+    transition: border-color var(--dur), box-shadow var(--dur); }
+  #compositor:focus-within { border-color: var(--prim); box-shadow: 0 0 0 3px color-mix(in srgb, var(--prim) 18%, transparent), var(--sombra-md); }
+  #texto { flex: 1; resize: none; height: 44px; max-height: 160px; border: 0; background: transparent; padding: 10px 0; line-height: 1.5; }
+  #texto:focus { outline: 0; }
+  #texto::placeholder { color: var(--tenue); }
+  #compositor .btn { flex: none; }
+  .ayuda { max-width: 860px; margin: 6px auto 0; font-size: 12px; color: var(--tenue); text-align: center; }
+  kbd { font-family: inherit; font-size: 11px; font-weight: 700; padding: 0 5px; border: 1px solid var(--borde2); border-bottom-width: 2px; border-radius: 5px; background: var(--tarjeta); }
 
   /* ---- editor de informe ---- */
-  #capa { position: fixed; inset: 0; display: none; background: #02101ad0; backdrop-filter: blur(2px);
-    align-items: center; justify-content: center; padding: 18px; z-index: 10; }
-  #capa.abierta { display: flex; }
-  .doc { width: 100%; max-width: 760px; max-height: 92dvh; display: flex; flex-direction: column;
-    background: var(--panel); border: 1px solid var(--borde); border-radius: 16px; box-shadow: var(--sombra); overflow: hidden; }
-  .doc .cab { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--borde); }
-  .doc .cab h2 { margin: 0; font-size: 17px; color: var(--acento); }
+  #capa { position: fixed; inset: 0; display: none; background: color-mix(in srgb, #0F172A 55%, transparent); backdrop-filter: blur(3px);
+    align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  #capa.abierta { display: flex; animation: aparece 160ms ease-out; }
+  @keyframes aparece { from { opacity: 0; } }
+  .doc { width: 100%; max-width: 780px; max-height: 92dvh; display: flex; flex-direction: column;
+    background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 16px; box-shadow: var(--sombra-lg); overflow: hidden; }
+  .doc .cab { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--borde); }
+  .doc .cab .ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--prim-suave); color: var(--prim); }
+  .doc .cab h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .doc .cab p { margin: 0; font-size: 13px; color: var(--tenue); }
   .doc .cab .espacio { flex: 1; }
-  .barra-herr { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--borde); background: var(--fondo2); }
-  .barra-herr button { padding: 7px 11px; font-size: 13px; background: var(--panel); color: var(--texto); border: 1px solid var(--borde); }
+  .barra-herr { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--borde); background: var(--suave-fondo); }
+  .barra-herr button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; min-width: 36px; justify-content: center; padding: 6px 10px; font-size: 14px;
+    background: var(--tarjeta); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px; cursor: pointer; }
   .barra-herr button:hover { border-color: var(--borde2); }
-  #editor { flex: 1; overflow-y: auto; padding: 18px 20px; min-height: 220px; line-height: 1.6; outline: 0; }
+  .barra-herr .sep { width: 1px; background: var(--borde2); margin: 4px 4px; }
+  #editor { flex: 1; overflow-y: auto; padding: 20px 22px; min-height: 240px; line-height: 1.65; outline: 0; }
   #editor:empty::before { content: attr(data-vacio); color: var(--tenue); }
-  #editor img { max-width: 100%; border-radius: 10px; display: block; margin: 10px 0; }
-  #editor h3 { color: var(--acento); margin: 14px 0 6px; }
+  #editor img { max-width: 100%; border-radius: 10px; display: block; margin: 10px 0; border: 1px solid var(--borde); }
+  #editor h3 { color: var(--prim); margin: 16px 0 6px; font-size: 18px; letter-spacing: -.01em; }
   #editor ul { padding-left: 22px; }
-  .doc .pie { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--borde); background: var(--fondo2); }
+  .doc .pie { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--borde); background: var(--suave-fondo); }
   .doc .pie .msg { flex: 1; font-size: 13px; color: var(--tenue); }
-  .doc .pie .msg.ok { color: var(--ok); }
-  .doc .pie .msg.err { color: var(--error); }
+  .doc .pie .msg.ok { color: var(--ok); font-weight: 600; }
+  .doc .pie .msg.err { color: var(--mal); font-weight: 600; }
 
-  @media (max-width: 520px) {
-    .tarjeta { padding: 26px 20px; }
-    header .b { font-size: 13px; }
-    header button { padding: 7px 10px; }
+  @media (max-width: 720px) {
+    .barra .cont { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+    .marca .txt small, .yo .nombre, .btn .et { display: none; }
+    .tabs { order: 3; width: 100%; }
+    .tab { flex: 1; justify-content: center; }
+    .btn.icono { padding: 8px 10px; }
+    #mensajes .lista { padding: 14px 12px 8px; }
+    .m { max-width: 100%; }
+    .m .ava { display: none; }
+    .compositor-envoltura { padding: 6px 10px calc(10px + env(safe-area-inset-bottom)); }
+    .ayuda { display: none; }
+    .acceso form { padding: 26px 20px; }
   }
 </style>
 </head>
 <body data-estado="fuera">
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-orion" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/><ellipse cx="12" cy="12" rx="10" ry="4.5" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-equipo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-candado" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-informe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></symbol>
+    <symbol id="i-salir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+    <symbol id="i-enviar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+    <symbol id="i-imagen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+    <symbol id="i-lista" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></symbol>
+    <symbol id="i-cerrar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-pausa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M10 15V9"/><path d="M14 15V9"/></symbol>
+    <symbol id="i-ojo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </defs>
+</svg>
+
 <!-- ======== LOGIN ======== -->
-<section id="login">
-  <form class="tarjeta" id="form-entrar" autocomplete="on">
-    <div class="marca"><span class="punto"></span><h1>ORIÓN · EQUIPO</h1></div>
-    <p class="sub">Entra con tu usuario y contraseña para abrir la sala.</p>
-    <div class="campo">
-      <label for="usuario">Usuario</label>
-      <input id="usuario" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="tu usuario">
-    </div>
-    <div class="campo">
-      <label for="clave">Contraseña</label>
-      <input id="clave" name="password" type="password" autocomplete="current-password" placeholder="tu contraseña">
-    </div>
-    <button type="submit" class="acento">Entrar</button>
-    <p id="aviso" class="error"></p>
+<section id="login" class="acceso">
+  <form id="form-entrar" autocomplete="on">
+    <div class="marca"><span class="logo" aria-hidden="true"><svg><use href="#i-orion"/></svg></span><span>Orión Equipo<small>Sala de seguridad</small></span></div>
+    <h1>Bienvenido a la sala</h1>
+    <p class="sub">Entra con el usuario y la contraseña que te pasó David.</p>
+    <label for="usuario">Usuario</label>
+    <input id="usuario" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="tu usuario">
+    <label for="clave">Contraseña</label>
+    <input id="clave" name="password" type="password" autocomplete="current-password" placeholder="tu contraseña">
+    <button type="submit" class="btn prim">Entrar</button>
+    <p id="aviso" class="error" role="alert"></p>
+    <p class="pie-marca">Un proyecto de UbuntuLabs</p>
   </form>
 </section>
 
 <!-- ======== APP ======== -->
 <div id="app">
-  <header>
-    <span class="b">ORIÓN · EQUIPO</span>
+  <header class="barra"><div class="cont">
+    <span class="marca"><span class="logo" aria-hidden="true"><svg><use href="#i-orion"/></svg></span><span class="txt">Orión Equipo<small>Sala de seguridad</small></span></span>
     <span class="espacio"></span>
-    <span class="chip"><span class="punto"></span><span id="yo"></span></span>
-    <button class="fantasma" id="abrir-informe">Mi informe</button>
-    <button class="fantasma" id="salir">Salir</button>
-  </header>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Chats">
+      <button id="tab-grupo" class="tab activo" role="tab" aria-selected="true"><svg class="i" aria-hidden="true"><use href="#i-equipo"/></svg>Equipo</button>
+      <button id="tab-privado" class="tab" role="tab" aria-selected="false"><svg class="i" aria-hidden="true"><use href="#i-candado"/></svg>Privado con Orión</button>
+    </nav>
+    <span class="espacio"></span>
+    <span class="yo"><span class="ava" id="yo-ava" aria-hidden="true"></span><span class="nombre" id="yo"></span></span>
+    <button class="btn sec sm icono" id="abrir-informe" aria-label="Mi informe"><svg class="i" aria-hidden="true"><use href="#i-informe"/></svg><span class="et">Mi informe</span></button>
+    <button class="btn fantasma sm icono" id="salir" aria-label="Salir"><svg class="i" aria-hidden="true"><use href="#i-salir"/></svg><span class="et">Salir</span></button>
+  </div></header>
 
-  <nav id="tabs" role="tablist" aria-label="Chats">
-    <button id="tab-grupo" class="tab activo" role="tab" aria-selected="true">Equipo</button>
-    <button id="tab-privado" class="tab" role="tab" aria-selected="false">Privado con Orión</button>
-  </nav>
+  <p class="contexto" id="contexto"><svg class="i" aria-hidden="true"><use href="#i-ojo"/></svg><span>Sala del equipo: todos ven estos mensajes.</span></p>
 
-  <div id="mensajes"></div>
+  <div id="mensajes" role="log" aria-live="polite" aria-label="Mensajes"><div class="lista" id="lista"></div></div>
 
   <div id="estado-barra">
-    <div id="aviso-pausa">Orión está en pausa (David lo detuvo). Vuelve en un rato.</div>
-    <div id="pensando"></div>
+    <div id="aviso-pausa" role="status"><svg class="i" aria-hidden="true"><use href="#i-pausa"/></svg>Orión está en pausa (David lo detuvo). Vuelve en un rato.</div>
+    <div id="pensando" role="status"></div>
   </div>
 
-  <form id="compositor">
-    <textarea id="texto" placeholder="Pregúntale a Orión. Enter envía, Shift+Enter baja de línea."></textarea>
-    <button type="submit" class="acento">Enviar</button>
-  </form>
+  <div class="compositor-envoltura">
+    <form id="compositor">
+      <label for="texto" class="solo-lectores">Mensaje para Orión</label>
+      <textarea id="texto" rows="1" placeholder="Pregúntale a Orión…"></textarea>
+      <button type="submit" class="btn prim"><svg class="i" aria-hidden="true"><use href="#i-enviar"/></svg><span class="et">Enviar</span></button>
+    </form>
+    <p class="ayuda"><kbd>Enter</kbd> envía · <kbd>Shift</kbd> + <kbd>Enter</kbd> baja de línea</p>
+  </div>
 </div>
 
 <!-- ======== EDITOR DE INFORME ======== -->
-<div id="capa">
+<div id="capa" role="dialog" aria-modal="true" aria-labelledby="titulo-informe">
   <div class="doc">
     <div class="cab">
-      <h2>Mi informe de seguridad</h2>
+      <span class="ico" aria-hidden="true"><svg class="i"><use href="#i-informe"/></svg></span>
+      <div><h2 id="titulo-informe">Mi informe de seguridad</h2><p>Qué hiciste, qué encontraste y cómo lo comprobaste.</p></div>
       <span class="espacio"></span>
-      <button class="fantasma" id="cerrar-informe">Cerrar</button>
+      <button class="btn fantasma sm" id="cerrar-informe" aria-label="Cerrar"><svg class="i" aria-hidden="true"><use href="#i-cerrar"/></svg></button>
     </div>
-    <div class="barra-herr">
-      <button type="button" data-cmd="bold" title="Negrita"><b>N</b></button>
-      <button type="button" data-cmd="italic" title="Cursiva"><i>C</i></button>
+    <div class="barra-herr" role="toolbar" aria-label="Formato">
+      <button type="button" data-cmd="bold" title="Negrita" aria-label="Negrita"><b>N</b></button>
+      <button type="button" data-cmd="italic" title="Cursiva" aria-label="Cursiva"><i>C</i></button>
       <button type="button" data-bloque="h3" title="Título">Título</button>
-      <button type="button" data-cmd="insertUnorderedList" title="Lista">• Lista</button>
-      <button type="button" id="btn-imagen">Añadir imagen</button>
+      <button type="button" data-cmd="insertUnorderedList" title="Lista"><svg class="i" aria-hidden="true"><use href="#i-lista"/></svg>Lista</button>
+      <span class="sep" aria-hidden="true"></span>
+      <button type="button" id="btn-imagen"><svg class="i" aria-hidden="true"><use href="#i-imagen"/></svg>Añadir imagen</button>
       <input type="file" id="archivo-imagen" accept="image/*" multiple hidden>
     </div>
-    <div id="editor" contenteditable="true" data-vacio="Escribe aquí: qué hiciste, qué encontraste, cómo lo comprobaste y qué aprendiste. Puedes pegar o añadir capturas."></div>
+    <div id="editor" contenteditable="true" aria-label="Texto del informe" data-vacio="Escribe aquí: qué hiciste, qué encontraste, cómo lo comprobaste y qué aprendiste. Puedes pegar o añadir capturas."></div>
     <div class="pie">
-      <span class="msg" id="informe-msg">Se guarda en el panel de David. Puedes volver y seguir editándolo.</span>
-      <button class="acento" id="guardar-informe">Guardar</button>
+      <span class="msg" id="informe-msg" role="status">Se guarda en el panel de David. Puedes volver y seguir editándolo.</span>
+      <button class="btn verde" id="guardar-informe">Guardar</button>
     </div>
   </div>
 </div>
@@ -192,30 +329,62 @@ async function api(ruta, opciones = {}) {
   return datos;
 }
 
-function pintar(m) {
-  const div = document.createElement("div");
-  div.className = "m" + (m.de === "orion" ? " orion" : m.de === nombre ? " mio" : "");
-  const quien = document.createElement("small");
-  quien.textContent = (m.de === "orion" ? "Orión" : m.de) + " · " + m.hora;
-  div.append(quien, document.createTextNode(m.texto));
-  $("mensajes").append(div);
+const SVG = "http://www.w3.org/2000/svg";
+function avatar(de) {
+  const a = document.createElement("span");
+  a.setAttribute("aria-hidden", "true");
+  if (de === "orion") {
+    a.className = "ava orion";
+    const s = document.createElementNS(SVG, "svg"), u = document.createElementNS(SVG, "use");
+    u.setAttribute("href", "#i-orion"); s.append(u); a.append(s);
+  } else {
+    let h = 0; for (const c of de) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    a.className = "ava c" + (h % 5);   // c0 usa el color base
+    a.textContent = de.slice(0, 2);
+  }
+  return a;
 }
+
+function burbuja(de, hora, texto) {
+  const div = document.createElement("div");
+  div.className = "m nuevo" + (de === "orion" ? " orion" : de === nombre ? " mio" : "");
+  if (de !== nombre) div.append(avatar(de));
+  const cuerpo = document.createElement("div");
+  cuerpo.className = "cuerpo";
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const quien = document.createElement("b");
+  quien.textContent = de === "orion" ? "Orión" : de === nombre ? "Tú" : de;
+  meta.append(quien);
+  if (hora) { const t = document.createElement("time"); t.textContent = hora; meta.append(t); }
+  const b = document.createElement("div");
+  b.className = "burbuja";
+  b.textContent = texto;
+  cuerpo.append(meta, b);
+  div.append(cuerpo);
+  $("lista").append(div);
+}
+
+function pintar(m) { burbuja(m.de, m.hora, m.texto); }
 
 function bienvenida() {
   // Saludo instantáneo de Orión (del lado del cliente, sin esperar al modelo).
-  $("mensajes").innerHTML = "";
-  const div = document.createElement("div");
-  div.className = "m orion";
-  const quien = document.createElement("small");
-  quien.textContent = "Orión";
-  const cuerpo = document.createElement("div");
-  cuerpo.textContent = privado
+  $("lista").innerHTML = "";
+  burbuja("orion", "", privado
     ? "¡Hola, " + nombre + "! Este es tu chat privado conmigo: aquí solo estamos tú y yo, nadie más del " +
       "equipo lo ve. Pregúntame lo que quieras, practica o pídeme que revisemos algo con calma."
     : "¡Hola, " + nombre + "! Soy Orión, tu senior de seguridad. Esta es la sala del equipo (la ven todos): " +
-      "pídeme que te guíe, que revise algo o que repartamos tareas. Cuando terminen, no olviden su informe.";
-  div.append(quien, cuerpo);
-  $("mensajes").append(div);
+      "pídeme que te guíe, que revise algo o que repartamos tareas. Cuando terminen, no olviden su informe.");
+  $("contexto").lastElementChild.textContent = privado
+    ? "Chat privado: solo tú y Orión lo ven."
+    : "Sala del equipo: todos ven estos mensajes.";
+}
+
+function pensando(ocupado) {
+  const p = $("pensando");
+  if (!ocupado) { p.textContent = ""; return; }
+  if (p.querySelector(".puntos")) return;
+  p.innerHTML = '<span class="puntos" aria-hidden="true"><span></span><span></span><span></span></span>Orión está trabajando…';
 }
 
 async function leer() {
@@ -227,8 +396,8 @@ async function leer() {
     const abajo = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 90;
     for (const m of d.mensajes) { pintar(m); ultimos[k] = m.n; }
     if (d.mensajes.length && abajo) caja.scrollTop = caja.scrollHeight;
-    $("pensando").textContent = d.ocupado ? "Orión está trabajando…" : "";
-    $("aviso-pausa").style.display = d.pausa ? "block" : "none";
+    pensando(d.ocupado);
+    $("aviso-pausa").style.display = d.pausa ? "flex" : "none";
   } catch (e) {
     if (e.codigo === 401) salir();
   }
@@ -253,6 +422,7 @@ $("tab-privado").onclick = () => cambiarTab(true);
 function mostrarSala() {
   document.body.dataset.estado = "dentro";
   $("yo").textContent = nombre;
+  $("yo-ava").textContent = nombre.slice(0, 2);
   bienvenida();
 }
 
@@ -263,7 +433,7 @@ function salir() {
   $("tab-grupo").classList.add("activo"); $("tab-grupo").setAttribute("aria-selected", "true");
   $("tab-privado").classList.remove("activo"); $("tab-privado").setAttribute("aria-selected", "false");
   document.body.dataset.estado = "fuera";
-  $("mensajes").innerHTML = "";
+  $("lista").innerHTML = "";
   $("capa").classList.remove("abierta");
 }
 
@@ -299,7 +469,7 @@ $("texto").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("compositor").requestSubmit(); }
 });
 $("texto").addEventListener("input", () => {
-  $("texto").style.height = "50px";
+  $("texto").style.height = "44px";
   $("texto").style.height = Math.min($("texto").scrollHeight, 160) + "px";
 });
 $("compositor").onsubmit = async (e) => {
@@ -308,7 +478,7 @@ $("compositor").onsubmit = async (e) => {
   if (!texto) return;
   try {
     await api("/api/pedir", { method: "POST", body: JSON.stringify({ texto, privado }) });
-    $("texto").value = ""; $("texto").style.height = "50px";
+    $("texto").value = ""; $("texto").style.height = "44px";
     leer();
   } catch (err) {
     $("pensando").textContent = "No se envió: " + err.message;
@@ -336,6 +506,7 @@ function cerrarInforme() { $("capa").classList.remove("abierta"); }
 $("abrir-informe").onclick = abrirInforme;
 $("cerrar-informe").onclick = cerrarInforme;
 $("capa").addEventListener("click", (e) => { if (e.target === $("capa")) cerrarInforme(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("capa").classList.contains("abierta")) cerrarInforme(); });
 
 for (const b of document.querySelectorAll(".barra-herr [data-cmd]")) {
   b.onclick = () => { $("editor").focus(); document.execCommand(b.dataset.cmd, false, null); };
