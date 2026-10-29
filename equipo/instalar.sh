@@ -155,6 +155,7 @@ sudo install -d -m 755 /etc/caddy/conf.d
 sudo tee /etc/caddy/conf.d/orion-equipo.caddy >/dev/null <<EOF
 # Lo escribe equipo/instalar.sh. La sala de Orión Equipo.
 $dominio {
+	import /etc/caddy/orion-registro*.caddy
 	encode gzip
 	request_body {
 		max_size 8MB

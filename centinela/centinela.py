@@ -41,6 +41,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import web  # noqa: E402  (vive junto a este archivo, también en /opt/orion-centinela)
+
 BASE = Path(os.environ.get("CENTINELA_DATOS", "/var/lib/orion-centinela"))
 ESTADO = BASE / "estado.json"
 AVISOS = BASE / "avisos"            # el puente de WhatsApp los lee y los borra
@@ -72,6 +75,18 @@ AJUSTES = {
     "CPU_PCT": 50,               # % de CPU sostenido para congelar un programa sospechoso
     "AVISO_REPETIR_MIN": 30,     # el mismo aviso no se repite antes de esto
     "CONFIANZA_DIAS": 3,
+    # Webs del dominio (registro de Caddy, ver centinela/caddy-registro.sh)
+    "WEB_REGISTRO": "/var/log/caddy/acceso.log",
+    "WEB_ATAQUES": 3,            # peticiones con inyección/XSS/etc. en 10 min = bloqueo (las graves, a la primera)
+    "WEB_SENSIBLES": 5,          # pedir .env, .git, wp-login... en 10 min
+    "WEB_ERRORES": 100,          # respuestas 404/4xx en 10 min (buscando rutas a ciegas)
+    "WEB_LOGIN_FALLOS": 20,      # POST rechazados (401/403) en 10 min (fuerza bruta a un login)
+    "WEB_PETICIONES_MIN": 600,   # peticiones por minuto de una sola IP (flood HTTP)
+    "WEB_DESCARGA_MB": 500,      # MB que se lleva una IP en 10 min
+    "WEB_TOTAL_MIN": 6000,       # piso de peticiones/min de todos juntos para llamar DDoS a un pico
+    # Cloudflare: con token, bloquea en Cloudflare a quien ataca a través de él y activa "Under Attack"
+    "CF_TOKEN": "",
+    "CF_ZONA": "",
 }
 
 # Cloudflare (https://www.cloudflare.com/ips/): si los dominios pasan por su proxy, todo el tráfico web
@@ -295,12 +310,18 @@ class Centinela:
         except (FileNotFoundError, ValueError):
             self.e = {}
         for clave in ("bloqueos", "historial", "confianza", "avisados", "fallos", "huellas", "puertos",
-                      "salida", "cpu", "congelados", "normal"):
+                      "salida", "cpu", "congelados", "normal", "web", "cf_bloqueos"):
             self.e.setdefault(clave, {})
         self.primera_vez = "inicio" not in self.e
         self.e.setdefault("inicio", ahora())
         self.protegidas = redes(CLOUDFLARE + TAILSCALE + self.c["PERMITIDOS"].split(","))
         self.mias = set()
+        self.cf = web.Cloudflare(self.c["CF_TOKEN"], self.c["CF_ZONA"]) if self.c["CF_TOKEN"] and self.c["CF_ZONA"] else None
+        self.cloudflare = redes(CLOUDFLARE)
+
+    def es_cloudflare(self, ip):
+        ip = ip_valida(ip)
+        return ip is not None and any(ip in r for r in self.cloudflare if r.version == ip.version)
 
     # --- memoria ---
 
@@ -434,10 +455,38 @@ class Centinela:
         dura = f"{minutos // 60} h" if minutos >= 60 else f"{minutos} min"
         return f"Bloqueé {ip} por {dura} (se quita sola). Para soltarla ya: `sudo orion-centinela desbloquear {ip}`"
 
+    def bloquear_en_cloudflare(self, ip, minutos, motivo):
+        """Para quien ataca a través de Cloudflare: bloquearlo aquí cortaría a Cloudflare entero."""
+        ip = str(ip_valida(ip))
+        if self.protegida(ip):
+            self.anotar("no-bloqueada", ip=ip, motivo=motivo)
+            return f"No la bloqueé porque {ip} está en tu lista de confianza."
+        if not self.cf:
+            return ("Llega a través de Cloudflare, así que aquí no la puedo cortar sin cortar a todos. Con el token de "
+                    "Cloudflare en /etc/orion-centinela.conf la bloqueo allá sola; mientras, bloquéala en Cloudflare: "
+                    f"Security > WAF > Tools > IP Access Rules > {ip} > Block.")
+        if not self.actua():
+            return "Estoy en modo solo avisar, así que no la bloqueé en Cloudflare."
+        if self.e["historial"].get(ip, 0) > ahora() - 7 * 86400:
+            minutos = max(minutos, self.c["REINCIDENTE_MIN"])
+        hasta = ahora() + minutos * 60
+        regla, r = self.cf.bloquear(ip, f"orion-centinela: {motivo} (hasta {time.strftime('%d/%m %H:%M', time.localtime(hasta))})")
+        if not regla:
+            self.anotar("error-cloudflare", ip=ip, error=web.Cloudflare.error(r))
+            return f"Intenté bloquearla en Cloudflare y respondió: {web.Cloudflare.error(r)[:120]}"
+        self.e["cf_bloqueos"][ip] = {"id": regla, "hasta": hasta, "motivo": motivo}
+        self.e["historial"][ip] = ahora()
+        self.anotar("bloqueo-cloudflare", ip=ip, minutos=minutos, motivo=motivo)
+        dura = f"{minutos // 60} h" if minutos >= 60 else f"{minutos} min"
+        return f"La bloqueé en Cloudflare por {dura} (se quita sola). Para soltarla: `sudo orion-centinela desbloquear {ip}`"
+
     def desbloquear(self, ip):
         ip = str(ip_valida(ip))
         self._elemento("delete", "bloqueados", ip)
         self.e["bloqueos"].pop(ip, None)
+        cf = self.e["cf_bloqueos"].pop(ip, None)
+        if cf and self.cf:
+            self.cf.soltar(cf["id"])
         self.anotar("desbloqueo", ip=ip)
         return f"{ip} desbloqueada."
 
@@ -513,6 +562,120 @@ class Centinela:
                 motivo, texto = "más de 50 conexiones nuevas por segundo", "lanzó más de 50 conexiones nuevas por segundo al servidor (inundación / DoS)"
             r = self.bloquear(ip, self.c["BLOQUEO_MIN"], motivo)
             self.avisar(f"exceso-{ip}", "media", f"{ip} {texto}. El servidor tiró el exceso al momento y no se cayó. {r}")
+
+    def _leer_registro_web(self):
+        """Las líneas nuevas del registro de Caddy desde la última ronda (aguanta rotaciones)."""
+        ruta = Path(self.c["WEB_REGISTRO"])
+        try:
+            st = ruta.stat()
+        except OSError:
+            return []
+        pos = self.e["web"].get("pos", {})
+        inicio = pos.get("offset", 0) if pos.get("inodo") == st.st_ino and st.st_size >= pos.get("offset", 0) else 0
+        if self.primera_vez or not pos:
+            inicio = st.st_size                     # lo de antes de encender no se juzga
+        inicio = max(inicio, st.st_size - 20 * 1024 * 1024)   # como mucho 20 MB por ronda
+        with open(ruta, "rb") as f:
+            f.seek(inicio)
+            datos = f.read()
+        corte = datos.rfind(b"\n") + 1                  # una línea a medio escribir se lee la próxima vez
+        self.e["web"]["pos"] = {"inodo": st.st_ino, "offset": inicio + corte}
+        return datos[:corte].decode(errors="replace").splitlines()
+
+    def revisar_web(self):
+        """Ataques a las webs del dominio: inyecciones, escáneres, fuerza bruta, floods HTTP, descargas masivas."""
+        ventana = 600
+        hist = self.e["web"].get("ips", {})
+        ronda, total = {}, 0
+        for texto in self._leer_registro_web():
+            a = web.linea(texto)
+            if not a:
+                continue
+            total += 1
+            ip, via_cf = web.ip_real(a, self.es_cloudflare)
+            if not ip_valida(ip) or self.protegida(ip):
+                continue
+            ip = str(ip_valida(ip))
+            r = ronda.setdefault(ip, {"pet": 0, "ataques": 0, "graves": 0, "sensibles": 0, "errores": 0, "login": 0,
+                                      "bytes": 0, "tipos": [], "ejemplo": "", "host": a["host"], "cf": via_cf})
+            r["pet"] += 1
+            r["bytes"] += a["bytes"]
+            r["errores"] += 400 <= a["estado"] < 500
+            r["login"] += a["metodo"] == "POST" and a["estado"] in (401, 403)
+            tipos = web.ataques_en(a)
+            for t in tipos:
+                if t not in r["tipos"]:
+                    r["tipos"].append(t)
+            if tipos:
+                r["sensibles"] += "busca archivos sensibles" in tipos
+                otros = [t for t in tipos if t != "busca archivos sensibles"]
+                r["ataques"] += bool(otros)
+                r["graves"] += any(t in web.GRAVES or t == "escáner automático" for t in otros)
+                r["ejemplo"] = r["ejemplo"] or f"{a['metodo']} {a['host']}{a['uri']}"[:110].replace("`", "'")
+        claves = ("pet", "ataques", "graves", "sensibles", "errores", "login", "bytes")
+        for ip, r in ronda.items():
+            hist[ip] = [x for x in hist.get(ip, []) if x[0] > ahora() - ventana] + [[ahora()] + [r[k] for k in claves]]
+        hist = {ip: l for ip, l in hist.items() if l and l[-1][0] > ahora() - ventana}
+        self.e["web"]["ips"] = hist
+        for ip, r in ronda.items():
+            suma = dict(zip(claves, (sum(x[i + 1] for x in hist[ip]) for i in range(len(claves)))))
+            motivo = None
+            if suma["graves"]:
+                motivo = f"ataque a la web ({', '.join(r['tipos'])})"
+            elif suma["ataques"] >= self.c["WEB_ATAQUES"]:
+                motivo = f"{suma['ataques']} intentos de {', '.join(r['tipos'])}"
+            elif suma["sensibles"] >= self.c["WEB_SENSIBLES"]:
+                motivo = f"buscó {suma['sensibles']} archivos sensibles (.env, .git, wp-login...)"
+            elif suma["login"] >= self.c["WEB_LOGIN_FALLOS"]:
+                motivo = f"{suma['login']} intentos de login rechazados (fuerza bruta)"
+            elif suma["errores"] >= self.c["WEB_ERRORES"]:
+                motivo = f"{suma['errores']} páginas inexistentes en 10 min (buscando rutas a ciegas)"
+            elif r["pet"] >= self.c["WEB_PETICIONES_MIN"]:
+                motivo = f"{r['pet']} peticiones en un minuto (flood HTTP)"
+            if motivo and ip not in self.e["bloqueos"] and ip not in self.e["cf_bloqueos"]:
+                if r["cf"]:
+                    hecho = self.bloquear_en_cloudflare(ip, self.c["BLOQUEO_MIN"], motivo)
+                else:
+                    hecho = self.bloquear(ip, self.c["BLOQUEO_MIN"], motivo)
+                ejemplo = f"\nEjemplo: `{r['ejemplo']}`" if r["ejemplo"] else ""
+                self.avisar(f"web-{ip}", "alta" if suma["graves"] else "media",
+                            f"Ataque a {r['host'] or 'la web'} desde {ip}: {motivo}.{ejemplo}\n{hecho}")
+            elif suma["bytes"] >= self.c["WEB_DESCARGA_MB"] * 1e6:
+                self.avisar(f"webdesc-{ip}", "media", f"{ip} se ha llevado {mb(suma['bytes'])} de {r['host']} en 10 min. "
+                            f"Si no es un cliente tuyo, `sudo orion-centinela bloquear {ip}`.")
+        self._modo_ataque(total)
+
+    def _modo_ataque(self, total):
+        """Si llegan muchísimas más peticiones de lo normal, sube Cloudflare a "Under Attack"; lo baja tras 30 min en calma."""
+        n = Normal(self.e["normal"].get("web"))
+        pico = n.raro(total, self.c["WEB_TOTAL_MIN"])
+        if not pico:
+            n.sumar(total)
+        self.e["normal"]["web"] = n.dict()
+        ua = self.e["web"].get("under_attack")
+        if pico:
+            if ua:
+                ua["ultimo_pico"] = ahora()
+                return
+            if self.cf and self.actua():
+                antes = self.cf.nivel() or "medium"
+                r = self.cf.poner_nivel("under_attack")
+                if r.get("success"):
+                    self.e["web"]["under_attack"] = {"antes": antes, "desde": ahora(), "ultimo_pico": ahora()}
+                    self.anotar("under-attack", peticiones=total)
+                    hecho = "Activé el modo *Under Attack* de Cloudflare: los visitantes ven un reto de 5 s y los bots no pasan. Lo apago solo tras 30 min de calma."
+                else:
+                    hecho = f"Quise activar Under Attack en Cloudflare y respondió: {web.Cloudflare.error(r)[:120]}"
+            else:
+                hecho = "Actívalo a mano en Cloudflare: Overview > Under Attack Mode (o pon el token para que lo haga yo)."
+            self.avisar("ddos-web", "alta", f"Posible DDoS a las webs: {total} peticiones en un minuto (lo normal: "
+                        f"{n.media:.0f}). {hecho}")
+        elif ua and ahora() - ua["ultimo_pico"] > 1800 and self.cf:
+            r = self.cf.poner_nivel(ua["antes"])
+            if r.get("success"):
+                self.e["web"].pop("under_attack")
+                self.anotar("under-attack-fin")
+                self.avisar("ddos-web-fin", "info", f"30 min sin picos: Cloudflare vuelve al nivel de seguridad '{ua['antes']}'.")
 
     def revisar_conexiones(self, conns, puertos_abiertos):
         abiertos = {int(p.split(":")[1]) for p in puertos_abiertos if p.startswith("tcp:")} | {22, 80, 443}
@@ -724,6 +887,10 @@ class Centinela:
             self.encender()            # tras un reinicio la tabla no existe: se vuelve a poner
         for ip in [ip for ip, b in self.e["bloqueos"].items() if b["hasta"] < t0]:
             self.e["bloqueos"].pop(ip)
+        for ip in [ip for ip, b in self.e["cf_bloqueos"].items() if b["hasta"] < t0]:
+            b = self.e["cf_bloqueos"].pop(ip)
+            r = self.cf.soltar(b["id"]) if self.cf else {"success": False, "errors": [{"message": "sin token"}]}
+            self.anotar("desbloqueo-cloudflare", ip=ip, **({} if r.get("success") else {"error": web.Cloudflare.error(r)}))
         self.e["confianza"] = {ip: h for ip, h in self.e["confianza"].items() if h > t0}
         self.e["historial"] = {ip: h for ip, h in self.e["historial"].items() if h > t0 - 7 * 86400}
         self.e["avisados"] = {k: h for k, h in self.e["avisados"].items() if h > t0 - 86400}
@@ -738,6 +905,7 @@ class Centinela:
 
         pasos = [
             ("ssh", self.revisar_ssh),
+            ("web", self.revisar_web),
             ("excesos", self.revisar_excesos),
             ("conexiones", lambda: self.revisar_conexiones(conns, puertos)),
             ("trafico", lambda: previo and rx >= previo[0] and self.revisar_trafico(
@@ -771,6 +939,8 @@ class Centinela:
 
     def lista(self):
         vivos = {ip: b for ip, b in self.e["bloqueos"].items() if b["hasta"] > ahora()}
+        vivos.update({ip: {**b, "motivo": "en Cloudflare: " + b["motivo"]} for ip, b in self.e["cf_bloqueos"].items()
+                      if b["hasta"] > ahora()})
         if not vivos:
             return "No hay IPs bloqueadas ahora."
         return "\n".join(f"{ip}  hasta {time.strftime('%d/%m %H:%M', time.localtime(b['hasta']))}  ({b['motivo']})"
@@ -780,6 +950,7 @@ class Centinela:
         modo = "apagado (solo avisa)" if self.e.get("apagado") else ("bloquea y avisa" if self.actua() else "solo avisa")
         lineas = [f"Centinela: {modo}. Reglas en nftables: {'sí' if self.tabla_viva() else 'no'}.",
                   f"Última ronda: {time.strftime('%d/%m %H:%M', time.localtime(self.e.get('ultima', 0)))}.",
+                  self._estado_cloudflare(),
                   "", "Bloqueadas:", self.lista(), "", f"Últimos {n} eventos:"]
         try:
             ult = REGISTRO.read_text().splitlines()[-n:]
@@ -792,6 +963,15 @@ class Centinela:
                 continue
             lineas.append(f"{d.pop('t')} {d.pop('tipo')}: " + " ".join(f"{k}={v}" for k, v in d.items())[:220])
         return "\n".join(lineas)
+
+    def _estado_cloudflare(self):
+        if not self.cf:
+            return "Cloudflare: sin token (los ataques que llegan por Cloudflare solo se avisan)."
+        nivel = self.cf.nivel()
+        if not nivel:
+            return "Cloudflare: el token NO funciona (revisa CENTINELA_CF_TOKEN, CENTINELA_CF_ZONA y sus permisos)."
+        ua = " · Under Attack puesto por el centinela" if self.e["web"].get("under_attack") else ""
+        return f"Cloudflare: conectado, nivel de seguridad {nivel}{ua}."
 
     def restaurar(self, ruta):
         ruta = os.path.abspath(ruta)

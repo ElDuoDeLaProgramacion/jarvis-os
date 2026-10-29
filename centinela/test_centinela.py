@@ -95,6 +95,64 @@ class Lectura(unittest.TestCase):
         self.assertIsNone(c.ip_valida("1.2.3.4; rm -rf /"))
 
 
+def acceso(uri, ip="45.10.0.2", cf_ip="", ua="Mozilla/5.0", metodo="GET", estado=200, size=100):
+    cab = {"User-Agent": [ua], "Cookie": []}
+    if cf_ip:
+        cab["Cf-Connecting-Ip"] = [cf_ip]
+    return json.dumps({"logger": "http.log.access", "request": {"remote_ip": ip, "method": metodo, "host": "api.ubuntulabs.co",
+                       "uri": uri, "headers": cab}, "status": estado, "size": size})
+
+
+class Web(unittest.TestCase):
+    def test_ataques(self):
+        def tipos(uri, ua="Mozilla/5.0"):
+            return c.web.ataques_en(c.web.linea(acceso(uri, ua=ua)))
+        self.assertIn("inyección SQL", tipos("/buscar?q=1%27%20OR%201=1--"))
+        self.assertIn("inyección SQL", tipos("/p?id=1+UNION+ALL+SELECT+password+FROM+users"))
+        self.assertIn("XSS", tipos("/?q=%253Cscript%253Ealert(1)"))          # doble codificación
+        self.assertIn("recorrido de rutas", tipos("/descargar?f=../../etc/passwd"))
+        self.assertIn("ejecución de comandos", tipos("/", ua="${jndi:ldap://x/a}"))
+        self.assertIn("busca archivos sensibles", tipos("/.env"))
+        self.assertIn("escáner automático", tipos("/", ua="sqlmap/1.7"))
+        for normal in ("/", "/panel/api/alertas?n=20", "/app/index.html", "/buscar?q=select+un+carro", "/blog/2026/union"):
+            self.assertEqual(tipos(normal), [], normal)
+
+    def test_ip_real_solo_si_viene_de_cloudflare(self):
+        cf = lambda ip: ip.startswith("104.16.")
+        self.assertEqual(c.web.ip_real(c.web.linea(acceso("/", ip="104.16.0.5", cf_ip="45.77.8.9")), cf), ("45.77.8.9", True))
+        # Cabecera falsa enviada directo (sin pasar por Cloudflare): se ignora.
+        self.assertEqual(c.web.ip_real(c.web.linea(acceso("/", ip="45.10.0.2", cf_ip="1.1.1.1")), cf), ("45.10.0.2", False))
+
+    def test_cliente_cloudflare(self):
+        pedidos = []
+
+        class Resp:
+            def __init__(self, d):
+                self.d = d
+
+            def read(self):
+                return json.dumps(self.d).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def abrir(req, timeout):
+            pedidos.append((req.get_method(), req.full_url, json.loads(req.data or b"null"), req.headers["Authorization"]))
+            return Resp({"success": True, "result": {"id": "regla1", "value": "medium"}})
+        cf = c.web.Cloudflare("tok", "zona1", abrir)
+        self.assertEqual(cf.bloquear("45.77.8.9", "prueba")[0], "regla1")
+        self.assertEqual(pedidos[0][0], "POST")
+        self.assertTrue(pedidos[0][1].endswith("/zones/zona1/firewall/access_rules/rules"))
+        self.assertEqual(pedidos[0][2]["configuration"], {"target": "ip", "value": "45.77.8.9"})
+        self.assertEqual(pedidos[0][3], "Bearer tok")
+        cf.poner_nivel("under_attack")
+        self.assertEqual(pedidos[-1][:3], ("PATCH", "https://api.cloudflare.com/client/v4/zones/zona1/settings/security_level",
+                                            {"value": "under_attack"}))
+
+
 class Decisiones(unittest.TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())
@@ -170,6 +228,49 @@ class Decisiones(unittest.TestCase):
         self.assertIn("45.10.0.2", self.cen.e["bloqueos"])
         self.assertNotIn("104.16.1.1", self.cen.e["bloqueos"])       # Cloudflare: nunca
         self.assertTrue(any("50 conexiones nuevas por segundo al servidor" in a for a in self.avisos()))
+
+    def _registro(self, lineas):
+        ruta = self.dir / "acceso.log"
+        self.cen.c["WEB_REGISTRO"] = str(ruta)
+        self.cen.e["web"]["pos"] = {"inodo": 0, "offset": 0}
+        ruta.write_text("\n".join(lineas) + "\n")
+        self.cen.e["web"]["pos"]["inodo"] = ruta.stat().st_ino
+
+    def test_web_directo_bloquea_en_nftables(self):
+        self._registro([acceso("/?f=../../etc/passwd"), acceso("/")])
+        self.cen.revisar_web()
+        self.assertIn("45.10.0.2", self.cen.e["bloqueos"])
+
+    def test_web_por_cloudflare_bloquea_en_cloudflare_no_aqui(self):
+        llamados = []
+
+        class CF:
+            def bloquear(self, ip, nota):
+                llamados.append(ip)
+                return "r1", {"success": True}
+
+            def soltar(self, regla):
+                llamados.append(("soltar", regla))
+                return {"success": True}
+        self.cen.cf = CF()
+        self._registro([acceso("/.env", ip="104.16.0.5", cf_ip="45.77.8.9") for _ in range(5)] +
+                       [acceso("/", ip="104.16.0.5", cf_ip="181.50.7.7")])
+        self.cen.revisar_web()
+        self.assertEqual(llamados, ["45.77.8.9"])
+        self.assertNotIn("104.16.0.5", self.cen.e["bloqueos"])        # Cloudflare nunca se bloquea aquí
+        self.assertIn("45.77.8.9", self.cen.e["cf_bloqueos"])
+        self.cen.desbloquear("45.77.8.9")
+        self.assertEqual(llamados[-1], ("soltar", "r1"))
+
+    def test_web_sin_token_avisa_como_bloquear(self):
+        self._registro([acceso("/.env", ip="104.16.0.5", cf_ip="45.77.8.9") for _ in range(5)])
+        self.cen.revisar_web()
+        self.assertTrue(any("IP Access Rules" in a for a in self.avisos()))
+
+    def test_web_visitas_normales_no_avisan(self):
+        self._registro([acceso(f"/app/{i}.js") for i in range(200)] + [acceso("/no-existe", estado=404) for _ in range(5)])
+        self.cen.revisar_web()
+        self.assertEqual(self.avisos(), [])
 
     def test_aviso_no_se_repite(self):
         self.cen.avisar("x", "media", "hola")

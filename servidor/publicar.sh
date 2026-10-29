@@ -42,6 +42,7 @@ sudo install -d -m 755 /etc/caddy/conf.d
 sudo tee /etc/caddy/Caddyfile >/dev/null <<EOF
 # Lo escribe servidor/publicar.sh. La API de Orión, publicada con HTTPS.
 $dominio {
+	import /etc/caddy/orion-registro*.caddy
 	encode gzip
 	request_body {
 		max_size 45MB
@@ -56,6 +57,7 @@ $dominio {
 }
 
 sitios.$dominio {
+	import /etc/caddy/orion-registro*.caddy
 	encode gzip
 	root * $sitios_dir
 	file_server

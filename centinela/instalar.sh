@@ -21,6 +21,7 @@ paso "Copia del centinela en $DESTINO (solo root puede cambiarla)"
 sudo install -d -o root -g root -m 755 "$DESTINO"
 sudo install -o root -g root -m 755 centinela/centinela.py "$DESTINO/centinela.py"
 sudo install -o root -g root -m 644 centinela/reglas.nft "$DESTINO/reglas.nft"
+sudo install -o root -g root -m 644 centinela/web.py "$DESTINO/web.py"
 sudo ln -sf "$DESTINO/centinela.py" /usr/local/sbin/orion-centinela
 
 paso "Carpetas: avisos (los lee el puente de WhatsApp) y registro"
@@ -50,8 +51,12 @@ CENTINELA_GRUPO=$GRUPO
 # CENTINELA_BLOQUEO_MIN=60
 # CENTINELA_CONEXIONES_IP=150
 # CENTINELA_SALIDA_MB=300
+# Cloudflare (opcional): bloquear en Cloudflare a quien ataca las webs a través de él y activar Under Attack.
+# Token en Cloudflare > Mi perfil > API Tokens, solo para tu zona, con permisos Zone > Firewall Services: Edit,
+# Zone Settings: Edit y Analytics: Read. El ID de zona sale en la portada del dominio (columna derecha).
+# CENTINELA_CF_TOKEN=
+# CENTINELA_CF_ZONA=
 EOF
-  sudo chmod 644 "$CONF"
   echo "Creado. Permitidas para siempre: ${permitidas:-ninguna}"
 else
   sudo sed -i "s/^CENTINELA_MODO=.*/CENTINELA_MODO=$MODO/" "$CONF"
@@ -60,6 +65,12 @@ else
     echo "de confianza 3 días. Si es fija, añádela en $CONF."
   fi
 fi
+
+# Puede llevar el token de Cloudflare: solo root lo lee.
+sudo chmod 600 "$CONF"
+
+paso "Caddy: anotar las visitas para vigilar las webs"
+./centinela/caddy-registro.sh || echo "No pude activar el registro de Caddy; el resto sigue igual."
 
 paso "Kernel: aguantar inundaciones SYN y no aceptar redirecciones"
 sudo tee /etc/sysctl.d/60-orion-centinela.conf >/dev/null <<'EOF'
