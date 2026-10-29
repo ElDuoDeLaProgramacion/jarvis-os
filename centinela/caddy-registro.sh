@@ -7,7 +7,16 @@
 # Caddy no guarda Cookie ni Authorization en el registro (las tapa como REDACTED).
 set -euo pipefail
 command -v caddy >/dev/null || { echo "Caddy no está instalado: nada que hacer."; exit 0; }
-sudo install -d -m 755 /var/log/caddy
+# Caddy corre como su propio usuario: la carpeta y el archivo del registro tienen que ser suyos o no arranca.
+yo_caddy=$(systemctl show -p User --value caddy 2>/dev/null || true)
+yo_caddy=${yo_caddy:-caddy}
+id "$yo_caddy" >/dev/null 2>&1 || yo_caddy=root
+dueno() {
+  sudo install -d -o "$yo_caddy" -g "$yo_caddy" -m 755 /var/log/caddy
+  [ -f /var/log/caddy/acceso.log ] || sudo install -o "$yo_caddy" -g "$yo_caddy" -m 640 /dev/null /var/log/caddy/acceso.log
+  sudo chown "$yo_caddy:$yo_caddy" /var/log/caddy/acceso.log*
+}
+dueno
 sudo tee /etc/caddy/orion-registro.caddy >/dev/null <<'REG'
 # Lo escribe centinela/caddy-registro.sh: registro de visitas que lee el centinela de Orión.
 log {
@@ -34,10 +43,12 @@ for f in /etc/caddy/Caddyfile /etc/caddy/conf.d/*.caddy; do
   fi
 done
 if [ ${#cambiados[@]} -eq 0 ]; then echo "Caddy ya anotaba las visitas."; exit 0; fi
-if sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 && sudo systemctl reload caddy; then
+# validate corre como root y puede dejar el archivo a nombre de root: se devuelve a Caddy antes de recargar.
+if sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 && dueno && sudo systemctl reload caddy; then
   echo "Caddy anota las visitas en /var/log/caddy/acceso.log (sitios en: ${cambiados[*]})."
 else
   for f in "${cambiados[@]}"; do sudo cp -p "$f.antes-del-centinela-$marca" "$f"; done
+  sudo journalctl -u caddy -n 8 --no-pager -o cat 2>/dev/null | grep -iE 'error|denied|fail' | tail -3 || true
   sudo systemctl reload caddy || true
   echo "Caddy no aceptó el cambio; dejé todo como estaba. El centinela sigue vigilando el servidor, pero no las webs."
 fi
