@@ -476,6 +476,38 @@ class Centinela:
                             f"{self.c['SSH_VENTANA_MIN']} min (usuario: {usuario or '?'}). {r}")
         self.e["fallos"] = {ip: l for ip, l in self.e["fallos"].items() if l and l[-1] > ahora() - ventana}
 
+    def excesos(self):
+        """IPs que nftables pilló pasándose del límite de conexiones nuevas -> {ip: 'ssh'|'web'}."""
+        out = {}
+        for tipo in ("ssh", "web"):
+            for v in (4, 6):
+                _, js, _ = self._nft("-j", "list", "set", *TABLA, f"exceso_{tipo}{v}")
+                try:
+                    datos = json.loads(js or "{}")["nftables"]
+                except (ValueError, KeyError):
+                    continue
+                for d in datos:
+                    for el in d.get("set", {}).get("elem", []):
+                        ip = el.get("elem", {}).get("val") if isinstance(el, dict) else el
+                        if ip_valida(ip):
+                            out[str(ip_valida(ip))] = tipo
+        return out
+
+    def revisar_excesos(self):
+        """Quien se pasó del límite ya vio su exceso tirado al instante; aquí se bloquea del todo y se avisa."""
+        if not self.tabla_viva():
+            return
+        for ip, tipo in self.excesos().items():
+            self._elemento("delete", f"exceso_{tipo}", ip)
+            if ip in self.e["bloqueos"]:
+                continue
+            if tipo == "ssh":
+                motivo, texto = "más de 10 conexiones SSH nuevas por minuto", "abrió más de 10 conexiones SSH por minuto (robot probando claves)"
+            else:
+                motivo, texto = "más de 50 conexiones web nuevas por segundo", "lanzó más de 50 conexiones nuevas por segundo a la web (inundación / DoS)"
+            r = self.bloquear(ip, self.c["BLOQUEO_MIN"], motivo)
+            self.avisar(f"exceso-{ip}", "media", f"{ip} {texto}. El servidor tiró el exceso al momento y no se cayó. {r}")
+
     def revisar_conexiones(self, conns, puertos_abiertos):
         abiertos = {int(p.split(":")[1]) for p in puertos_abiertos if p.startswith("tcp:")} | {22, 80, 443}
         por_ip, syn_ip, syn_total = {}, {}, 0
@@ -518,9 +550,12 @@ class Centinela:
             n[clave] = norm.dict()
         if "rx" in raros or "pps" in raros:
             top = ", ".join(f"{ip} ({c})" for ip, c in sorted(por_ip.items(), key=lambda x: -x[1])[:5]) or "ninguna destaca"
-            v, m = raros.get("rx", (rx_s, n["rx"]["media"]))
-            self.avisar("rx", "alta", f"Entra muchísimo más tráfico de lo normal: {mb(v)}/s ({pps:.0f} paquetes/s; "
-                        f"lo normal aquí es {mb(m)}/s). Puede ser un DDoS. IPs con más conexiones: {top}. "
+            if "rx" in raros:
+                medida = f"{mb(raros['rx'][0])}/s ({pps:.0f} paquetes/s; lo normal aquí es {mb(raros['rx'][1])}/s)"
+            else:
+                medida = f"{pps:.0f} paquetes/s ({mb(rx_s)}/s; lo normal aquí son {raros['pps'][1]:.0f} paquetes/s)"
+            self.avisar("rx", "alta", f"Entra muchísimo más tráfico de lo normal: {medida}. "
+                        f"Puede ser un DDoS. IPs con más conexiones: {top}. "
                         "Bloqueo sola a la que se pase de la raya; si son miles de IPs, lo que lo para es Cloudflare "
                         "(Under Attack) o el proveedor, porque el ataque llena el cable antes de llegar aquí.")
         if "tx" in raros:
@@ -697,6 +732,7 @@ class Centinela:
 
         pasos = [
             ("ssh", self.revisar_ssh),
+            ("excesos", self.revisar_excesos),
             ("conexiones", lambda: self.revisar_conexiones(conns, puertos)),
             ("trafico", lambda: previo and rx >= previo[0] and self.revisar_trafico(
                 intervalo, rx - previo[0], rxp - previo[1], tx - previo[2], self._por_ip(conns, puertos))),

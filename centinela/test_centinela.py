@@ -159,6 +159,15 @@ class Decisiones(unittest.TestCase):
         self.assertNotIn("34.120.5.6", self.cen.e["bloqueos"])
         self.assertTrue(any("fuga de datos" in a for a in self.avisos()))
 
+    def test_exceso_de_nftables_se_bloquea(self):
+        js = json.dumps({"nftables": [{"metainfo": {}}, {"set": {"name": "exceso_web4", "elem": [
+            {"elem": {"val": "45.10.0.2", "expires": 299}}, {"elem": {"val": "104.16.1.1", "expires": 100}}]}}]})
+        self.cen._nft = lambda *a, **k: (0, js if a[-1] == "exceso_web4" else "", "")
+        self.cen.revisar_excesos()
+        self.assertIn("45.10.0.2", self.cen.e["bloqueos"])
+        self.assertNotIn("104.16.1.1", self.cen.e["bloqueos"])       # Cloudflare: nunca
+        self.assertTrue(any("50 conexiones nuevas por segundo" in a for a in self.avisos()))
+
     def test_aviso_no_se_repite(self):
         self.cen.avisar("x", "media", "hola")
         self.cen.avisar("x", "media", "hola")
