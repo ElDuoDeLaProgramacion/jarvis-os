@@ -40,9 +40,9 @@ table inet orion_centinela {
 		# SSH: más de 10 conexiones nuevas por minuto desde una IP es un robot probando claves.
 		tcp dport 22 ct state new add @ssh_rl4 { ip saddr limit rate over 10/minute burst 15 packets } update @exceso_ssh4 { ip saddr } counter drop
 		tcp dport 22 ct state new add @ssh_rl6 { ip6 saddr limit rate over 10/minute burst 15 packets } update @exceso_ssh6 { ip6 saddr } counter drop
-		# Web: una persona no abre 50 conexiones por segundo; una inundación sí.
-		tcp dport { 80, 443 } ct state new add @web_rl4 { ip saddr limit rate over 50/second burst 300 packets } update @exceso_web4 { ip saddr } counter drop
-		tcp dport { 80, 443 } ct state new add @web_rl6 { ip6 saddr limit rate over 50/second burst 300 packets } update @exceso_web6 { ip6 saddr } counter drop
+		# Cualquier otro puerto TCP (web, paneles, apps): una persona no abre 50 conexiones por segundo; una inundación sí.
+		tcp dport != 22 ct state new add @web_rl4 { ip saddr limit rate over 50/second burst 300 packets } update @exceso_web4 { ip saddr } counter drop
+		tcp dport != 22 ct state new add @web_rl6 { ip6 saddr limit rate over 50/second burst 300 packets } update @exceso_web6 { ip6 saddr } counter drop
 	}
 
 	chain salida {

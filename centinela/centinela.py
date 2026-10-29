@@ -504,7 +504,7 @@ class Centinela:
             if tipo == "ssh":
                 motivo, texto = "más de 10 conexiones SSH nuevas por minuto", "abrió más de 10 conexiones SSH por minuto (robot probando claves)"
             else:
-                motivo, texto = "más de 50 conexiones web nuevas por segundo", "lanzó más de 50 conexiones nuevas por segundo a la web (inundación / DoS)"
+                motivo, texto = "más de 50 conexiones nuevas por segundo", "lanzó más de 50 conexiones nuevas por segundo al servidor (inundación / DoS)"
             r = self.bloquear(ip, self.c["BLOQUEO_MIN"], motivo)
             self.avisar(f"exceso-{ip}", "media", f"{ip} {texto}. El servidor tiró el exceso al momento y no se cayó. {r}")
 
