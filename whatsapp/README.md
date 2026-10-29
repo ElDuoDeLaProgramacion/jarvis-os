@@ -29,10 +29,24 @@ Si el QR se ve mal en la terminal, usa un código: `./whatsapp/iniciar.sh --codi
 
 **Arranque automático:** después de vincular, vuelve a ejecutar `rutinas\instalar-inicio.ps1` en PowerShell. Se añade la tarea "WhatsApp".
 
+## Darle a Orión su propio número
+
+Si no quieres que Orión use tu chat contigo mismo, dale un número aparte. Tú le escribes desde tu WhatsApp, como a cualquier contacto, y él sigue leyendo tus chats con la vinculación que ya tienes.
+
+- **Qué necesitas:** un número que pueda recibir un SMS o una llamada una vez, por ejemplo una SIM prepago o una eSIM. Instala ahí *WhatsApp Business* (o WhatsApp normal en otro celular) y regístralo. Si tu celular es dual SIM, WhatsApp Business convive con tu WhatsApp de siempre.
+- **Vincular:** donde corre el puente (en el servidor, `cd ~/jarvis-os`), ejecuta `./whatsapp/vincular-orion.sh 57300XXXXXXX` con el número de Orión. En el celular de ese número ve a *Dispositivos vinculados → Vincular dispositivo → Vincular con número de teléfono* y escribe el código que aparece. Al terminar, el script reinicia el puente y Orión te saluda desde su número.
+- **Cómo queda:**
+  - Las órdenes, avisos, borradores, archivos y avisos del centinela llegan al chat con Orión.
+  - Tu chat contigo mismo vuelve a ser solo tuyo.
+  - Cuando apruebas un mensaje con "sí", sale de tu número, porque es tuyo para tu contacto.
+  - Si alguien más le escribe al número de Orión, no lo atiende. Solo obedece a tu número y a `WHATSAPP_PERMITIDOS`.
+- **Volver a como antes:** `rm -rf whatsapp/sesion-orion` y reinicia el puente. Si WhatsApp desvincula el número de Orión, el puente vuelve solo a tu chat contigo mismo y te lo dice.
+- El celular con el número de Orión debe conectarse al menos una vez cada 14 días, o WhatsApp desvincula el puente. Un número nuevo que solo habla con un bot puede levantar sospechas, así que úsalo un par de días como un WhatsApp normal antes de vincularlo.
+
 ## Opciones en `.env`
 - `WHATSAPP_GUARDAR_GRUPOS=1` también anota los grupos. Por defecto solo se anotan los chats individuales.
 - `WHATSAPP_NO_GUARDAR=57300...,57311...` son números que nunca se anotan.
-- `WHATSAPP_PERMITIDOS=57300...` solo hace falta si vinculas un número aparte, solo para Orión. En ese caso le escribes desde tu celular y obedece únicamente a esos números.
+- `WHATSAPP_PERMITIDOS=57300...` son otros números a los que Orión obedece. Con número propio (ver arriba) ya te obedece a ti sin ponerlo.
 
 ## Cómo funciona
 - `puente.mjs` usa [Baileys](https://github.com/WhiskeySockets/Baileys), la librería que habla con WhatsApp Web. La vinculación se guarda en `whatsapp/sesion/`, que no se sube a git. Si la borras, toca escanear el QR otra vez.
