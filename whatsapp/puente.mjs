@@ -544,6 +544,19 @@ async function esDavid(sock, chat, alt) {
 
 const sinLeer = new Map()   // id -> reloj: mensajes de David a Orión que llegaron cifrados
 
+/**
+ * Los errores de Baileys en el número de Orión ("failed to decrypt message"...) van al log, solo con su
+ * texto: los objetos traen llaves de cifrado y no deben salir de aquí.
+ */
+const avisosBaileys = pino({ level: 'warn' }, {
+  write(linea) {
+    try {
+      const o = JSON.parse(linea)
+      log(`Baileys (Orión): ${o.msg || ''}${o.err?.message ? `: ${o.err.message}` : ''}`)
+    } catch {}
+  },
+})
+
 async function iniciar(rol) {
   const { state, saveCreds } = await useMultiFileAuthState(rol === 'orion' ? SESION_ORION : SESION)
   let version
@@ -551,7 +564,7 @@ async function iniciar(rol) {
   const sock = makeWASocket({
     ...(version ? { version } : {}),
     auth: state,
-    logger: pino({ level: process.env.WHATSAPP_DEBUG ? 'debug' : 'silent' }),
+    logger: process.env.WHATSAPP_DEBUG ? pino({ level: 'debug' }) : rol === 'orion' ? avisosBaileys : pino({ level: 'silent' }),
     // WhatsApp rechaza el código de vinculación si el "navegador" no es uno real; con QR el nombre da igual.
     browser: NUMERO_CODIGO ? Browsers.ubuntu('Chrome') : Browsers.ubuntu('Orión'),
     markOnlineOnConnect: false,   // así el celular sigue recibiendo las notificaciones
@@ -559,6 +572,15 @@ async function iniciar(rol) {
     getMessage: async (key) => enviados.get(key.id),
   })
   socks[rol === 'orion' ? 'orion' : 'personal'] = sock
+  if (rol === 'orion') {
+    // Antes de que Baileys lo descifre: si un mensaje de David llega aquí pero no sale como mensaje, el log
+    // dice si traía algo cifrado para este dispositivo (enc) o nada.
+    sock.ws.on('CB:message', (nodo) => {
+      const hijos = Array.isArray(nodo.content) ? nodo.content.map((h) => h.tag + (h.attrs?.type ? `:${h.attrs.type}` : '')) : []
+      log(`Llega al número de Orión: de ${nodo.attrs.from}${nodo.attrs.sender_pn ? ` (${nodo.attrs.sender_pn})` : ''}` +
+        `${nodo.attrs.offline ? ', guardado mientras estaba desconectado' : ''}; trae ${hijos.join(', ') || 'nada'}.`)
+    })
+  }
   sock.ev.on('creds.update', saveCreds)
 
   let codigoPedido = false
