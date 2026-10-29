@@ -49,6 +49,8 @@ const PREFIJO = '*Orión:* '
 const PREFIJO_VIEJO = '*Orión:* '   // respuestas de antes del cambio de nombre
 const ESCRITOS = join(RAIZ, 'cola', 'escritos')            // la voz del PC atiende lo que llegue aquí
 const VOZ_VIVA = join(RAIZ, 'cola', 'voz-viva')
+// Avisos del centinela (centinela/centinela.py, corre como root): llegan aquí y se mandan al chat contigo mismo.
+const CENTINELA = process.env.CENTINELA_AVISOS || '/var/lib/orion-centinela/avisos'
 
 cargarEnv(join(RAIZ, '.env'))
 const PERMITIDOS = new Set((process.env.WHATSAPP_PERMITIDOS || '').split(',').map(soloDigitos).filter(Boolean))
@@ -254,6 +256,8 @@ const pendientes = new Map()   // chat de órdenes -> { rutas, hasta }: archivos
 let cadena = Promise.resolve() // las órdenes se atienden de una en una
 let ocupado = false
 let vigilante = null
+let mandandoAvisos = false
+const avisosMandados = new Set()   // por si no se pudo borrar uno: que no se repita
 const arranque = Date.now()
 
 async function iniciar() {
@@ -297,6 +301,7 @@ async function iniciar() {
       // Borradores pedidos por voz o desde el HUD: se confirman igual, aquí en el chat contigo mismo.
       clearInterval(vigilante)
       vigilante = setInterval(() => {
+        mandarAvisosCentinela(jidNormalizedUser(sock.user.id))
         if (ocupado || !existsSync(BORRADOR)) return
         borrador = leerBorrador()
         if (borrador) {
@@ -347,6 +352,32 @@ async function iniciar() {
         if (intento >= 2) throw e
         await new Promise((r) => setTimeout(r, 3000))
       }
+    }
+  }
+
+  /**
+   * Los avisos del centinela no esperan a que termine una orden: un ataque no puede esperar a que Orión
+   * acabe de redactar un correo. Van de 5 en 5, del más viejo al más nuevo.
+   */
+  async function mandarAvisosCentinela(yo) {
+    if (mandandoAvisos) return
+    let nombres
+    try { nombres = readdirSync(CENTINELA).filter((f) => f.endsWith('.txt') && !avisosMandados.has(f)).sort().slice(0, 5) } catch { return }
+    if (!nombres.length) return
+    mandandoAvisos = true
+    try {
+      for (const f of nombres) {
+        const ruta = join(CENTINELA, f)
+        let texto
+        try { texto = readFileSync(ruta, 'utf8').trim() } catch { continue }
+        if (texto) await responder(yo, `${PREFIJO}${texto}`)
+        log(`Aviso del centinela enviado: ${f}`)
+        try { rmSync(ruta, { force: true }) } catch { avisosMandados.add(f) }
+      }
+    } catch (e) {
+      log('No pude mandar un aviso del centinela:', e.message)
+    } finally {
+      mandandoAvisos = false
     }
   }
 

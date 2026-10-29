@@ -1,0 +1,48 @@
+#!/usr/sbin/nft -f
+# Reglas del centinela de Orión (centinela/centinela.py las carga con "orion-centinela encender").
+# Viven en su propia tabla: no tocan ufw ni las reglas del proveedor, y "orion-centinela apagar" la borra
+# entera. Solo pueden QUITAR tráfico (bloqueados y excesos), nunca abrir puertos.
+#
+#  permitidos   nunca se frenan: tus IPs de /etc/orion-centinela.conf, Cloudflare y la red de Tailscale.
+#  confianza    IPs desde las que entraste por SSH hace poco (caducan solas, 3 días por defecto).
+#  bloqueados   lo que el centinela (o tú) bloqueó; cada IP caduca sola. Se corta en ambos sentidos.
+#  *_rl         contadores para frenar ráfagas de conexiones nuevas (no bloquean: solo tiran el exceso).
+
+table inet orion_centinela
+delete table inet orion_centinela
+
+table inet orion_centinela {
+	set permitidos4 { type ipv4_addr; flags interval; auto-merge; }
+	set permitidos6 { type ipv6_addr; flags interval; auto-merge; }
+	set confianza4 { type ipv4_addr; flags timeout; }
+	set confianza6 { type ipv6_addr; flags timeout; }
+	set bloqueados4 { type ipv4_addr; flags timeout; }
+	set bloqueados6 { type ipv6_addr; flags timeout; }
+	set ssh_rl4 { type ipv4_addr; size 65535; flags dynamic,timeout; timeout 2m; }
+	set ssh_rl6 { type ipv6_addr; size 65535; flags dynamic,timeout; timeout 2m; }
+	set web_rl4 { type ipv4_addr; size 65535; flags dynamic,timeout; timeout 1m; }
+	set web_rl6 { type ipv6_addr; size 65535; flags dynamic,timeout; timeout 1m; }
+
+	chain entrada {
+		type filter hook input priority filter - 5; policy accept;
+		iif "lo" accept
+		ip saddr @permitidos4 accept
+		ip6 saddr @permitidos6 accept
+		ip saddr @confianza4 accept
+		ip6 saddr @confianza6 accept
+		ip saddr @bloqueados4 counter drop
+		ip6 saddr @bloqueados6 counter drop
+		# SSH: más de 10 conexiones nuevas por minuto desde una IP es un robot probando claves.
+		tcp dport 22 ct state new add @ssh_rl4 { ip saddr limit rate over 10/minute burst 15 packets } counter drop
+		tcp dport 22 ct state new add @ssh_rl6 { ip6 saddr limit rate over 10/minute burst 15 packets } counter drop
+		# Web: una persona no abre 50 conexiones por segundo; una inundación sí.
+		tcp dport { 80, 443 } ct state new add @web_rl4 { ip saddr limit rate over 50/second burst 300 packets } counter drop
+		tcp dport { 80, 443 } ct state new add @web_rl6 { ip6 saddr limit rate over 50/second burst 300 packets } counter drop
+	}
+
+	chain salida {
+		type filter hook output priority filter - 5; policy accept;
+		ip daddr @bloqueados4 counter drop
+		ip6 daddr @bloqueados6 counter drop
+	}
+}

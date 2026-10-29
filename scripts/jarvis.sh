@@ -57,6 +57,10 @@ permitidas=(
   # —WhatsApp incluido, donde no hay forma de aprobar un permiso a mano— sin quedarse trabado.
   "Bash(scripts/seguridad.sh:*)" "Bash(./scripts/seguridad.sh:*)"
   "Bash(bash scripts/seguridad.sh:*)" "Bash(bash ./scripts/seguridad.sh:*)"
+  # Centinela del servidor (centinela/): ver estado y bloquear o soltar IPs. sudoers solo deja estas cuatro
+  # órdenes (centinela/instalar.sh); apagarlo, aceptar o restaurar archivos queda para David.
+  "Bash(sudo orion-centinela estado)" "Bash(sudo orion-centinela lista)"
+  "Bash(sudo orion-centinela bloquear:*)" "Bash(sudo orion-centinela desbloquear:*)"
   # IAs externas (Gemini, OpenRouter) para una segunda opinión; ya entra en python3, se nombra por claridad.
   "Bash(python3 scripts/ia_externa.py:*)"
   "Bash(python3 scripts/cerebro.py:*)"
