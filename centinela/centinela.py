@@ -944,6 +944,7 @@ class Centinela:
         modo = "apagado (solo avisa)" if self.e.get("apagado") else ("bloquea y avisa" if self.actua() else "solo avisa")
         lineas = [f"Centinela: {modo}. Reglas en nftables: {'sí' if self.tabla_viva() else 'no'}.",
                   f"Última ronda: {time.strftime('%d/%m %H:%M', time.localtime(self.e.get('ultima', 0)))}.",
+                  self._estado_cloudflare(),
                   "", "Bloqueadas:", self.lista(), "", f"Últimos {n} eventos:"]
         try:
             ult = REGISTRO.read_text().splitlines()[-n:]
@@ -956,6 +957,15 @@ class Centinela:
                 continue
             lineas.append(f"{d.pop('t')} {d.pop('tipo')}: " + " ".join(f"{k}={v}" for k, v in d.items())[:220])
         return "\n".join(lineas)
+
+    def _estado_cloudflare(self):
+        if not self.cf:
+            return "Cloudflare: sin token (los ataques que llegan por Cloudflare solo se avisan)."
+        nivel = self.cf.nivel()
+        if not nivel:
+            return "Cloudflare: el token NO funciona (revisa CENTINELA_CF_TOKEN, CENTINELA_CF_ZONA y sus permisos)."
+        ua = " · Under Attack puesto por el centinela" if self.e["web"].get("under_attack") else ""
+        return f"Cloudflare: conectado, nivel de seguridad {nivel}{ua}."
 
     def restaurar(self, ruta):
         ruta = os.path.abspath(ruta)
