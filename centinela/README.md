@@ -19,7 +19,7 @@ Hazlo **por SSH desde tu casa**: tu IP de ese momento queda permitida para siemp
 |---|---|---|
 | 8 claves SSH malas en 10 min desde una IP | Bloquea la IP 1 h (24 h si reincide en la semana) | ⚠️ |
 | Entrada SSH buena desde una IP nueva | La marca de confianza 3 días (para no bloquearte nunca) | ⚠️ (🚨 si es root) |
-| Más de 10 conexiones SSH nuevas por minuto o 50 web por segundo desde una IP | El kernel tira el exceso (no bloquea) | — |
+| Más de 10 conexiones SSH nuevas por minuto o 50 web por segundo desde una IP (flood SYN tipo hping3) | El kernel tira el exceso al instante y en menos de 1 min bloquea la IP 1 h | ⚠️ |
 | 150 conexiones abiertas o 60 a medio abrir desde una IP (DoS) | Bloquea 15 min / 1 h | ⚠️ |
 | Ola de conexiones a medio abrir desde muchas IPs (DDoS SYN) | Cookies SYN del kernel + frena a las peores | 🚨 |
 | Tráfico de entrada o salida muy por encima de lo normal (aprende lo normal solo, el primer día es prudente) | — | 🚨 |
