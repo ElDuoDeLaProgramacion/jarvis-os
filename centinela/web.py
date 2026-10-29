@@ -30,9 +30,15 @@ SENSIBLES = re.compile(r"/\.(env|git|svn|hg|aws|ssh|htpasswd|DS_Store)\b|/wp-(lo
                        r"phpmyadmin|/adminer|/\.well-known/security\.txt\.bak|/(backup|dump|db|database)\.(sql|zip|tar|gz)|"
                        r"/config\.(php|json|yml|yaml)\b|/server-status|/actuator|/vendor/phpunit|/cgi-bin/|/console\b|"
                        r"/HNAP1|/boaform|/shell\b|\.(bak|old|swp|sql)$", re.I)
+# Las que ningún visitante de tus webs pide jamás: quien las pide está robando secretos o buscando un panel
+# que no existe aquí. Bastan una sola vez para bloquear.
+TRAMPAS = re.compile(r"/\.(env|git|svn|hg|aws|ssh|htpasswd|docker|kube)\b|\.env\.(bak|old|local|prod|production|dev|save)\b|"
+                     r"/wp-(login|admin|config|content|includes)|xmlrpc\.php|phpmyadmin|/pma\b|/adminer|/vendor/phpunit|"
+                     r"/HNAP1|/boaform|/cgi-bin/|/(backup|dump|db|database)\.(sql|zip|tar|gz)|/id_(rsa|ed25519)\b|"
+                     r"/(credentials|secrets)\.(json|yml|yaml)", re.I)
 ESCANERES = re.compile(r"sqlmap|nikto|nuclei|masscan|zgrab|gobuster|ffuf|wpscan|dirbuster|dirb/|feroxbuster|"
                        r"acunetix|nessus|openvas|netsparker|w3af|hydra|httpx|jaeles|whatweb", re.I)
-GRAVES = {"ejecución de comandos", "recorrido de rutas"}   # uno solo de estos ya merece bloqueo
+GRAVES = {"ejecución de comandos", "recorrido de rutas", "busca secretos (.env, .git, wp-login...)"}   # uno solo de estos ya merece bloqueo
 
 
 def linea(texto):
@@ -67,7 +73,10 @@ def ataques_en(acceso):
         uri = urllib.parse.unquote_plus(uri)
     texto = f"{uri} {acceso['ua']}"
     out = [nombre for nombre, r in ATAQUES.items() if r.search(texto)]
-    if SENSIBLES.search(uri.split("?")[0]):
+    ruta = uri.split("?")[0]
+    if TRAMPAS.search(ruta):
+        out.append("busca secretos (.env, .git, wp-login...)")
+    elif SENSIBLES.search(ruta):
         out.append("busca archivos sensibles")
     if ESCANERES.search(acceso["ua"]):
         out.append("escáner automático")

@@ -112,9 +112,13 @@ class Web(unittest.TestCase):
         self.assertIn("XSS", tipos("/?q=%253Cscript%253Ealert(1)"))          # doble codificación
         self.assertIn("recorrido de rutas", tipos("/descargar?f=../../etc/passwd"))
         self.assertIn("ejecución de comandos", tipos("/", ua="${jndi:ldap://x/a}"))
-        self.assertIn("busca archivos sensibles", tipos("/.env"))
+        self.assertIn("busca secretos (.env, .git, wp-login...)", tipos("/.env"))
+        self.assertIn("busca secretos (.env, .git, wp-login...)", tipos("/.git/config"))
+        self.assertIn("busca secretos (.env, .git, wp-login...)", tipos("/wp-login.php"))
+        self.assertIn("busca archivos sensibles", tipos("/config.php"))
         self.assertIn("escáner automático", tipos("/", ua="sqlmap/1.7"))
-        for normal in ("/", "/panel/api/alertas?n=20", "/app/index.html", "/buscar?q=select+un+carro", "/blog/2026/union"):
+        for normal in ("/", "/panel/api/alertas?n=20", "/app/index.html", "/buscar?q=select+un+carro", "/blog/2026/union",
+                       "/.well-known/acme-challenge/abc", "/.github/x", "/environment", "/docs/wordpress"):
             self.assertEqual(tipos(normal), [], normal)
 
     def test_ip_real_solo_si_viene_de_cloudflare(self):
@@ -184,7 +188,7 @@ class Decisiones(unittest.TestCase):
     def test_bloqueo_y_reincidente(self):
         self.assertIn("1 h", self.cen.bloquear("45.10.20.30", 60, "prueba"))
         self.cen.desbloquear("45.10.20.30")
-        self.assertIn("24 h", self.cen.bloquear("45.10.20.30", 60, "otra vez"))
+        self.assertIn("7 días", self.cen.bloquear("45.10.20.30", 60, "otra vez"))
 
     def test_modo_avisar_no_bloquea(self):
         self.cen.c["MODO"] = "avisar"
@@ -240,6 +244,23 @@ class Decisiones(unittest.TestCase):
         self._registro([acceso("/?f=../../etc/passwd"), acceso("/")])
         self.cen.revisar_web()
         self.assertIn("45.10.0.2", self.cen.e["bloqueos"])
+
+    def test_web_un_solo_env_bloquea_24h(self):
+        self._registro([acceso("/.env")])
+        self.cen.revisar_web(rapida=True)
+        self.assertIn("45.10.0.2", self.cen.e["bloqueos"])
+        self.assertTrue(any("por 24 h" in a and "busca secretos" in a for a in self.avisos()))
+
+    def test_web_flood_se_suma_entre_vueltas_rapidas(self):
+        self.cen.c["WEB_PETICIONES_MIN"] = 30
+        for _ in range(3):
+            self._registro([acceso(f"/p{i}") for i in range(12)])
+            self.cen.revisar_web(rapida=True)
+        self.assertIn("45.10.0.2", self.cen.e["bloqueos"])
+        self.assertEqual(self.cen.e["web"]["total"], 36)          # el DDoS lo juzga la ronda del minuto
+        self._registro([acceso("/")])
+        self.cen.revisar_web()
+        self.assertNotIn("total", self.cen.e["web"])
 
     def test_web_por_cloudflare_bloquea_en_cloudflare_no_aqui(self):
         llamados = []
