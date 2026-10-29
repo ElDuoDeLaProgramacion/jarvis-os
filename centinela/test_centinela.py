@@ -166,7 +166,7 @@ class Decisiones(unittest.TestCase):
         self.cen.revisar_excesos()
         self.assertIn("45.10.0.2", self.cen.e["bloqueos"])
         self.assertNotIn("104.16.1.1", self.cen.e["bloqueos"])       # Cloudflare: nunca
-        self.assertTrue(any("50 conexiones nuevas por segundo" in a for a in self.avisos()))
+        self.assertTrue(any("50 conexiones nuevas por segundo al servidor" in a for a in self.avisos()))
 
     def test_aviso_no_se_repite(self):
         self.cen.avisar("x", "media", "hola")
