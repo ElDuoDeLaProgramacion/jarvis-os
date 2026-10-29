@@ -41,6 +41,8 @@ tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:* users:(("sshd",pid=1,fd=3))
 tcp LISTEN 0 128 127.0.0.1:7788 0.0.0.0:* users:(("python3",pid=2,fd=3))
 tcp LISTEN 0 128 [::]:443 [::]:* users:(("caddy",pid=3,fd=3))
 udp UNCONN 0 0 *:22000 *:* users:(("syncthing",pid=4,fd=3))
+udp UNCONN 0 0 0.0.0.0:57540 0.0.0.0:* users:(("syncthing",pid=4,fd=9))
+udp UNCONN 0 0 0.0.0.0:42340 0.0.0.0:* users:(("syncthing",pid=4,fd=10))
 """
 
 
@@ -65,7 +67,8 @@ class Lectura(unittest.TestCase):
         self.assertIsNone(cs[3]["remoto"])
 
     def test_escuchando_sin_loopback(self):
-        self.assertEqual(c.escuchando(SS_L), {"tcp:22": "sshd", "tcp:443": "caddy", "udp:22000": "syncthing"})
+        self.assertEqual(c.escuchando(SS_L), {"tcp:22": "sshd", "tcp:443": "caddy", "udp:22000": "syncthing",
+                                             "udp:alto(syncthing)": "syncthing"})
 
     def test_contadores(self):
         dev = ("Inter-|   Receive |  Transmit\n face |bytes packets errs drop fifo frame compressed multicast|bytes\n"
@@ -172,6 +175,13 @@ class Decisiones(unittest.TestCase):
         self.cen.avisar("x", "media", "hola")
         self.cen.avisar("x", "media", "hola")
         self.assertEqual(len(self.avisos()), 1)
+
+    def test_syncthing_cambiando_puertos_no_avisa(self):
+        uno = 'udp UNCONN 0 0 0.0.0.0:57540 0.0.0.0:* users:(("syncthing",pid=4,fd=9))'
+        dos = 'udp UNCONN 0 0 0.0.0.0:43181 0.0.0.0:* users:(("syncthing",pid=4,fd=9))'
+        self.cen.revisar_puertos(c.escuchando(uno))
+        self.cen.revisar_puertos(c.escuchando(dos))
+        self.assertEqual(self.avisos(), [])
 
     def test_puerto_nuevo(self):
         self.cen.revisar_puertos({"tcp:22": "sshd"})
