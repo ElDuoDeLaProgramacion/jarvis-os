@@ -528,6 +528,22 @@ async function proponer({ para, nombre: quien, mensajes }) {
     '\n\nResponde 1, 2 o 3 (sí = la 1), no para dejarlo así, o dime qué le contesto.')
 }
 
+/** El número (jid PN) detrás de un @lid, según lo que Baileys ya sabe; null si no lo sabe. */
+async function pnDeLid(sock, lid) {
+  try { return await sock.signalRepository.lidMapping.getPNForLID(lid) } catch { return null }
+}
+
+/** ¿Este chat es David? Llega por su número o por su @lid, y no siempre trae el otro al lado. */
+async function esDavid(sock, chat, alt) {
+  if (!chat || !david.pn) return false
+  if (david.lid && jidNormalizedUser(chat) === david.lid) return true
+  let pn = alt || chat
+  if (!/@s\.whatsapp\.net$/.test(pn) && chat.endsWith('@lid')) pn = await pnDeLid(sock, chat) || ''
+  return numeroDe(pn) === numeroDe(david.pn)
+}
+
+const sinLeer = new Map()   // id -> reloj: mensajes de David a Orión que llegaron cifrados
+
 async function iniciar(rol) {
   const { state, saveCreds } = await useMultiFileAuthState(rol === 'orion' ? SESION_ORION : SESION)
   let version
@@ -646,11 +662,26 @@ async function iniciar(rol) {
       try {
         const k = msg.key
         const chat = k.remoteJid
+        if (rol === 'orion' && chat && !k.fromMe) {
+          // Todo lo que le llega al número de Orión queda en el log, para saber por qué no se atendió algo.
+          log(`Al número de Orión: ${msg.message ? 'mensaje' : `aviso tipo ${msg.messageStubType ?? '?'}`} de ${chat}` +
+            `${k.remoteJidAlt ? ` (${k.remoteJidAlt})` : ''}.`)
+        }
         if (chat && !msg.message && msg.messageStubType === 2) {
           // CIPHERTEXT: WhatsApp aún no dio las llaves de ese chat; suele llegar de nuevo en segundos.
           log(`Mensaje de ${chatDe(chat)} aún cifrado; espero a que WhatsApp lo reenvíe.`)
+          if (rol === 'orion' && !k.fromMe && !sinLeer.has(k.id) && await esDavid(sock, chat, k.remoteJidAlt)) {
+            // Si en un minuto no llegó descifrado, David tiene que saberlo: si no, parece que Orión lo ignora.
+            sinLeer.set(k.id, setTimeout(() => {
+              sinLeer.delete(k.id)
+              log('Un mensaje de David al número de Orión nunca se pudo descifrar.')
+              responder(david.pn, `${PREFIJO}Me llegó un mensaje tuyo que WhatsApp no me dejó leer. ¿Me lo repites?`)
+                .catch((e) => log('No pude avisar del mensaje sin leer:', e.message))
+            }, 60000))
+          }
           continue
         }
+        if (sinLeer.has(k.id)) { clearTimeout(sinLeer.get(k.id)); sinLeer.delete(k.id) }
         if (!chat || !msg.message || vistos.has(k.id)) continue
         vistos.add(k.id)
         if (vistos.size > 5000) vistos.delete(vistos.values().next().value)
@@ -661,12 +692,12 @@ async function iniciar(rol) {
         const cuando = new Date(Number(msg.messageTimestamp || 0) * 1000 || Date.now())
         const reciente = Date.now() - cuando.getTime() < ORDEN_VIEJA_MIN * 60000 && cuando.getTime() > arranque - ORDEN_VIEJA_MIN * 60000
         const grupo = isJidGroup(chat)
-        const pnChat = k.remoteJidAlt || chat
+        let pnChat = k.remoteJidAlt || chat
+        if (rol === 'orion' && !k.remoteJidAlt && chat.endsWith('@lid')) pnChat = await pnDeLid(sock, chat) || chat
         const conmigo = !grupo && k.fromMe && (chat === yoPn || chat === yoLid || jidNormalizedUser(pnChat) === yoPn)
         const remitente = numeroDe(pnChat)
         // En el número de Orión, David es un contacto más (puede llegar por su número o por su @lid).
-        const deDavid = rol === 'orion' && !grupo && !k.fromMe &&
-          (remitente === numeroDe(david.pn || '') || (!!david.lid && jidNormalizedUser(chat) === david.lid))
+        const deDavid = rol === 'orion' && !grupo && !k.fromMe && await esDavid(sock, chat, pnChat)
         // Al chat contigo mismo (o al de David con Orión) se responde siempre por el número (jid PN), no por
         // el @lid: es el mismo destino que usan los avisos y evita que la respuesta se pierda en un chat "lid".
         const destino = conmigo || deDavid ? david.pn || yoPn : chat
