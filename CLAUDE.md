@@ -25,6 +25,7 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | canales, redes, seguidores, vistas, métricas | `canales` |
 | música, Spotify, "pon...", "reproduce...", qué está sonando | `musica` |
 | WhatsApp, chats, "qué me escribieron", "qué dijo X", "respóndele a X por WhatsApp" | `whatsapp` |
+| ataques, "¿me están atacando?", centinela, alertas de intrusión, bloquear o desbloquear una IP | `centinela` |
 | seguridad, auditoría, pruebas de seguridad, puertos abiertos, vulnerabilidades, certificados, "prueba la seguridad del servidor" | `seguridad` |
 | suscripciones, cobros recurrentes, renovaciones, pruebas gratis, "cuánto pago al mes", cancelar un servicio | `suscripciones` |
 | billetera, cripto, Bitso, "cómo va la billetera", pausar o reanudar la billetera, el experimento de inversión de las IAs | `billetera` |
