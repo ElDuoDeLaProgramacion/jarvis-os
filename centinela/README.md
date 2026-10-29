@@ -17,7 +17,7 @@ Hazlo **por SSH desde tu casa**: tu IP de ese momento queda permitida para siemp
 ## Qué vigila y qué hace
 | Qué ve | Qué hace solo | Aviso |
 |---|---|---|
-| 8 claves SSH malas en 10 min desde una IP | Bloquea la IP 1 h (24 h si reincide en la semana) | ⚠️ |
+| 8 claves SSH malas en 10 min desde una IP | Bloquea la IP 1 h (7 días si reincide en la semana) | ⚠️ |
 | Entrada SSH buena desde una IP nueva | La marca de confianza 3 días (para no bloquearte nunca) | ⚠️ (🚨 si es root) |
 | Más de 10 conexiones SSH nuevas por minuto o 50 por segundo a cualquier otro puerto TCP desde una IP (flood SYN tipo hping3) | El kernel tira el exceso al instante y en menos de 1 min bloquea la IP 1 h | ⚠️ |
 | 150 conexiones abiertas o 60 a medio abrir desde una IP (DoS) | Bloquea 15 min / 1 h | ⚠️ |
@@ -32,15 +32,16 @@ Hazlo **por SSH desde tu casa**: tu IP de ese momento queda permitida para siemp
 
 ### Las webs del dominio (ubuntulabs.co y las demás que sirve Caddy)
 `instalar.sh` hace que Caddy anote cada visita en `/var/log/caddy/acceso.log` (`caddy-registro.sh`; Cookie y
-Authorization salen tapadas). El centinela lee lo nuevo cada minuto, con la **IP real** del visitante
-(detrás de Cloudflare viene en `Cf-Connecting-Ip`; esa cabecera solo se cree si la visita llega desde
-Cloudflare), y bloquea 1 h a quien:
+Authorization salen tapadas). El servicio `orion-centinela-web` lee lo nuevo **cada 2 segundos**, con la
+**IP real** del visitante (detrás de Cloudflare viene en `Cf-Connecting-Ip`; esa cabecera solo se cree si la
+visita llega desde Cloudflare), y bloquea **24 h** (7 días si reincide) a quien ataca, o 1 h si solo abusa:
 
 | Qué ve (por IP, en 10 min) | Umbral |
 |---|---|
+| Pide secretos o paneles que aquí no existen (`.env`, `.git`, `.aws`, `wp-login`, `phpmyadmin`, respaldos `.sql`…) | a la primera |
 | Recorrido de rutas (`../`, `/etc/passwd`), ejecución de comandos (`;wget`, `${jndi:`), escáner (sqlmap, nikto, nuclei…) | a la primera |
 | Inyección SQL, XSS, inclusión de archivos | 3 |
-| Pide archivos sensibles (`.env`, `.git`, `wp-login`, respaldos `.sql`…) | 5 |
+| Otras rutas sensibles (`config.php`, `.bak`, `/actuator`…) | 3 |
 | Logins rechazados (POST con 401/403) | 20 |
 | Páginas inexistentes (buscando rutas a ciegas) | 100 |
 | Flood HTTP | 600 peticiones en 1 min |
@@ -55,6 +56,15 @@ más peticiones de lo normal (DDoS), sube Cloudflare a **Under Attack** y lo baj
 Token: Cloudflare → Mi perfil → API Tokens → Crear, solo para la zona del dominio, permisos *Zone →
 Firewall Services: Edit*, *Zone → Zone Settings: Edit* y *Zone → Analytics: Read*. El ID de zona está en la
 portada del dominio. Ponlos con `sudo nano /etc/orion-centinela.conf` (el archivo es solo de root).
+
+**Frenarlo antes de que llegue (Cloudflare, gratis):** Security → WAF → Custom rules → Create rule, acción
+*Block*, con esta expresión (Edit expression). Así esas peticiones ni tocan el servidor:
+
+```
+(http.request.uri.path contains "/.env") or (http.request.uri.path contains "/.git") or
+(http.request.uri.path contains "/.aws") or (http.request.uri.path contains "/wp-") or
+(http.request.uri.path contains "xmlrpc.php") or (http.request.uri.path contains "phpmyadmin")
+```
 
 Lo que hace Cloudflare solo y gratis (actívalo en su panel, no depende de Orión): nube naranja en cada
 subdominio, *Security → Bots → Bot Fight Mode*, *Security → WAF → Managed rules* y una regla de rate limiting.

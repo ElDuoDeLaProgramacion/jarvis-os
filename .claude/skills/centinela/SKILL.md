@@ -1,10 +1,10 @@
 ---
 name: centinela
-description: El centinela que vigila el servidor de Orión y las webs del dominio cada minuto (intentos de hackeo por SSH, DoS/DDoS, inyecciones SQL/XSS, escáneres, fuerza bruta a logins, fugas de datos, archivos sensibles cambiados, puertos nuevos, mineros) y bloquea solo las IPs atacantes, en el servidor o en Cloudflare. Úsala para "¿me están atacando?", "estado del centinela", "qué IPs bloqueaste", "bloquea la IP X", "desbloquea X", "¿qué fue esa alerta?" o cuando David responde a un aviso del centinela.
+description: El centinela que vigila el servidor de Orión cada minuto y las webs del dominio cada 2 segundos (intentos de hackeo por SSH, DoS/DDoS, inyecciones SQL/XSS, escáneres, fuerza bruta a logins, fugas de datos, archivos sensibles cambiados, puertos nuevos, mineros) y bloquea solo las IPs atacantes, en el servidor o en Cloudflare. Úsala para "¿me están atacando?", "estado del centinela", "qué IPs bloqueaste", "bloquea la IP X", "desbloquea X", "¿qué fue esa alerta?" o cuando David responde a un aviso del centinela.
 ---
 # Centinela
 
-El centinela (`centinela/centinela.py`) corre como root cada minuto en el servidor, aparte de ti. Detecta, bloquea solo lo claro (con caducidad) y le manda los avisos a David por WhatsApp. Tú no lo reemplazas: lo consultas y, si David te lo pide, bloqueas o sueltas IPs.
+El centinela (`centinela/centinela.py`) corre como root en el servidor, aparte de ti: cada minuto revisa todo y cada 2 segundos las webs (quien pide .env, .git o wp-login queda bloqueado 24 h a la primera). Detecta, bloquea solo lo claro (con caducidad) y le manda los avisos a David por WhatsApp. Tú no lo reemplazas: lo consultas y, si David te lo pide, bloqueas o sueltas IPs.
 
 ## Lo que puedes correr (y nada más)
 | Pedido | Comando |

@@ -14,7 +14,9 @@ Qué vigila en cada ronda:
   procesos    programas corriendo desde /tmp o /dev/shm, o mineros conocidos, gastando CPU
 
 Qué hace solo (todo con marcha atrás):
-  - Bloquea IPs atacantes en su propia tabla de nftables, con caducidad (1 h; 24 h si reincide).
+  - Bloquea IPs atacantes en su propia tabla de nftables, con caducidad (1 h; 24 h si ataca la web; 7 días si reincide).
+  - Las webs se vigilan casi al instante (orion-centinela-web.service, cada 2 s): pedir .env, .git, wp-login o
+    meter una inyección grave bloquea a la primera.
   - Frena ráfagas de conexiones nuevas a SSH y a la web (reglas.nft).
   - Congela (SIGSTOP, no mata) un minero o un programa sospechoso de /tmp que se come la CPU.
 Nunca bloquea: loopback, redes privadas, Cloudflare, Tailscale, las IPs de CENTINELA_PERMITIDOS, ni una
@@ -24,10 +26,11 @@ Lo que no puede arreglar desde aquí (y lo dice en el aviso): un DDoS que llena 
 antes de llegar al servidor (Cloudflare o el proveedor); los archivos cambiados no los revierte solo
 porque pudo ser David, pero guarda la versión anterior para "orion-centinela restaurar <ruta>".
 
-Uso:  orion-centinela ronda | encender | apagar | estado | lista | bloquear IP [min] | desbloquear IP
+Uso:  orion-centinela ronda | web-vivo | encender | apagar | estado | lista | bloquear IP [min] | desbloquear IP
                       | confiar IP [días] | aceptar | restaurar RUTA | soltar PID
 """
 import difflib
+import fcntl
 import fnmatch
 import glob
 import hashlib
@@ -61,7 +64,7 @@ AJUSTES = {
     "SSH_FALLOS": 8,             # intentos fallidos...
     "SSH_VENTANA_MIN": 10,       # ...en estos minutos = bloqueo
     "BLOQUEO_MIN": 60,
-    "REINCIDENTE_MIN": 1440,     # si ya se bloqueó esa IP en la última semana
+    "REINCIDENTE_MIN": 10080,    # si ya se bloqueó esa IP en la última semana (7 días)
     "CONEXIONES_IP": 150,        # conexiones abiertas a la vez desde una IP
     "SYN_IP": 60,                # conexiones a medio abrir desde una IP
     "SYN_TOTAL": 300,            # a medio abrir en total: ola de SYN
@@ -77,8 +80,10 @@ AJUSTES = {
     "CONFIANZA_DIAS": 3,
     # Webs del dominio (registro de Caddy, ver centinela/caddy-registro.sh)
     "WEB_REGISTRO": "/var/log/caddy/acceso.log",
+    "WEB_BLOQUEO_MIN": 1440,     # quien ataca la web (inyección, secretos, escáner) se queda fuera 24 h
+    "WEB_RAPIDO_S": 2,           # cada cuántos segundos mira el registro de Caddy (orion-centinela-web.service)
     "WEB_ATAQUES": 3,            # peticiones con inyección/XSS/etc. en 10 min = bloqueo (las graves, a la primera)
-    "WEB_SENSIBLES": 5,          # pedir .env, .git, wp-login... en 10 min
+    "WEB_SENSIBLES": 3,          # otras rutas sensibles (config.php, .bak, /actuator...) en 10 min; .env, .git, wp-login: a la primera
     "WEB_ERRORES": 100,          # respuestas 404/4xx en 10 min (buscando rutas a ciegas)
     "WEB_LOGIN_FALLOS": 20,      # POST rechazados (401/403) en 10 min (fuerza bruta a un login)
     "WEB_PETICIONES_MIN": 600,   # peticiones por minuto de una sola IP (flood HTTP)
@@ -298,6 +303,12 @@ def diferencias(antes, despues, max_lineas=8):
     return out[:max_lineas] + ([f"(+{len(out) - max_lineas} líneas más)"] if len(out) > max_lineas else [])
 
 
+def duracion(minutos):
+    if minutos >= 2880:
+        return f"{minutos // 1440} días"
+    return f"{minutos // 60} h" if minutos >= 60 else f"{minutos} min"
+
+
 # ---------- el centinela ----------
 
 
@@ -452,7 +463,7 @@ class Centinela:
         self.e["bloqueos"][ip] = {"hasta": hasta, "motivo": motivo, "desde": ahora()}
         self.e["historial"][ip] = ahora()
         self.anotar("bloqueo", ip=ip, minutos=minutos, motivo=motivo)
-        dura = f"{minutos // 60} h" if minutos >= 60 else f"{minutos} min"
+        dura = duracion(minutos)
         return f"Bloqueé {ip} por {dura} (se quita sola). Para soltarla ya: `sudo orion-centinela desbloquear {ip}`"
 
     def bloquear_en_cloudflare(self, ip, minutos, motivo):
@@ -477,7 +488,7 @@ class Centinela:
         self.e["cf_bloqueos"][ip] = {"id": regla, "hasta": hasta, "motivo": motivo}
         self.e["historial"][ip] = ahora()
         self.anotar("bloqueo-cloudflare", ip=ip, minutos=minutos, motivo=motivo)
-        dura = f"{minutos // 60} h" if minutos >= 60 else f"{minutos} min"
+        dura = duracion(minutos)
         return f"La bloqueé en Cloudflare por {dura} (se quita sola). Para soltarla: `sudo orion-centinela desbloquear {ip}`"
 
     def desbloquear(self, ip):
@@ -582,8 +593,9 @@ class Centinela:
         self.e["web"]["pos"] = {"inodo": st.st_ino, "offset": inicio + corte}
         return datos[:corte].decode(errors="replace").splitlines()
 
-    def revisar_web(self):
-        """Ataques a las webs del dominio: inyecciones, escáneres, fuerza bruta, floods HTTP, descargas masivas."""
+    def revisar_web(self, rapida=False):
+        """Ataques a las webs del dominio: inyecciones, escáneres, fuerza bruta, floods HTTP, descargas masivas.
+        Corre cada 2 s (rapida=True, desde web-vivo) y también en la ronda de cada minuto, que además mira si hay DDoS."""
         ventana = 600
         hist = self.e["web"].get("ips", {})
         ronda, total = {}, 0
@@ -630,20 +642,24 @@ class Centinela:
                 motivo = f"{suma['login']} intentos de login rechazados (fuerza bruta)"
             elif suma["errores"] >= self.c["WEB_ERRORES"]:
                 motivo = f"{suma['errores']} páginas inexistentes en 10 min (buscando rutas a ciegas)"
-            elif r["pet"] >= self.c["WEB_PETICIONES_MIN"]:
-                motivo = f"{r['pet']} peticiones en un minuto (flood HTTP)"
+            elif (pet_min := sum(x[1] for x in hist[ip] if x[0] > ahora() - 60)) >= self.c["WEB_PETICIONES_MIN"]:
+                motivo = f"{pet_min} peticiones en un minuto (flood HTTP)"
             if motivo and ip not in self.e["bloqueos"] and ip not in self.e["cf_bloqueos"]:
+                minutos = self.c["WEB_BLOQUEO_MIN"] if suma["graves"] or suma["ataques"] or suma["sensibles"] else self.c["BLOQUEO_MIN"]
                 if r["cf"]:
-                    hecho = self.bloquear_en_cloudflare(ip, self.c["BLOQUEO_MIN"], motivo)
+                    hecho = self.bloquear_en_cloudflare(ip, minutos, motivo)
                 else:
-                    hecho = self.bloquear(ip, self.c["BLOQUEO_MIN"], motivo)
+                    hecho = self.bloquear(ip, minutos, motivo)
                 ejemplo = f"\nEjemplo: `{r['ejemplo']}`" if r["ejemplo"] else ""
                 self.avisar(f"web-{ip}", "alta" if suma["graves"] else "media",
                             f"Ataque a {r['host'] or 'la web'} desde {ip}: {motivo}.{ejemplo}\n{hecho}")
             elif suma["bytes"] >= self.c["WEB_DESCARGA_MB"] * 1e6:
                 self.avisar(f"webdesc-{ip}", "media", f"{ip} se ha llevado {mb(suma['bytes'])} de {r['host']} en 10 min. "
                             f"Si no es un cliente tuyo, `sudo orion-centinela bloquear {ip}`.")
-        self._modo_ataque(total)
+        # El DDoS se juzga por minuto: las vueltas rápidas van sumando y la ronda del minuto decide.
+        self.e["web"]["total"] = self.e["web"].get("total", 0) + total
+        if not rapida:
+            self._modo_ataque(self.e["web"].pop("total"))
 
     def _modo_ataque(self, total):
         """Si llegan muchísimas más peticiones de lo normal, sube Cloudflare a "Under Attack"; lo baja tras 30 min en calma."""
@@ -1001,6 +1017,25 @@ class Centinela:
         return f"Proceso {pid} descongelado."
 
 
+def web_vivo():
+    """Vigila el registro de Caddy cada pocos segundos, para cortar a un atacante a la primera petición."""
+    cerrojo = open(BASE / "cerrojo", "w")
+    while True:
+        espera = 2
+        fcntl.flock(cerrojo, fcntl.LOCK_EX)
+        try:
+            cen = Centinela()
+            espera = cen.c["WEB_RAPIDO_S"]
+            if not cen.primera_vez:            # hasta la primera ronda no hay nada aprendido
+                cen.revisar_web(rapida=True)
+                cen.guardar()
+        except Exception as e:                  # un fallo no apaga la vigilancia
+            print(f"web-vivo: {type(e).__name__}: {e}", file=sys.stderr)
+        finally:
+            fcntl.flock(cerrojo, fcntl.LOCK_UN)
+        time.sleep(max(1, espera))
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help", "ayuda"):
         return print(__doc__)
@@ -1008,6 +1043,11 @@ def main(argv):
         sys.exit("Necesito root: sudo orion-centinela " + " ".join(argv))
     orden, args = argv[0], argv[1:]
     BASE.mkdir(parents=True, exist_ok=True)
+    if orden == "web-vivo":
+        return web_vivo()
+    # Una cosa a la vez: la ronda, la vigilancia rápida de la web y las órdenes a mano comparten estado.
+    cerrojo = open(BASE / "cerrojo", "w")
+    fcntl.flock(cerrojo, fcntl.LOCK_EX)
     cen = Centinela()
     if orden in ("bloquear", "desbloquear", "confiar") and (not args or not ip_valida(args[0])):
         sys.exit(f"Uso: orion-centinela {orden} <IP>")

@@ -117,10 +117,27 @@ AccuracySec=5s
 [Install]
 WantedBy=timers.target
 EOF
+# Las webs, casi al instante: lee el registro de Caddy cada 2 s y corta a la primera petición mala.
+sudo tee /etc/systemd/system/orion-centinela-web.service >/dev/null <<EOF
+[Unit]
+Description=Centinela de Orión: vigila las webs cada 2 segundos
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 $DESTINO/centinela.py web-vivo
+Restart=always
+RestartSec=5
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
 sudo systemctl daemon-reload
 if [ "$MODO" = actuar ]; then sudo orion-centinela encender; fi
 sudo systemctl enable --now orion-centinela.timer
 sudo systemctl start orion-centinela.service || true
+sudo systemctl enable orion-centinela-web.service >/dev/null 2>&1
+sudo systemctl restart orion-centinela-web.service
 # Lo que acaba de instalar (sudoers, servicio) no es una intrusión: queda como lo normal.
 sudo orion-centinela aceptar >/dev/null
 
@@ -132,4 +149,4 @@ echo "Listo. En un minuto te llega por WhatsApp: \"Centinela encendido\"."
 echo "  Ver qué pasa:        sudo orion-centinela estado"
 echo "  Soltar una IP:       sudo orion-centinela desbloquear 1.2.3.4"
 echo "  Quitar todo bloqueo: sudo orion-centinela apagar     (vuelve con: sudo orion-centinela encender)"
-echo "  Desinstalar:         sudo systemctl disable --now orion-centinela.timer && sudo orion-centinela apagar"
+echo "  Desinstalar:         sudo systemctl disable --now orion-centinela.timer orion-centinela-web && sudo orion-centinela apagar"
