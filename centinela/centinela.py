@@ -224,7 +224,13 @@ def escuchando(salida_ss):
         if ip is not None and ip.is_loopback:
             continue
         proc = re.search(r'users:\(\("([^"]+)"', linea)
-        out[f"{p[0]}:{puerto}"] = proc.group(1) if proc else "?"
+        nombre = proc.group(1) if proc else "?"
+        # UDP en el rango efímero (Syncthing, QUIC, descubrimiento): cambia de puerto a cada rato. Se vigila
+        # por programa: avisa si un programa NUEVO abre puertos altos, no cada vez que uno conocido cambia.
+        if p[0] == "udp" and puerto >= 32768:
+            out[f"udp:alto({nombre})"] = nombre
+        else:
+            out[f"{p[0]}:{puerto}"] = nombre
     return out
 
 
