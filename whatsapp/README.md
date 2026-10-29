@@ -40,6 +40,11 @@ Si no quieres que Orión use tu chat contigo mismo, dale un número aparte. Tú 
   - Tu chat contigo mismo vuelve a ser solo tuyo.
   - Cuando apruebas un mensaje con "sí", sale de tu número, porque es tuyo para tu contacto.
   - Si alguien más le escribe al número de Orión, no lo atiende. Solo obedece a tu número y a `WHATSAPP_PERMITIDOS`.
+- **Si el celular dice "No se pudo vincular":**
+  - Pide un código nuevo, porque cada uno dura poco. Escribe el número con 57 y sin + ni espacios.
+  - Un número recién registrado a veces no deja vincular dispositivos durante unas horas.
+  - Si estás en el PC, prueba sin número (`./whatsapp/vincular-orion.sh`) y escanea el QR.
+  - Un intento fallido no cambia nada: el puente sigue hablándote en tu chat contigo mismo.
 - **Volver a como antes:** `rm -rf whatsapp/sesion-orion` y reinicia el puente. Si WhatsApp desvincula el número de Orión, el puente vuelve solo a tu chat contigo mismo y te lo dice.
 - El celular con el número de Orión debe conectarse al menos una vez cada 14 días, o WhatsApp desvincula el puente. Un número nuevo que solo habla con un bot puede levantar sospechas, así que úsalo un par de días como un WhatsApp normal antes de vincularlo.
 

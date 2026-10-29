@@ -68,9 +68,16 @@ const codigoIdx = process.argv.indexOf('--codigo')
 const NUMERO_CODIGO = codigoIdx > 0 ? soloDigitos(process.argv[codigoIdx + 1]) : ''
 // --orion: solo vincula el número de Orión (whatsapp/vincular-orion.sh) y sale.
 const VINCULAR_ORION = process.argv.includes('--orion')
+/** ¿Esa carpeta tiene una vinculación terminada? Un intento a medias deja creds.json, pero sin cuenta. */
+function vinculada(carpeta) {
+  try { return !!JSON.parse(readFileSync(join(carpeta, 'creds.json'), 'utf8')).account } catch { return false }
+}
+// Al volver a intentarlo, lo que dejó un intento a medias estorba: se empieza de cero.
+if (VINCULAR_ORION && existsSync(SESION_ORION) && !vinculada(SESION_ORION)) rmSync(SESION_ORION, { recursive: true, force: true })
 const CON_PERSONAL = existsSync(join(SESION, 'creds.json'))
 // Número propio: Orión le habla a David desde su número. Sin él, todo pasa por el chat de David consigo mismo.
-const DOS = !VINCULAR_ORION && existsSync(join(SESION_ORION, 'creds.json'))
+// Un intento de vincular que no terminó no cuenta: el puente sigue como antes en vez de esperar un número que no existe.
+const DOS = !VINCULAR_ORION && vinculada(SESION_ORION)
 
 function log(...partes) {
   const texto = partes.join(' ')
@@ -529,7 +536,8 @@ async function iniciar(rol) {
     ...(version ? { version } : {}),
     auth: state,
     logger: pino({ level: process.env.WHATSAPP_DEBUG ? 'debug' : 'silent' }),
-    browser: Browsers.ubuntu('Orión'),
+    // WhatsApp rechaza el código de vinculación si el "navegador" no es uno real; con QR el nombre da igual.
+    browser: NUMERO_CODIGO ? Browsers.ubuntu('Chrome') : Browsers.ubuntu('Orión'),
     markOnlineOnConnect: false,   // así el celular sigue recibiendo las notificaciones
     syncFullHistory: false,
     getMessage: async (key) => enviados.get(key.id),
