@@ -46,13 +46,15 @@ class Base(unittest.TestCase):
     def tearDown(self):
         self.http.shutdown()
 
-    def pedir(self, metodo, ruta, datos=None, cookie=None, csrf=True):
+    def pedir(self, metodo, ruta, datos=None, cookie=None, csrf=True, cabeceras=None):
         c = http.client.HTTPConnection("127.0.0.1", self.puerto, timeout=5)
         cab = {"Content-Type": "application/json"}
         if cookie:
             cab["Cookie"] = cookie
         if csrf:
             cab["X-OE"] = "1"
+        if cabeceras:
+            cab.update(cabeceras)
         c.request(metodo, ruta, json.dumps(datos) if datos is not None else None, cab)
         r = c.getresponse()
         galleta = r.getheader("Set-Cookie")
@@ -189,6 +191,21 @@ class Panel(Base):
         self.assertEqual(self.pedir("POST", "/api/pedir", {"texto": "x"}, cookie=ap)[0], 409)
         self.assertTrue(self.pedir("POST", "/panel/api/quitar", {"nombre": "luis"}, cookie=ck)[1]["ok"])
         self.assertNotIn("luis", servidor.leer_personas())
+
+    def test_access_cloudflare_login_unico(self):
+        dueno = {"Cf-Access-Authenticated-User-Email": "dueno@x.com"}
+        # Sin ORION_EQUIPO_ACCESS_EMAIL no se confía en el encabezado (sigue pidiendo clave).
+        self.assertEqual(self.pedir("GET", "/panel/api/estado", cabeceras=dueno)[0], 401)
+        servidor.ACCESS_EMAIL = "dueno@x.com"
+        self.addCleanup(setattr, servidor, "ACCESS_EMAIL", "")
+        # Con Cloudflare Access delante, el correo del dueño entra sin clave ni cookie.
+        self.assertTrue(self.pedir("GET", "/panel/api/sesion", cabeceras=dueno)[1]["dentro"])
+        self.assertEqual(self.pedir("GET", "/panel/api/estado", cabeceras=dueno)[0], 200)
+        # Funciona igual en el alias /equipo (el mismo panel en api.ubuntulabs.co/equipo).
+        self.assertEqual(self.pedir("GET", "/equipo/api/estado", cabeceras=dueno)[0], 200)
+        # Otro correo no entra.
+        self.assertEqual(self.pedir("GET", "/panel/api/estado",
+                         cabeceras={"Cf-Access-Authenticated-User-Email": "otro@x.com"})[0], 401)
 
     def test_bloquear_impide_entrar(self):
         ck = self.entrar_panel()

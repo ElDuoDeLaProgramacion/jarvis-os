@@ -76,6 +76,10 @@ ORION_EQUIPO_URL=https://$dominio
 PANELES=
 # Dominio donde vive tu panel junto al de Hallazgos (https://ESTE/equipo). Vacío = api.ubuntulabs.co
 PANEL_UNIDO=
+# Login único con Cloudflare Access: pon tu correo (el dueño) para entrar al panel sin la clave+código,
+# cuando ya pusiste Cloudflare Access delante de api.ubuntulabs.co. Vacío = como siempre. Ver CLOUDFLARE.md.
+# IMPORTANTE: solo con el origen detrás de Cloudflare (nube naranja + 443 solo para Cloudflare, o un túnel).
+ORION_EQUIPO_ACCESS_EMAIL=
 EOF
 fi
 # Frase secreta del servidor (firma los tokens de sesión y las contraseñas): se crea una vez.

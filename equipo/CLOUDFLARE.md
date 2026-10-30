@@ -49,3 +49,28 @@ Para solo poner el login delante, con el paso 3 basta; el túnel es un extra de 
 
 > Los menús de Cloudflare cambian de nombre de vez en cuando. Si algo no está donde dice aquí, búscalo
 > como "Cloudflare Access self-hosted application" en su documentación.
+
+## 5. Un solo login para los dos paneles (Hallazgos y Equipo)
+
+Los dos paneles ya viven en un mismo dominio: Hallazgos en `https://api.ubuntulabs.co/panel` y Orión
+Equipo en `https://api.ubuntulabs.co/equipo`, con el botón de arriba para saltar de uno a otro. Para
+entrar **una sola vez** (y no con la clave de cada panel), pon Cloudflare Access como la puerta de
+`api.ubuntulabs.co` y deja que los paneles confíen en ese login.
+
+1. **Encierra el origen en Cloudflare (imprescindible).** Esto es lo que hace seguro confiar en Access.
+   Elige una:
+   - **Nube naranja** en el registro `api` + en el firewall del proveedor deja el 443 **solo** para los
+     [rangos de IP de Cloudflare](https://www.cloudflare.com/ips/); o
+   - un **túnel** (sección 4) para `api.ubuntulabs.co`, y cierra el 443 público.
+   Si cualquiera puede llegar al servidor saltándose Cloudflare, no actives el login único.
+2. **Access en `api.ubuntulabs.co`.** En **Access → Applications → Add → Self-hosted**: dominio
+   `api.ubuntulabs.co` (cubre `/panel` y `/equipo`), y una **policy** que incluya **solo tu correo**.
+3. **Diles a los paneles que confíen en Access** (así no vuelven a pedir clave):
+   - Orión Equipo: en `~equipo/.env` pon `ORION_EQUIPO_ACCESS_EMAIL=tucorreo@dominio` y
+     `sudo systemctl restart orion-equipo`.
+   - Hallazgos: en su `.env` pon `PANEL_ACCESS_EMAIL=tucorreo@dominio` y `./hv reiniciar`.
+   Con eso, Cloudflare te identifica una vez y entras a los dos paneles. La clave+código de cada panel
+   siguen sirviendo como respaldo (p. ej. desde la red local). Si prefieres quitarlos del todo, dímelo.
+
+El chat del equipo va aparte, en `https://equipos.ubuntulabs.co`, con su propia policy de Access para los
+correos del equipo (sección 3) y, adentro, el usuario y contraseña de cada quien.
