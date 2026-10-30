@@ -25,6 +25,7 @@ import makeWASocket, {
   isJidStatusBroadcast, jidNormalizedUser, normalizeMessageContent, useMultiFileAuthState,
 } from '@whiskeysockets/baileys'
 import { spawn } from 'node:child_process'
+import { setDefaultResultOrder } from 'node:dns'
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { dirname, join } from 'node:path'
@@ -57,6 +58,9 @@ const VOZ_VIVA = join(RAIZ, 'cola', 'voz-viva')
 const CENTINELA = process.env.CENTINELA_AVISOS || '/var/lib/orion-centinela/avisos'
 
 cargarEnv(join(RAIZ, '.env'))
+// web.whatsapp.com también tiene IPv6, y Node lo prueba primero sin caer a IPv4 (curl sí cae). Si la ruta IPv6 del
+// servidor se rompe, las dos sesiones fallan con 408 en bucle aunque WhatsApp esté arriba. IPv4 primero.
+setDefaultResultOrder('ipv4first')
 const PERMITIDOS = new Set((process.env.WHATSAPP_PERMITIDOS || '').split(',').map(soloDigitos).filter(Boolean))
 const GUARDAR_GRUPOS = process.env.WHATSAPP_GUARDAR_GRUPOS === '1'
 const AVISAR = process.env.WHATSAPP_AVISAR !== '0'    // avisar en tu chat de cada mensaje
@@ -542,6 +546,7 @@ async function esDavid(sock, chat, alt) {
   return numeroDe(pn) === numeroDe(david.pn)
 }
 
+const fallos = {}           // rol -> reconexiones fallidas seguidas
 const sinLeer = new Map()   // id -> reloj: mensajes de David a Orión que llegaron cifrados
 
 /**
@@ -599,6 +604,7 @@ async function iniciar(rol) {
     }
     if (qr || connection === 'open') { vivo = true; clearTimeout(espera) }
     if (connection === 'open') {
+      fallos[rol] = 0
       const yo = jidNormalizedUser(sock.user.id)
       const yoLid = sock.user.lid ? jidNormalizedUser(sock.user.lid) : null
       if (rol === 'orion') Object.assign(orion, { pn: yo, lid: yoLid || orion.lid })
@@ -660,9 +666,15 @@ async function iniciar(rol) {
         }
         process.exit(2)
       }
-      log(`Conexión cerrada${DOS ? ` (${rol})` : ''} (${codigo ?? 'sin código'}); reconecto.`)
-      setTimeout(() => iniciar(rol).catch((e) => { log('No pude reconectar:', e.message); process.exit(1) }),
-        codigo === DisconnectReason.restartRequired ? 0 : 5000)
+      // Si falla una y otra vez (p. ej. 408: sin red hacia WhatsApp), cada reintento espera el doble, hasta 5 min:
+      // martillar a WhatsApp cada 5 s no arregla la red y puede hacer que marque al servidor.
+      const n = codigo === DisconnectReason.restartRequired ? 0 : (fallos[rol] = (fallos[rol] || 0) + 1)
+      const pausa = n ? Math.min(5000 * 2 ** (n - 1), 5 * 60000) : 0
+      const err = lastDisconnect?.error
+      const detalle = [err?.data?.code, err?.message].filter(Boolean).join(' ')
+      log(`Conexión cerrada${DOS ? ` (${rol})` : ''} (${codigo ?? 'sin código'}${detalle ? `: ${detalle}` : ''}); ` +
+        `reconecto${pausa >= 10000 ? ` en ${Math.round(pausa / 1000)} s` : ''}.`)
+      setTimeout(() => iniciar(rol).catch((e) => { log('No pude reconectar:', e.message); process.exit(1) }), pausa)
     }
   })
 
