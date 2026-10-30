@@ -69,7 +69,10 @@ _SOLO_CIERRE = {"br", "img"}
 
 # Selector de proyectos arriba del panel: el mismo que en el panel de Hallazgos Viales (allá usa
 # la misma variable). Formato "Nombre|URL;Nombre|URL". Para sumar un proyecto, agrégalo en los dos.
-PANELES_DEFECTO = "Hallazgos Viales|https://api.ubuntulabs.co/panel;Orión Equipo|https://equipo.ubuntulabs.co/panel"
+PANELES_DEFECTO = "Hallazgos Viales|https://api.ubuntulabs.co/panel;Orión Equipo|https://api.ubuntulabs.co/equipo"
+# El panel también responde en /equipo (mismo contenido que /panel) para vivir junto al de Hallazgos en
+# un solo dominio: el Caddy de ese dominio manda /equipo* a esta sala (lo arma ./equipo/instalar.sh).
+ALIAS_PANEL = "/equipo"
 
 
 def paneles():
@@ -466,8 +469,23 @@ class Manejador(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(cuerpo)
 
+    def _alias(self):
+        """/equipo, /equipo/api/... y /equipo/fuentes/... son el panel con otro nombre (ver ALIAS_PANEL)."""
+        self.prefijo = "/panel"
+        u = urlparse(self.path)
+        if u.path == ALIAS_PANEL or u.path.startswith(ALIAS_PANEL + "/"):
+            self.prefijo = ALIAS_PANEL
+            resto = u.path[len(ALIAS_PANEL):]
+            nueva = resto if resto.startswith("/fuentes/") else "/panel" + resto
+            self.path = nueva + ("?" + u.query if u.query else "")
+
     def _html(self, nombre):
         cuerpo = (AQUI / nombre).read_bytes()
+        if nombre == "panel.html" and self.prefijo != "/panel":
+            p = self.prefijo.encode()
+            cuerpo = (cuerpo.replace(b'"/panel/api/', b'"' + p + b"/api/")
+                      .replace(b"url(/fuentes/", b"url(" + p + b"/fuentes/")
+                      .replace(b'href="/panel"', b'href="' + p + b'"'))
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(cuerpo)))
@@ -517,6 +535,7 @@ class Manejador(BaseHTTPRequestHandler):
 
     # ------------------------------------------------ GET
     def do_GET(self):
+        self._alias()
         url = urlparse(self.path)
         ruta = url.path
         if ruta in ("/", "/index.html"):
@@ -614,6 +633,7 @@ class Manejador(BaseHTTPRequestHandler):
 
     # ------------------------------------------------ POST
     def do_POST(self):
+        self._alias()
         ruta = urlparse(self.path).path
         if ruta.startswith("/panel/api/"):
             return self._panel_post(ruta)
@@ -684,7 +704,7 @@ class Manejador(BaseHTTPRequestHandler):
             codigo_ok = (not admin.get("totp")) or seguridad.totp_correcto(admin["totp"], str(j.get("codigo") or ""))
             if clave_ok and codigo_ok:
                 t = self.sesiones.crear("David", "admin")
-                return self._json({"ok": True}, cookie=self._set_cookie("oe_panel", t, "/panel"))
+                return self._json({"ok": True}, cookie=self._set_cookie("oe_panel", t, self.prefijo))
             self.fallos.anotar(ip)
             time.sleep(0.5)
             return self._json({"error": "la clave o el código no son correctos"}, 401)
@@ -694,7 +714,7 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json({"error": "pedido no válido"}, 403)
         if ruta == "/panel/api/salir":
             self.sesiones.borrar(self._cookie("oe_panel"))
-            return self._json({"ok": True}, cookie=self._set_cookie("oe_panel", "x", "/panel", borrar=True))
+            return self._json({"ok": True}, cookie=self._set_cookie("oe_panel", "x", self.prefijo, borrar=True))
         j = self._cuerpo() or {}
         if ruta == "/panel/api/autorizar":
             horas = j.get("horas", 8)

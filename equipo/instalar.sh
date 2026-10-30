@@ -74,6 +74,8 @@ ORION_EQUIPO_URL=https://$dominio
 # Selector de proyectos del panel (el mismo del panel de Hallazgos). Vacío = Hallazgos Viales y
 # Orión Equipo. Para sumar uno: "Nombre|https://...;Otro|https://..."
 PANELES=
+# Dominio donde vive tu panel junto al de Hallazgos (https://ESTE/equipo). Vacío = api.ubuntulabs.co
+PANEL_UNIDO=
 EOF
 fi
 # Frase secreta del servidor (firma los tokens de sesión y las contraseñas): se crea una vez.
@@ -172,10 +174,36 @@ grep -q 'import /etc/caddy/conf.d/\*.caddy' /etc/caddy/Caddyfile \
   || echo 'import /etc/caddy/conf.d/*.caddy' | sudo tee -a /etc/caddy/Caddyfile >/dev/null
 sudo systemctl reload caddy || sudo systemctl restart caddy
 
+# Tu panel también en el dominio del panel de Hallazgos (https://api.ubuntulabs.co/equipo), para tener
+# los dos en una sola dirección. Se agrega una línea "import" al bloque de ese dominio en el Caddyfile
+# (con copia, caddy validate y vuelta atrás si algo falla). Otro dominio: PANEL_UNIDO en ~equipo/.env.
+paso "Caddy: tu panel junto al de Hallazgos"
+UNIDO="$(sudo grep -m1 '^PANEL_UNIDO=' "$CASA/.env" | cut -d= -f2- || true)"; UNIDO="${UNIDO:-api.ubuntulabs.co}"
+SNIP=/etc/caddy/orion-equipo-panel.caddy; PANEL_URL="https://$dominio/panel"
+printf '# Lo escribe equipo/instalar.sh. El panel de Orión Equipo en /equipo.\nhandle /equipo* {\n\treverse_proxy unix//run/orion-equipo/sala.sock\n}\n' | sudo tee "$SNIP" >/dev/null
+CF=/etc/caddy/Caddyfile
+L="$(sudo grep -nE "^[[:space:]]*${UNIDO//./\\.}[[:space:]]*\{" "$CF" | head -1 | cut -d: -f1)"
+if [ -z "$L" ]; then
+  echo "  No encontré el bloque de $UNIDO en $CF; tu panel sigue solo en https://$dominio/panel"
+elif sudo grep -q "orion-equipo-panel.caddy" "$CF"; then
+  sudo systemctl reload caddy; PANEL_URL="https://$UNIDO/equipo"; echo "  Ya estaba: $PANEL_URL"
+else
+  R="$CF.antes-de-equipo-$(date +%Y%m%d%H%M)"; sudo cp -p "$CF" "$R"
+  # debajo del import de la página de error de Hallazgos si está (./hv errores la busca justo al inicio)
+  sudo sed -n "$((L+1))p" "$CF" | grep -q "hallazgos_errores" && L=$((L+1))
+  sudo sed -i "${L}a\\\timport $SNIP" "$CF"
+  if sudo caddy validate --config "$CF" --adapter caddyfile >/dev/null 2>&1 && sudo systemctl reload caddy; then
+    PANEL_URL="https://$UNIDO/equipo"; echo "  Listo: $PANEL_URL  (copia del Caddyfile anterior: $R)"
+  else
+    sudo cp -p "$R" "$CF"; sudo systemctl reload caddy 2>/dev/null
+    echo "  Caddy no aceptó el cambio; dejé el Caddyfile como estaba. Tu panel sigue en https://$dominio/panel"
+  fi
+fi
+
 echo
 echo "Listo."
 echo "  Sala del equipo: https://$dominio"
-echo "  Tu panel:        https://$dominio/panel"
+echo "  Tu panel:        $PANEL_URL"
 if ! sudo grep -qE '^(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_AUTH_TOKEN|CLAUDE_CODE_USE_BEDROCK|CLAUDE_CODE_USE_VERTEX)=.+' "$CASA/.env" \
    && ! sudo test -f "$CASA/.claude/.credentials.json"; then
   echo "  Falta: configura el motor en $CASA/.env (API key, token de suscripción o pasarela). Ver equipo/MOTOR.md, luego sudo systemctl restart orion-equipo"

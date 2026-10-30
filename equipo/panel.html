@@ -397,15 +397,16 @@ $("form-login").onsubmit = async (e) => {
 $("salir").onclick = async () => { try { await api("/panel/api/salir", { method: "POST" }); } catch (e) {} mostrarLogin(); };
 
 // Selector de proyectos: la lista sale de PANELES en ~equipo/.env (la misma del panel de Hallazgos).
-// Queda marcado el de este dominio; probando en local, el de Orión Equipo.
+// Queda marcado el de esta dirección; probando en local, el de Orión Equipo.
 function ponerProyectos(lista) {
   if (!lista || lista.length < 2) return;
-  const aqui = lista.some((p) => new URL(p.url).host === location.host);
+  const es = (p) => { const u = new URL(p.url); return u.host === location.host && u.pathname === location.pathname; };
+  const aqui = lista.some(es);
   const nav = $("proyectos"); nav.textContent = "";
   for (const p of lista) {
     const a = document.createElement("a");
     a.href = p.url; a.textContent = p.nombre;
-    if (aqui ? new URL(p.url).host === location.host : p.nombre === "Orión Equipo") { a.className = "activo"; a.setAttribute("aria-current", "page"); }
+    if (aqui ? es(p) : p.nombre === "Orión Equipo") { a.className = "activo"; a.setAttribute("aria-current", "page"); }
     nav.appendChild(a);
   }
 }
