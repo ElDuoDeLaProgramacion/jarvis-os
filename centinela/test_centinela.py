@@ -127,6 +127,21 @@ class Web(unittest.TestCase):
         # Cabecera falsa enviada directo (sin pasar por Cloudflare): se ignora.
         self.assertEqual(c.web.ip_real(c.web.linea(acceso("/", ip="45.10.0.2", cf_ip="1.1.1.1")), cf), ("45.10.0.2", False))
 
+    def test_origen_ipinfo(self):
+        class R:
+            def __init__(self, d): self.d = d
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def read(self): return json.dumps(self.d).encode()
+        pedidas = []
+        def abrir(req, timeout): pedidas.append(req.full_url); return R({"ip": "34.165.143.207", "city": "The Dalles", "country": "US", "org": "AS396982 Google LLC"})
+        self.assertEqual(c.web.origen("34.165.143.207", abrir=abrir), "Estados Unidos (The Dalles), Google LLC (AS396982)")
+        self.assertEqual(pedidas, ["https://ipinfo.io/34.165.143.207/json"])
+        self.assertEqual(c.web.origen("1.2.3.4", abrir=lambda r, timeout: R({"country": "KZ"})), "KZ")
+        self.assertIsNone(c.web.origen("1.2.3.4", abrir=lambda r, timeout: R({"bogon": True})))
+        def caida(r, timeout): raise OSError("sin red")
+        self.assertIsNone(c.web.origen("1.2.3.4", abrir=caida))
+
     def test_cliente_cloudflare(self):
         pedidos = []
 
@@ -170,6 +185,8 @@ class Decisiones(unittest.TestCase):
         self.bloqueadas = []
         self.cen.tabla_viva = lambda: True
         self.cen._elemento = lambda accion, conjunto, ip, s=None: (self.bloqueadas.append((accion, conjunto, str(ip))), (0, "", ""))[1]
+        self.consultas = []
+        self.cen.buscar_origen = lambda ip: (self.consultas.append(ip), None)[1]   # nunca sale a internet
 
     def tearDown(self):
         c.correr = self.correr_real
@@ -292,6 +309,22 @@ class Decisiones(unittest.TestCase):
         self._registro([acceso(f"/app/{i}.js") for i in range(200)] + [acceso("/no-existe", estado=404) for _ in range(5)])
         self.cen.revisar_web()
         self.assertEqual(self.avisos(), [])
+
+    def test_aviso_dice_de_donde_es_la_ip(self):
+        self.cen.buscar_origen = lambda ip: (self.consultas.append(ip), "Estados Unidos (The Dalles), Google LLC (AS396982)")[1]
+        self.cen.avisar("a", "media", "Ataque desde 34.165.143.207 y otra vez 34.165.143.207; tu IP 190.1.2.50 no, ni 10.0.0.8")
+        self.assertIn("📍 34.165.143.207: Estados Unidos (The Dalles), Google LLC (AS396982)", self.avisos()[0])
+        self.assertEqual(self.consultas, ["34.165.143.207"])          # ni repetidas ni las de confianza o privadas
+        self.cen.avisar("b", "media", "De nuevo 34.165.143.207")
+        self.assertEqual(self.consultas, ["34.165.143.207"])          # la segunda vez sale de la memoria
+        self.assertIn("📍 34.165.143.207", self.avisos()[1])
+
+    def test_aviso_sin_origen_si_falla_o_esta_apagado(self):
+        self.cen.avisar("a", "media", "Ataque desde 45.10.20.30")
+        self.assertNotIn("📍", self.avisos()[0])
+        self.cen.c["ORIGEN"] = 0
+        self.cen.avisar("b", "media", "Ataque desde 45.10.20.31")
+        self.assertEqual(self.consultas, ["45.10.20.30"])
 
     def test_aviso_no_se_repite(self):
         self.cen.avisar("x", "media", "hola")

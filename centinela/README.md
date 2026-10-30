@@ -77,6 +77,11 @@ Cloudflare, bloquear una de sus IPs tumbaría la web para todos).
 está Cloudflare (Security → *Under Attack*) o el proveedor. Los archivos cambiados no los revierte solo,
 porque pudiste ser tú: te dice el comando para deshacerlo.
 
+**De dónde es la IP:** cada aviso termina con una línea por IP, por ejemplo `📍 34.165.143.207: Estados Unidos (The Dalles), Google LLC (AS396982)`.
+- Sale de ipinfo.io y se guarda 7 días, así que una IP que vuelve no se consulta otra vez.
+- Es la ubicación del centro de datos o del proveedor, no la de la persona: casi todos los ataques salen de servidores alquilados o de VPN.
+- Para apagarlo, `CENTINELA_ORIGEN=0` en `/etc/orion-centinela.conf`.
+
 ## Comandos
 ```bash
 sudo orion-centinela estado                 # modo, IPs bloqueadas y últimos eventos

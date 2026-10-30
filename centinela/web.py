@@ -123,3 +123,33 @@ class Cloudflare:
 
     def poner_nivel(self, valor):
         return self._pedir("PATCH", "/settings/security_level", {"value": valor})
+
+
+# Nombres en español de los países de donde más llegan ataques; el resto se muestra con su código (p. ej. "KZ").
+PAISES = {
+    "US": "Estados Unidos", "CN": "China", "RU": "Rusia", "DE": "Alemania", "NL": "Países Bajos", "FR": "Francia",
+    "GB": "Reino Unido", "IN": "India", "BR": "Brasil", "SG": "Singapur", "HK": "Hong Kong", "JP": "Japón",
+    "KR": "Corea del Sur", "VN": "Vietnam", "ID": "Indonesia", "UA": "Ucrania", "IR": "Irán", "TR": "Turquía",
+    "CA": "Canadá", "AU": "Australia", "IT": "Italia", "ES": "España", "PL": "Polonia", "RO": "Rumania",
+    "BG": "Bulgaria", "SE": "Suecia", "FI": "Finlandia", "LT": "Lituania", "TW": "Taiwán", "TH": "Tailandia",
+    "PK": "Pakistán", "BD": "Bangladés", "ZA": "Sudáfrica", "MX": "México", "CO": "Colombia", "AR": "Argentina",
+    "CL": "Chile", "PE": "Perú", "VE": "Venezuela", "EC": "Ecuador", "PA": "Panamá", "SC": "Seychelles",
+}
+
+
+def origen(ip, token="", abrir=urllib.request.urlopen):
+    """País, ciudad y empresa de una IP según ipinfo.io: "Estados Unidos (Ashburn), Google LLC (AS15169)".
+    Es la ubicación del centro de datos o del proveedor, no la de la persona. None si no se pudo saber."""
+    url = f"https://ipinfo.io/{urllib.parse.quote(ip)}/json" + (f"?token={urllib.parse.quote(token)}" if token else "")
+    try:
+        with abrir(urllib.request.Request(url, headers={"Accept": "application/json"}), timeout=4) as r:
+            d = json.loads(r.read() or b"{}")
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+    if not isinstance(d, dict) or d.get("bogon") or not d.get("country"):
+        return None
+    lugar = PAISES.get(d["country"], d["country"]) + (f" ({d['city']})" if d.get("city") else "")
+    org = str(d.get("org") or "")
+    m = re.match(r"(AS\d+)\s+(.*)", org)
+    empresa = f"{m.group(2)} ({m.group(1)})" if m else org
+    return f"{lugar}, {empresa}" if empresa else lugar
