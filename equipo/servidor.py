@@ -73,6 +73,11 @@ PANELES_DEFECTO = "Hallazgos Viales|https://api.ubuntulabs.co/panel;Orión Equip
 # El panel también responde en /equipo (mismo contenido que /panel) para vivir junto al de Hallazgos en
 # un solo dominio: el Caddy de ese dominio manda /equipo* a esta sala (lo arma ./equipo/instalar.sh).
 ALIAS_PANEL = "/equipo"
+# Login único con Cloudflare Access: si pones aquí tu correo (el dueño), y el panel vive detrás de
+# Cloudflare Access, entras sin la clave+código del panel (Cloudflare ya te identificó). Vacío = como
+# siempre, con clave+código. OJO: solo actívalo si el origen SOLO se alcanza por Cloudflare (nube naranja
+# + 443 restringido a las IP de Cloudflare, o un túnel); si no, el encabezado se podría falsificar.
+ACCESS_EMAIL = os.environ.get("ORION_EQUIPO_ACCESS_EMAIL", "").strip().lower()
 
 
 def paneles():
@@ -584,11 +589,20 @@ class Manejador(BaseHTTPRequestHandler):
         limpio = re.sub(r"[^a-z0-9_-]", "", quien.lower()) or "equipo"
         return f"{datetime.now().strftime('%Y-%m-%d')}-{limpio}.html"
 
+    def _access_dueno(self):
+        """¿Cloudflare Access ya identificó al dueño? (solo si configuraste ORION_EQUIPO_ACCESS_EMAIL)."""
+        if not ACCESS_EMAIL:
+            return False
+        em = self.headers.get("Cf-Access-Authenticated-User-Email", "").strip().lower()
+        return bool(em) and em == ACCESS_EMAIL
+
+    def _panel_autorizado(self):
+        return self._access_dueno() or bool(self.sesiones.quien(self._cookie("oe_panel"), "admin"))
+
     def _panel_get(self, ruta, url):
         if ruta == "/panel/api/sesion":
-            return self._json({"configurado": ADMIN.exists(),
-                               "dentro": bool(self.sesiones.quien(self._cookie("oe_panel"), "admin"))})
-        if not self.sesiones.quien(self._cookie("oe_panel"), "admin"):
+            return self._json({"configurado": ADMIN.exists(), "dentro": self._panel_autorizado()})
+        if not self._panel_autorizado():
             return self._json({"error": "entra", "salir": True}, 401)
         if ruta == "/panel/api/estado":
             hoy = self.sala.cuenta if self.sala.cuenta.get("dia") == datetime.now().strftime("%Y-%m-%d") else {}
@@ -708,7 +722,7 @@ class Manejador(BaseHTTPRequestHandler):
             self.fallos.anotar(ip)
             time.sleep(0.5)
             return self._json({"error": "la clave o el código no son correctos"}, 401)
-        if not self.sesiones.quien(self._cookie("oe_panel"), "admin"):
+        if not self._panel_autorizado():
             return self._json({"error": "entra", "salir": True}, 401)
         if not self._csrf():
             return self._json({"error": "pedido no válido"}, 403)
