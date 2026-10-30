@@ -66,6 +66,24 @@ _IMG_OK = re.compile(r"^data:image/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=\s
 _SOLO_CIERRE = {"br", "img"}
 
 
+
+# Selector de proyectos arriba del panel: el mismo que en el panel de Hallazgos Viales (allá usa
+# la misma variable). Formato "Nombre|URL;Nombre|URL". Para sumar un proyecto, agrégalo en los dos.
+PANELES_DEFECTO = "Hallazgos Viales|https://api.ubuntulabs.co/panel;Orión Equipo|https://equipo.ubuntulabs.co/panel"
+
+
+def paneles():
+    propio = os.environ.get("PANELES", "").strip()
+    lista = []
+    for parte in (propio or PANELES_DEFECTO).split(";"):
+        nombre, _, url = (x.strip() for x in parte.partition("|"))
+        if nombre and url.startswith(("https://", "http://")):
+            lista.append({"nombre": nombre, "url": url})
+    viejo = os.environ.get("ORION_EQUIPO_HALLAZGOS_URL", "").strip()   # versión anterior
+    if viejo and not propio:
+        lista = [{**p, "url": viejo} if p["nombre"] == "Hallazgos Viales" else p for p in lista]
+    return lista
+
 class _LimpiadorHTML(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
@@ -560,7 +578,7 @@ class Manejador(BaseHTTPRequestHandler):
                                "bloqueados": sorted(leer_bloqueados()),
                                "pendientes": len(pendientes()),
                                "pedidos_hoy": {k: v for k, v in hoy.items() if k != "dia"},
-                               "hallazgos_url": os.environ.get("ORION_EQUIPO_HALLAZGOS_URL", "")})
+                               "paneles": paneles()})
         if ruta == "/panel/api/alertas":
             return self._json({"alertas": alertas_recientes()})
         if ruta == "/panel/api/autorizaciones":

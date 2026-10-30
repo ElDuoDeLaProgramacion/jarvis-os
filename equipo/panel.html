@@ -232,10 +232,7 @@
 <div id="app" class="oculto">
   <header class="barra"><div class="cont">
     <span class="marca"><span class="logo" aria-hidden="true"><svg><use href="#i-orion"/></svg></span><span class="txt">Orión Equipo<small>Panel del dueño</small></span></span>
-    <nav class="sw" aria-label="Proyectos">
-      <a class="activo" href="#" aria-current="page">Orión Equipo</a>
-      <a id="ir-hallazgos" href="#">Hallazgos Viales</a>
-    </nav>
+    <nav class="sw" id="proyectos" aria-label="Proyectos"><a class="activo" href="/panel" aria-current="page">Orión Equipo</a></nav>
     <button class="btn fantasma sm" id="salir" aria-label="Salir"><svg class="i" aria-hidden="true"><use href="#i-salir"/></svg><span class="et-salir">Salir</span></button>
   </div></header>
 
@@ -294,7 +291,7 @@ async function cargar() {
     const [est, aut, ale, inf] = await Promise.all([
       api("/panel/api/estado"), api("/panel/api/autorizaciones"),
       api("/panel/api/alertas"), api("/panel/api/informes")]);
-    ponerHallazgos(est.hallazgos_url);
+    ponerProyectos(est.paneles);
 
     const pedidosHoy = Object.values(est.pedidos_hoy || {}).reduce((a, b) => a + (b || 0), 0);
     const tiles = [
@@ -399,14 +396,19 @@ $("form-login").onsubmit = async (e) => {
 };
 $("salir").onclick = async () => { try { await api("/panel/api/salir", { method: "POST" }); } catch (e) {} mostrarLogin(); };
 
-// El switcher de proyectos: el enlace al panel de Hallazgos lo pone David con la variable
-// ORION_EQUIPO_HALLAZGOS_URL en ~equipo/.env (ver equipo/README.md). Si no está puesta, avisa.
-function ponerHallazgos(url) {
-  const a = $("ir-hallazgos");
-  if (url) { a.href = url; a.onclick = null; }
-  else { a.onclick = (e) => { e.preventDefault(); alert("Pon el enlace de tu panel de Hallazgos en ORION_EQUIPO_HALLAZGOS_URL de ~equipo/.env (p. ej. https://api.ubuntulabs.co/panel). Ver equipo/README.md."); }; }
+// Selector de proyectos: la lista sale de PANELES en ~equipo/.env (la misma del panel de Hallazgos).
+// Queda marcado el de este dominio; probando en local, el de Orión Equipo.
+function ponerProyectos(lista) {
+  if (!lista || lista.length < 2) return;
+  const aqui = lista.some((p) => new URL(p.url).host === location.host);
+  const nav = $("proyectos"); nav.textContent = "";
+  for (const p of lista) {
+    const a = document.createElement("a");
+    a.href = p.url; a.textContent = p.nombre;
+    if (aqui ? new URL(p.url).host === location.host : p.nombre === "Orión Equipo") { a.className = "activo"; a.setAttribute("aria-current", "page"); }
+    nav.appendChild(a);
+  }
 }
-ponerHallazgos("");
 
 api("/panel/api/sesion").then((s) => s.dentro ? mostrarApp() : mostrarLogin()).catch(mostrarLogin);
 </script>
