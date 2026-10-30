@@ -92,6 +92,9 @@ AJUSTES = {
     # Cloudflare: con token, bloquea en Cloudflare a quien ataca a través de él y activa "Under Attack"
     "CF_TOKEN": "",
     "CF_ZONA": "",
+    # De dónde es cada IP de un aviso (país, ciudad y empresa, por ipinfo.io). 0 = no consultar.
+    "ORIGEN": 1,
+    "IPINFO_TOKEN": "",          # opcional: sin token ipinfo da 50.000 consultas al mes, de sobra
 }
 
 # Cloudflare (https://www.cloudflare.com/ips/): si los dominios pasan por su proxy, todo el tráfico web
@@ -321,7 +324,7 @@ class Centinela:
         except (FileNotFoundError, ValueError):
             self.e = {}
         for clave in ("bloqueos", "historial", "confianza", "avisados", "fallos", "huellas", "puertos",
-                      "salida", "cpu", "congelados", "normal", "web", "cf_bloqueos"):
+                      "salida", "cpu", "congelados", "normal", "web", "cf_bloqueos", "origen"):
             self.e.setdefault(clave, {})
         self.primera_vez = "inicio" not in self.e
         self.e.setdefault("inicio", ahora())
@@ -329,6 +332,7 @@ class Centinela:
         self.mias = set()
         self.cf = web.Cloudflare(self.c["CF_TOKEN"], self.c["CF_ZONA"]) if self.c["CF_TOKEN"] and self.c["CF_ZONA"] else None
         self.cloudflare = redes(CLOUDFLARE)
+        self.buscar_origen = lambda ip: web.origen(ip, self.c["IPINFO_TOKEN"])
 
     def es_cloudflare(self, ip):
         ip = ip_valida(ip)
@@ -371,7 +375,7 @@ class Centinela:
             return
         self.e["avisados"][clave] = ahora()
         icono = {"alta": "🚨", "media": "⚠️", "info": "🛡️"}.get(gravedad, "🛡️")
-        cuerpo = f"{icono} *Centinela ({gravedad})*\n{texto}"
+        cuerpo = f"{icono} *Centinela ({gravedad})*\n{texto}" + self.origenes(texto)
         try:
             AVISOS.mkdir(parents=True, exist_ok=True)
             ruta = AVISOS / f"{int(ahora() * 1000)}-{os.getpid()}-{len(self.e['avisados'])}.txt"
@@ -382,6 +386,33 @@ class Centinela:
             self._para_grupo(ruta, 0o640)
         except OSError as e:
             print(f"No pude dejar el aviso: {e}", file=sys.stderr)
+
+    def origen(self, ip):
+        """De dónde es una IP pública, con memoria de 7 días (un fallo se reintenta en 1 h). None si no se sabe."""
+        if not self.c["ORIGEN"] or self.protegida(ip):
+            return None
+        guardado = self.e["origen"].get(ip)
+        if guardado and ahora() - guardado["t"] < (7 * 86400 if guardado["txt"] else 3600):
+            return guardado["txt"] or None
+        txt = self.buscar_origen(ip) or ""
+        self.e["origen"][ip] = {"t": ahora(), "txt": txt}
+        if len(self.e["origen"]) > 500:      # que el estado no crezca sin fin: se olvidan las más viejas
+            for vieja in sorted(self.e["origen"], key=lambda k: self.e["origen"][k]["t"])[:100]:
+                del self.e["origen"][vieja]
+        return txt or None
+
+    def origenes(self, texto):
+        """Líneas "📍 IP: país (ciudad), empresa" para las IPs públicas que nombra un aviso (máx. 3)."""
+        lineas, vistas = [], set()
+        for candidata in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b|\b[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{0,4}){2,7}\b", texto):
+            ip = ip_valida(candidata)
+            if ip is None or str(ip) in vistas or len(vistas) >= 3:
+                continue
+            vistas.add(str(ip))
+            donde = self.origen(str(ip))
+            if donde:
+                lineas.append(f"📍 {ip}: {donde}")
+        return ("\n" + "\n".join(lineas)) if lineas else ""
 
     # --- quién no se toca ---
 

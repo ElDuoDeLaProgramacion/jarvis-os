@@ -56,6 +56,9 @@ CENTINELA_GRUPO=$GRUPO
 # Zone Settings: Edit y Analytics: Read. El ID de zona sale en la portada del dominio (columna derecha).
 # CENTINELA_CF_TOKEN=
 # CENTINELA_CF_ZONA=
+# De dónde es cada IP de los avisos (ipinfo.io). 0 = no consultar; el token es opcional.
+# CENTINELA_ORIGEN=1
+# CENTINELA_IPINFO_TOKEN=
 EOF
   echo "Creado. Permitidas para siempre: ${permitidas:-ninguna}"
 else
