@@ -223,6 +223,29 @@ class Panel(Base):
         self.pedir("POST", "/panel/api/pausa", {"activar": True}, cookie=ck)
         self.assertEqual(self.pedir("POST", "/panel/api/empezar", cookie=ck)[0], 409)
 
+    def test_panel_en_equipo(self):
+        # /equipo es el mismo panel (para vivir junto al de Hallazgos en api.ubuntulabs.co/equipo)
+        c = http.client.HTTPConnection("127.0.0.1", self.puerto, timeout=5)
+        c.request("GET", "/equipo")
+        r = c.getresponse(); html = r.read().decode(); c.close()
+        self.assertEqual(r.status, 200)
+        self.assertIn('"/equipo/api/sesion"', html)
+        self.assertIn("url(/equipo/fuentes/", html)
+        self.assertNotIn('"/panel/api/', html)
+        c = http.client.HTTPConnection("127.0.0.1", self.puerto, timeout=5)
+        c.request("GET", "/equipo/fuentes/PlusJakartaSans-latin.woff2")
+        r = c.getresponse(); r.read(); c.close()
+        self.assertEqual(r.status, 200)
+        st, _, galleta = self.pedir("POST", "/equipo/api/entrar", {"clave": "clave-del-panel"})
+        self.assertEqual(st, 200)
+        self.assertIn("Path=/equipo", galleta)
+        ck = galleta.split(";")[0]
+        st, est, _ = self.pedir("GET", "/equipo/api/estado", cookie=ck)
+        self.assertEqual(st, 200)
+        self.assertIn("Orión Equipo", [p["nombre"] for p in est["paneles"]])
+        # /panel sigue igual
+        self.assertIn("Path=/panel", self.pedir("POST", "/panel/api/entrar", {"clave": "clave-del-panel"})[2])
+
 
 if __name__ == "__main__":
     unittest.main()

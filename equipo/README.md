@@ -71,7 +71,7 @@ Entras con la clave de `./equipo/admin.sh` y, si lo activaste, el código de 6 d
 - **Equipo**: quién está y cuántos pedidos lleva hoy; botón para quitar a alguien.
 - **Pausa**: frena todas las pruebas activas de golpe.
 - **Informes**: el de Orión y el de cada estudiante por sesión (texto e imágenes; se ven aquí mismo).
-- **Selector de proyectos**: arriba están **Hallazgos Viales** y **Orión Equipo**, igual que en el panel de Hallazgos, para saltar entre tus paneles. Funciona sin configurar nada. La lista sale de `PANELES` en `~equipo/.env` (`Nombre|URL;Nombre|URL`), la misma variable del `.env` del servidor de Hallazgos: para sumar un proyecto, agrégalo en los dos. (`ORION_EQUIPO_HALLAZGOS_URL` de la versión anterior sigue funcionando.)
+- **Un solo enlace para tus paneles**: tu panel también vive en `https://api.ubuntulabs.co/equipo`, junto al de Hallazgos (`https://api.ubuntulabs.co/panel`), y arriba hay un selector **Hallazgos Viales | Orión Equipo** para pasar de uno a otro. `./equipo/instalar.sh` agrega solo la línea en el Caddy de ese dominio (con copia y vuelta atrás si falla); otro dominio se pone en `PANEL_UNIDO` de `~equipo/.env`. La lista del selector sale de `PANELES` (`Nombre|URL;Nombre|URL`), la misma variable del servidor de Hallazgos: para sumar un proyecto, agrégalo en los dos. `https://equipo.../panel` sigue funcionando.
 
 ## Pentest y autorización
 
