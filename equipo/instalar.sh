@@ -71,8 +71,9 @@ JARVIS_OBJETIVOS_SEGURIDAD=
 # Pedidos por persona y por día (0 = sin tope).
 ORION_EQUIPO_LIMITE_DIA=40
 ORION_EQUIPO_URL=https://$dominio
-# Botón "Hallazgos Viales" del switcher de tu panel. Vacío = solo muestra un aviso.
-ORION_EQUIPO_HALLAZGOS_URL=https://api.ubuntulabs.co/panel
+# Selector de proyectos del panel (el mismo del panel de Hallazgos). Vacío = Hallazgos Viales y
+# Orión Equipo. Para sumar uno: "Nombre|https://...;Otro|https://..."
+PANELES=
 EOF
 fi
 # Frase secreta del servidor (firma los tokens de sesión y las contraseñas): se crea una vez.
