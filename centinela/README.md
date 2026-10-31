@@ -47,6 +47,15 @@ visita llega desde Cloudflare), y bloquea **24 h** (7 días si reincide) a quien
 | Flood HTTP | 600 peticiones en 1 min |
 | Se lleva más de 500 MB | solo avisa |
 
+**¿Se llevó algo?** Cada aviso de ataque web dice además si el atacante logró sacar información, mirando el
+código HTTP que Caddy respondió a sus peticiones maliciosas:
+- `📤 ¿Se llevó datos? ✅ NO` — todas dieron 404/403/30x/5xx (lista de códigos incluida).
+- `📤 ¿Se llevó datos? ⚠️ POSIBLE` — alguna respondió **200 con contenido**: dice cuántas, cuánto se entregó y
+  cuál pasó (p. ej. `GET api.ubuntulabs.co/.env → 200`). El aviso sube a 🚨 y, aunque sea una sola inyección
+  (por debajo del umbral de 3), avisa y bloquea a la primera. Ojo: si una web responde 200 a todo (página de
+  inicio para cualquier ruta), revisa si lo devuelto era el archivo de verdad.
+- En fuerza bruta a un login: `🔑 ¿Entró?` dice si, además de los rechazos, algún POST fue aceptado (200/30x).
+
 **Dónde lo bloquea:** si llegó directo, en nftables como siempre. Si llegó **a través de Cloudflare**, aquí no
 se puede (sería cortar a Cloudflare entero): con `CENTINELA_CF_TOKEN` y `CENTINELA_CF_ZONA` en
 `/etc/orion-centinela.conf` lo bloquea en Cloudflare (IP Access Rules, nota `orion-centinela`, se quita

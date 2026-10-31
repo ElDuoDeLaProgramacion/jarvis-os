@@ -629,6 +629,8 @@ class Centinela:
         Corre cada 2 s (rapida=True, desde web-vivo) y también en la ronda de cada minuto, que además mira si hay DDoS."""
         ventana = 600
         hist = self.e["web"].get("ips", {})
+        # Qué respondió la web a cada petición maliciosa (por IP, 10 min): así el aviso dice si se llevó algo.
+        res = {ip: x for ip, x in self.e["web"].get("res", {}).items() if x["t"] > ahora() - ventana}
         ronda, total = {}, 0
         for texto in self._leer_registro_web():
             a = web.linea(texto)
@@ -645,6 +647,9 @@ class Centinela:
             r["bytes"] += a["bytes"]
             r["errores"] += 400 <= a["estado"] < 500
             r["login"] += a["metodo"] == "POST" and a["estado"] in (401, 403)
+            if a["metodo"] == "POST" and 200 <= a["estado"] < 400:     # por si una fuerza bruta acierta
+                x = res.setdefault(ip, {"t": 0, "codigos": {}, "ok": 0, "ok_bytes": 0, "ok_ejemplo": ""})
+                x["t"], x["login_ok"] = ahora(), x.get("login_ok", 0) + 1
             tipos = web.ataques_en(a)
             for t in tipos:
                 if t not in r["tipos"]:
@@ -655,11 +660,21 @@ class Centinela:
                 r["ataques"] += bool(otros)
                 r["graves"] += any(t in web.GRAVES or t == "escáner automático" for t in otros)
                 r["ejemplo"] = r["ejemplo"] or f"{a['metodo']} {a['host']}{a['uri']}"[:110].replace("`", "'")
+                x = res.setdefault(ip, {"t": 0, "codigos": {}, "ok": 0, "ok_bytes": 0, "ok_ejemplo": ""})
+                x["t"] = ahora()
+                x["codigos"][str(a["estado"])] = x["codigos"].get(str(a["estado"]), 0) + 1
+                # Que el User-Agent se llame "httpx" no hace maliciosa una visita normal: para "se sirvió" cuenta la URL.
+                if web.servida(a["estado"], a["bytes"]) and [t for t in tipos if t != "escáner automático"]:
+                    x["ok"] += 1
+                    x["ok_bytes"] += a["bytes"]
+                    x["ok_ejemplo"] = x["ok_ejemplo"] or f"{a['metodo']} {a['host']}{a['uri']}"[:110].replace("`", "'")
+                    r["servidos"] = r.get("servidos", 0) + 1
         claves = ("pet", "ataques", "graves", "sensibles", "errores", "login", "bytes")
         for ip, r in ronda.items():
             hist[ip] = [x for x in hist.get(ip, []) if x[0] > ahora() - ventana] + [[ahora()] + [r[k] for k in claves]]
         hist = {ip: l for ip, l in hist.items() if l and l[-1][0] > ahora() - ventana}
         self.e["web"]["ips"] = hist
+        self.e["web"]["res"] = res
         for ip, r in ronda.items():
             suma = dict(zip(claves, (sum(x[i + 1] for x in hist[ip]) for i in range(len(claves)))))
             motivo = None
@@ -667,6 +682,8 @@ class Centinela:
                 motivo = f"ataque a la web ({', '.join(r['tipos'])})"
             elif suma["ataques"] >= self.c["WEB_ATAQUES"]:
                 motivo = f"{suma['ataques']} intentos de {', '.join(r['tipos'])}"
+            elif r.get("servidos"):               # una sola petición maliciosa que la web contestó con 200 ya es noticia
+                motivo = f"{', '.join(r['tipos'])}, y la web le respondió 200"
             elif suma["sensibles"] >= self.c["WEB_SENSIBLES"]:
                 motivo = f"buscó {suma['sensibles']} archivos sensibles (.env, .git, wp-login...)"
             elif suma["login"] >= self.c["WEB_LOGIN_FALLOS"]:
@@ -682,8 +699,15 @@ class Centinela:
                 else:
                     hecho = self.bloquear(ip, minutos, motivo)
                 ejemplo = f"\nEjemplo: `{r['ejemplo']}`" if r["ejemplo"] else ""
-                self.avisar(f"web-{ip}", "alta" if suma["graves"] else "media",
-                            f"Ataque a {r['host'] or 'la web'} desde {ip}: {motivo}.{ejemplo}\n{hecho}")
+                logro = web.resultado(res.get(ip, {}))
+                login_ok = (res.get(ip) or {}).get("login_ok", 0)
+                if suma["login"] >= self.c["WEB_LOGIN_FALLOS"]:
+                    logro = (f"🔑 *¿Entró? ⚠️ POSIBLE:* además de los rechazos, {login_ok} POST fueron aceptados (200/30x): "
+                             f"puede que acertara una contraseña. Revisa esa cuenta." if login_ok else
+                             "🔑 *¿Entró? ✅ NO:* todos sus intentos de login fueron rechazados.") + (f"\n{logro}" if logro else "")
+                grave = suma["graves"] or (res.get(ip) or {}).get("ok") or (suma["login"] >= self.c["WEB_LOGIN_FALLOS"] and login_ok)
+                self.avisar(f"web-{ip}", "alta" if grave else "media",
+                            f"Ataque a {r['host'] or 'la web'} desde {ip}: {motivo}.{ejemplo}\n" + (f"{logro}\n" if logro else "") + hecho)
             elif suma["bytes"] >= self.c["WEB_DESCARGA_MB"] * 1e6:
                 self.avisar(f"webdesc-{ip}", "media", f"{ip} se ha llevado {mb(suma['bytes'])} de {r['host']} en 10 min. "
                             f"Si no es un cliente tuyo, `sudo orion-centinela bloquear {ip}`.")
