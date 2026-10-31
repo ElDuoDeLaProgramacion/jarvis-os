@@ -18,6 +18,29 @@ export function numeroDe(jid) {
   return soloDigitos(jid.split('@')[0].split(':')[0])
 }
 
+/** Los dígitos de un @lid ("1234:5@lid" -> "1234"); vacío si no es un @lid. */
+export function digitosLid(jid) {
+  if (!jid || !/@lid$/.test(jid)) return ''
+  return soloDigitos(jid.split('@')[0].split(':')[0])
+}
+
+/**
+ * ¿Este chat es David, decidido sin preguntarle a la red? WhatsApp no siempre manda el número de quien
+ * escribe (sobre todo al cambiar de red o de configuración): llega un @lid pelado. Reconocemos a David por
+ * lo que ya sabemos: su número (david.pn), su @lid de la cuenta (david.lid), los @lid que ya aprendimos que
+ * son suyos (lidsDavid, un Set de dígitos), o un número ya resuelto a su lado (pnResuelto, de sender_pn o del
+ * mapa lid->pn). Así un @lid conocido se reconoce al instante, aunque esta vez no venga su número.
+ */
+export function esDavidConocido(david, lidsDavid, chat, pnResuelto) {
+  if (!chat || !david || !david.pn) return false
+  const suNumero = numeroDe(david.pn)
+  const lidChat = digitosLid(chat)
+  if (david.lid && lidChat && lidChat === digitosLid(david.lid)) return true
+  if (lidsDavid && lidChat && lidsDavid.has(lidChat)) return true
+  if (pnResuelto && numeroDe(pnResuelto) && numeroDe(pnResuelto) === suNumero) return true
+  return false
+}
+
 const SI = /^(si|sí|sip|dale|claro|confirmo|confirmado|hazlo|envialo|envíalo|mandalo|mándalo|de una|ok|okay|listo|adelante)(?=$|[\s.,!?¡¿])/i
 
 export function esSi(texto) {
