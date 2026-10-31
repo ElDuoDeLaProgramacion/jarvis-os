@@ -310,6 +310,50 @@ class Decisiones(unittest.TestCase):
         self.cen.revisar_web()
         self.assertEqual(self.avisos(), [])
 
+    def test_web_aviso_dice_si_se_llevo_datos(self):
+        self._registro([acceso("/.env", estado=200, size=3400)])
+        self.cen.revisar_web(rapida=True)
+        aviso = self.avisos()[0]
+        self.assertIn("¿Se llevó datos? ⚠️ POSIBLE:* 1 de 1", aviso)
+        self.assertIn("3.4 KB", aviso)
+        self.assertIn("Pasó: `GET api.ubuntulabs.co/.env` → 200", aviso)
+        self.assertIn("🚨", aviso)
+
+    def test_web_aviso_dice_que_no_se_llevo_nada(self):
+        self._registro([acceso("/.env", estado=404), acceso("/.git/config", estado=403), acceso("/", estado=200)])
+        self.cen.revisar_web(rapida=True)
+        aviso = self.avisos()[0]
+        self.assertIn("¿Se llevó datos? ✅ NO:* ninguna de sus 2 peticiones maliciosas consiguió nada sensible (códigos: 403 ×1, 404 ×1)", aviso)
+
+    def test_web_inyeccion_servida_avisa_a_la_primera(self):
+        # Una sola inyección no llega al umbral de 3, pero si la web respondió 200 hay que saberlo ya.
+        self._registro([acceso("/buscar?q=1%27%20OR%201=1--", estado=200, size=900)])
+        self.cen.revisar_web(rapida=True)
+        aviso = self.avisos()[0]
+        self.assertIn("la web le respondió 200", aviso)
+        self.assertIn("POSIBLE", aviso)
+        self.assertIn("45.10.0.2", self.cen.e["bloqueos"])
+        # y una sola inyección rechazada sigue sin avisar
+        self._registro([acceso("/buscar?q=1%27%20OR%201=1--", ip="45.10.0.3", estado=403)])
+        self.cen.revisar_web(rapida=True)
+        self.assertEqual(len(self.avisos()), 1)
+
+    def test_web_escaner_por_user_agent_no_cuenta_como_fuga(self):
+        self._registro([acceso("/", ua="sqlmap/1.7", estado=200, size=5000)])
+        self.cen.revisar_web(rapida=True)
+        self.assertIn("✅ NO", self.avisos()[0])
+        self.assertIn("páginas normales", self.avisos()[0])
+
+    def test_web_fuerza_bruta_dice_si_entro(self):
+        self.cen.c["WEB_LOGIN_FALLOS"] = 5
+        self._registro([acceso("/login", metodo="POST", estado=401) for _ in range(5)] +
+                       [acceso("/login", metodo="POST", estado=302)])
+        self.cen.revisar_web()
+        self.assertIn("¿Entró? ⚠️ POSIBLE:* además de los rechazos, 1 POST", self.avisos()[0])
+        self._registro([acceso("/login", ip="45.10.0.9", metodo="POST", estado=401) for _ in range(5)])
+        self.cen.revisar_web()
+        self.assertIn("¿Entró? ✅ NO", self.avisos()[1])
+
     def test_aviso_dice_de_donde_es_la_ip(self):
         self.cen.buscar_origen = lambda ip: (self.consultas.append(ip), "Estados Unidos (The Dalles), Google LLC (AS396982)")[1]
         self.cen.avisar("a", "media", "Ataque desde 34.165.143.207 y otra vez 34.165.143.207; tu IP 190.1.2.50 no, ni 10.0.0.8")

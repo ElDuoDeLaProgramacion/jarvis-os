@@ -153,3 +153,43 @@ def origen(ip, token="", abrir=urllib.request.urlopen):
     m = re.match(r"(AS\d+)\s+(.*)", org)
     empresa = f"{m.group(2)} ({m.group(1)})" if m else org
     return f"{lugar}, {empresa}" if empresa else lugar
+
+
+def tam(n):
+    """Bytes en algo legible: 820 B, 3.4 KB, 12 MB."""
+    if n < 1000:
+        return f"{n} B"
+    if n < 1e6:
+        return f"{n / 1e3:.1f} KB"
+    return f"{n / 1e6:.1f} MB" if n < 1e7 else f"{n / 1e6:.0f} MB"
+
+
+def servida(estado, size):
+    """¿La web entregó contenido a esa petición? 2xx con cuerpo = sí (posible fuga); 3xx, 4xx, 5xx o vacía = no."""
+    return 200 <= estado < 300 and size > 0
+
+
+def resultado(res):
+    """Una línea para el aviso: ¿el ataque logró sacar información?  res = {"codigos": {"404": 3, "200": 1},
+    "ok_bytes": 3400, "ok_ejemplo": "GET api.x/.env"} con solo las peticiones maliciosas de esa IP.
+    Mira el código HTTP que Caddy devolvió a cada una: 200 con contenido = se sirvió; lo demás = no se llevó nada."""
+    codigos = {int(k): v for k, v in (res.get("codigos") or {}).items()}
+    total = sum(codigos.values())
+    if not total:
+        return ""
+    lista = ", ".join(f"{k or 'sin respuesta'} ×{v}" for k, v in sorted(codigos.items(), key=lambda kv: (-kv[1], kv[0])))
+    ok = res.get("ok", 0)
+    pet = "petición maliciosa" if total == 1 else "peticiones maliciosas"
+    if ok:
+        ej = f"\nPasó: `{res['ok_ejemplo']}` → 200" if res.get("ok_ejemplo") else ""
+        return (f"📤 *¿Se llevó datos? ⚠️ POSIBLE:* {ok} de {total} {pet} {'respondió' if ok == 1 else 'respondieron'} 200 "
+                f"({tam(res.get('ok_bytes', 0))} entregados). Códigos: {lista}.{ej}\n"
+                f"Revisa si lo que devolvió era el archivo de verdad o tu página normal (algunas webs responden 200 a todo).")
+    nota = ""
+    if any(200 <= k < 300 for k in codigos):
+        nota += " Los 200 fueron páginas normales pedidas por su herramienta de ataque, sin nada sensible."
+    if any(k >= 500 for k in codigos):
+        nota += " La web dio error 5xx: el ataque no sacó datos, pero revisa que no la haya roto."
+    sus = "su petición maliciosa" if total == 1 else f"sus {total} {pet}"
+    return f"📤 *¿Se llevó datos? ✅ NO:* {sus} no consiguió nada sensible (códigos: {lista}).{nota}" if total == 1 else \
+        f"📤 *¿Se llevó datos? ✅ NO:* ninguna de {sus} consiguió nada sensible (códigos: {lista}).{nota}"
