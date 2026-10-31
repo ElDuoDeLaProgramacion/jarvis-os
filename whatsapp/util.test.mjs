@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { eleccion, esNo, esSi, esTeclaMusica, opcionesDe, limpiar, lineaChat, numeroDe, partir, textoDe } from './util.mjs'
+import { digitosLid, eleccion, esDavidConocido, esNo, esSi, esTeclaMusica, opcionesDe, limpiar, lineaChat, numeroDe, partir, textoDe } from './util.mjs'
 
 test('sí y no', () => {
   for (const t of ['sí', 'Si.', 'dale', 'ok envíalo', '¡Sí!']) assert.ok(esSi(t), t)
@@ -14,6 +14,30 @@ test('números de jid', () => {
   assert.equal(numeroDe('573001234567:12@s.whatsapp.net'), '573001234567')
   assert.equal(numeroDe('123456@lid'), '')
   assert.equal(numeroDe(undefined), '')
+})
+
+test('dígitos de un @lid', () => {
+  assert.equal(digitosLid('123456@lid'), '123456')
+  assert.equal(digitosLid('123456:7@lid'), '123456')
+  assert.equal(digitosLid('573001234567@s.whatsapp.net'), '')
+  assert.equal(digitosLid(undefined), '')
+})
+
+test('reconocer a David sin red', () => {
+  const david = { pn: '573001234567@s.whatsapp.net', lid: '999888@lid' }
+  const lids = new Set(['111222'])   // dígitos de @lid ya aprendidos como suyos
+  // Por su número al lado (sender_pn o mapa lid->pn resuelto):
+  assert.ok(esDavidConocido(david, lids, '777000@lid', '573001234567@s.whatsapp.net'))
+  // Por su @lid de la cuenta, aunque no venga su número:
+  assert.ok(esDavidConocido(david, lids, '999888@lid', null))
+  assert.ok(esDavidConocido(david, lids, '999888:3@lid', null))
+  // Por un @lid ya aprendido:
+  assert.ok(esDavidConocido(david, lids, '111222@lid', null))
+  // Un desconocido: ni su número, ni su @lid, ni aprendido -> no es David.
+  assert.ok(!esDavidConocido(david, lids, '444555@lid', null))
+  assert.ok(!esDavidConocido(david, lids, '444555@lid', '573009999999@s.whatsapp.net'))
+  // Dos @lid distintos no deben "empatar" por tener número vacío ambos.
+  assert.ok(!esDavidConocido(david, lids, '444555@lid', '666777@lid'))
 })
 
 test('texto de cada tipo de mensaje', () => {

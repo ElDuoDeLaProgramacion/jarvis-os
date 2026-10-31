@@ -33,13 +33,14 @@ import { fileURLToPath } from 'node:url'
 import pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import {
-  cargarEnv, eleccion, esNo, esPregunta, esSi, esTeclaMusica, extensionDe, limpiar, lineaChat, nombreSeguro, numeroDe, opcionesDe,
-  partir, pideOpciones, soloDigitos, textoDe, tipoDe,
+  cargarEnv, digitosLid, eleccion, esDavidConocido, esNo, esPregunta, esSi, esTeclaMusica, extensionDe, limpiar, lineaChat,
+  nombreSeguro, numeroDe, opcionesDe, partir, pideOpciones, soloDigitos, textoDe, tipoDe,
 } from './util.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SESION = join(RAIZ, 'whatsapp', 'sesion')          // credenciales de la vinculación (no van a git)
 const SESION_ORION = join(RAIZ, 'whatsapp', 'sesion-orion')  // la del número propio de Orión, si lo tiene
+const LIDS_DAVID = join(SESION_ORION, 'david-lids.json') // los @lid con los que David le ha escrito a Orión
 const DATOS = join(RAIZ, 'cola', 'whatsapp')              // contactos.json y borrador.json
 const CONTACTOS = join(DATOS, 'contactos.json')
 const BORRADOR = join(DATOS, 'borrador.json')
@@ -293,6 +294,27 @@ const socks = { personal: null, orion: null }
 const david = cuentaDe(SESION)
 if (!david.pn && PERMITIDOS.size) david.pn = `${[...PERMITIDOS][0]}@s.whatsapp.net`   // Orión sin leer los chats de David
 const orion = cuentaDe(SESION_ORION)
+
+// WhatsApp no siempre manda el número de quien le escribe a Orión: a veces llega un @lid pelado, sobre todo
+// cuando David cambia de red o toca su configuración y su teléfono rehace la sesión de cifrado. Entonces no se
+// le reconoce y su orden se descarta en silencio, aunque los avisos ("te escribió X") sigan saliendo. Para que
+// eso no vuelva a pasar: aprendemos sus @lid cuando SÍ sabemos que es él, y los reconocemos sin red la próxima
+// vez. lidsDavid guarda los dígitos de esos @lid; pnVisto recuerda el número que trajo cada @lid en el stanza.
+let lidsDavid = new Set()
+try { lidsDavid = new Set(JSON.parse(readFileSync(LIDS_DAVID, 'utf8')).map(digitosLid).filter(Boolean)) } catch {}
+const pnVisto = new Map()   // dígitos de @lid -> número (de sender_pn en el nodo CB:message)
+
+/** Recordar (y guardar) que un @lid es de David, para reconocer sus próximos mensajes aunque no traigan su número. */
+function aprenderLidDavid(chat) {
+  const d = digitosLid(chat)
+  if (!d || lidsDavid.has(d)) return
+  lidsDavid.add(d)
+  try {
+    mkdirSync(dirname(LIDS_DAVID), { recursive: true })
+    writeFileSync(LIDS_DAVID, JSON.stringify([...lidsDavid].map((n) => `${n}@lid`)))
+  } catch (e) { log('No pude guardar el @lid de David:', e.message) }
+  log(`Aprendí que ${chat} es David; reconozco sus órdenes a mi número aunque WhatsApp no mande su número.`)
+}
 /** El socket que le habla a David: el de Orión si tiene número propio; si no, el de David (chat consigo mismo). */
 const habla = () => DOS ? socks.orion : socks.personal
 const esDeOrion = (jid, pn) => !!jid && ((!!orion.lid && jidNormalizedUser(jid) === orion.lid) ||
@@ -534,16 +556,46 @@ async function proponer({ para, nombre: quien, mensajes }) {
 
 /** El número (jid PN) detrás de un @lid, según lo que Baileys ya sabe; null si no lo sabe. */
 async function pnDeLid(sock, lid) {
+  const visto = pnVisto.get(digitosLid(lid))   // el número que trajo el stanza (sender_pn), si lo vimos
+  if (visto) return `${visto}@s.whatsapp.net`
   try { return await sock.signalRepository.lidMapping.getPNForLID(lid) } catch { return null }
 }
 
 /** ¿Este chat es David? Llega por su número o por su @lid, y no siempre trae el otro al lado. */
 async function esDavid(sock, chat, alt) {
   if (!chat || !david.pn) return false
-  if (david.lid && jidNormalizedUser(chat) === david.lid) return true
-  let pn = alt || chat
-  if (!/@s\.whatsapp\.net$/.test(pn) && chat.endsWith('@lid')) pn = await pnDeLid(sock, chat) || ''
-  return numeroDe(pn) === numeroDe(david.pn)
+  // Sin red: su número, su @lid de la cuenta, un @lid que ya aprendimos suyo, o un número resuelto a su lado.
+  if (esDavidConocido(david, lidsDavid, chat, alt)) return true
+  // Llega por @lid sin su número: lo resolvemos (sender_pn visto o el mapa de WhatsApp) y, si es él, lo aprendemos.
+  if (chat.endsWith('@lid')) {
+    const pn = await pnDeLid(sock, chat)
+    if (pn && numeroDe(pn) === numeroDe(david.pn)) { aprenderLidDavid(chat); return true }
+  }
+  return false
+}
+
+/**
+ * Al número privado de Orión casi solo le escribe David. Si no logramos identificar al remitente (un @lid que
+ * no pudimos resolver a un número), lo tratamos como "quizá David" tras un cambio de red o de configuración:
+ * no obedecemos, pero tampoco lo dejamos en silencio.
+ */
+async function quizaDavidPrivado(sock, chat, alt) {
+  if (await esDavid(sock, chat, alt)) return true
+  if (!chat || !chat.endsWith('@lid')) return false
+  return !(await pnDeLid(sock, chat))
+}
+
+let ultimoNoIdentificado = 0
+/** Avisar a David (por su propio chat) que llegó algo a Orión que no se pudo identificar, sin repetirlo seguido. */
+function avisarNoIdentificado(chat) {
+  log(`Le escribió al número de Orión alguien que no pude identificar (${chatDe(chat)}); no lo atiendo, aviso a David.`)
+  if (Date.now() - ultimoNoIdentificado < 10 * 60000 || !david.pn) return
+  ultimoNoIdentificado = Date.now()
+  responder(david.pn,
+    `${PREFIJO}Me llegó un mensaje a mi número de alguien que WhatsApp no me dejó identificar. ` +
+    'Si eras tú, mándamelo otra vez; a veces pasa justo después de cambiar de red o de configuración.',
+    socks.personal || habla(),
+  ).catch((e) => log('No pude avisar del mensaje sin identificar:', e.message))
 }
 
 const fallos = {}           // rol -> reconexiones fallidas seguidas
@@ -582,6 +634,11 @@ async function iniciar(rol) {
     // dice si traía algo cifrado para este dispositivo (enc) o nada.
     sock.ws.on('CB:message', (nodo) => {
       const hijos = Array.isArray(nodo.content) ? nodo.content.map((h) => h.tag + (h.attrs?.type ? `:${h.attrs.type}` : '')) : []
+      // El stanza suele traer el número (sender_pn) aunque messages.upsert luego lo pierda: lo guardamos para
+      // resolver ese @lid, y si es el de David aprendemos su @lid (reconoce sus órdenes sin volver a preguntar).
+      const d = digitosLid(nodo.attrs.from)
+      const n = soloDigitos(nodo.attrs.sender_pn || '')
+      if (d && n) { pnVisto.set(d, n); if (n === numeroDe(david.pn)) aprenderLidDavid(nodo.attrs.from) }
       log(`Llega al número de Orión: de ${nodo.attrs.from}${nodo.attrs.sender_pn ? ` (${nodo.attrs.sender_pn})` : ''}` +
         `${nodo.attrs.offline ? ', guardado mientras estaba desconectado' : ''}; trae ${hijos.join(', ') || 'nada'}.`)
     })
@@ -704,12 +761,12 @@ async function iniciar(rol) {
         if (chat && !msg.message && msg.messageStubType === 2) {
           // CIPHERTEXT: WhatsApp aún no dio las llaves de ese chat; suele llegar de nuevo en segundos.
           log(`Mensaje de ${chatDe(chat)} aún cifrado; espero a que WhatsApp lo reenvíe.`)
-          if (rol === 'orion' && !k.fromMe && !sinLeer.has(k.id) && await esDavid(sock, chat, k.remoteJidAlt)) {
+          if (rol === 'orion' && !k.fromMe && !sinLeer.has(k.id) && await quizaDavidPrivado(sock, chat, k.remoteJidAlt)) {
             // Si en un minuto no llegó descifrado, David tiene que saberlo: si no, parece que Orión lo ignora.
             sinLeer.set(k.id, setTimeout(() => {
               sinLeer.delete(k.id)
-              log('Un mensaje de David al número de Orión nunca se pudo descifrar.')
-              responder(david.pn, `${PREFIJO}Me llegó un mensaje tuyo que WhatsApp no me dejó leer. ¿Me lo repites?`)
+              log('Un mensaje para el número de Orión nunca se pudo descifrar.')
+              responder(david.pn, `${PREFIJO}Me llegó un mensaje que WhatsApp no me dejó leer. Si eras tú, ¿me lo repites?`, socks.personal || habla())
                 .catch((e) => log('No pude avisar del mensaje sin leer:', e.message))
             }, 60000))
           }
@@ -739,7 +796,13 @@ async function iniciar(rol) {
         if (rol === 'orion') {
           // El número de Orión solo atiende órdenes; no anota ni avisa de nada.
           if (k.fromMe || grupo) continue
-          if (!deDavid && !PERMITIDOS.has(remitente)) { log(`Alguien (${chatDe(chat)}) le escribió al número de Orión; no lo atiendo.`); continue }
+          if (!deDavid && !PERMITIDOS.has(remitente)) {
+            // Si ni siquiera pudimos saber su número (un @lid sin resolver), es casi seguro David tras un cambio
+            // de red o de configuración: no lo obedezco, pero no lo dejo en silencio pensando que lo ignoro.
+            if (!remitente && chat.endsWith('@lid')) avisarNoIdentificado(chat)
+            else log(`Alguien (${chatDe(chat)}) le escribió al número de Orión; no lo atiendo.`)
+            continue
+          }
         } else if (DOS && (conmigo || esDeOrion(chat, pnChat))) {
           // Con número propio, tu chat contigo mismo vuelve a ser tuyo, y la charla con Orión no se anota.
           continue
