@@ -30,7 +30,7 @@ Hazlo **por SSH desde tu casa**: tu IP de ese momento queda permitida para siemp
 | Puerto nuevo escuchando hacia internet | — | ⚠️ |
 | Minero de cripto, o un programa de `/tmp` o `/dev/shm` comiéndose la CPU | Lo **congela** (SIGSTOP, no lo mata) | 🚨 |
 
-### Las webs del dominio (ubuntulabs.co y las demás que sirve Caddy)
+### Las webs del dominio (lampolabs.com y las demás que sirve Caddy)
 `instalar.sh` hace que Caddy anote cada visita en `/var/log/caddy/acceso.log` (`caddy-registro.sh`; Cookie y
 Authorization salen tapadas). El servicio `orion-centinela-web` lee lo nuevo **cada 2 segundos**, con la
 **IP real** del visitante (detrás de Cloudflare viene en `Cf-Connecting-Ip`; esa cabecera solo se cree si la
@@ -51,7 +51,7 @@ visita llega desde Cloudflare), y bloquea **24 h** (7 días si reincide) a quien
 código HTTP que Caddy respondió a sus peticiones maliciosas:
 - `📤 ¿Se llevó datos? ✅ NO` — todas dieron 404/403/30x/5xx (lista de códigos incluida).
 - `📤 ¿Se llevó datos? ⚠️ POSIBLE` — alguna respondió **200 con contenido**: dice cuántas, cuánto se entregó y
-  cuál pasó (p. ej. `GET api.ubuntulabs.co/.env → 200`). El aviso sube a 🚨 y, aunque sea una sola inyección
+  cuál pasó (p. ej. `GET api.lampolabs.com/.env → 200`). El aviso sube a 🚨 y, aunque sea una sola inyección
   (por debajo del umbral de 3), avisa y bloquea a la primera. Ojo: si una web responde 200 a todo (página de
   inicio para cualquier ruta), revisa si lo devuelto era el archivo de verdad.
 - En fuerza bruta a un login: `🔑 ¿Entró?` dice si, además de los rechazos, algún POST fue aceptado (200/30x).

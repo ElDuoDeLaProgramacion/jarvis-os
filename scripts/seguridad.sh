@@ -29,7 +29,7 @@ permitido() {
   done
   echo "Objetivo no permitido: $1"
   echo "Solo se prueban los sistemas de David. Para añadir uno, David lo pone a mano en .env:"
-  echo "  JARVIS_OBJETIVOS_SEGURIDAD=ubuntulabs.co,www.ubuntulabs.co,api.ubuntulabs.co,cuenta.ubuntulabs.co,79.143.88.182"
+  echo "  JARVIS_OBJETIVOS_SEGURIDAD=lampolabs.com,www.lampolabs.com,api.lampolabs.com,cuenta.lampolabs.com,79.143.88.182"
   exit 2
 }
 

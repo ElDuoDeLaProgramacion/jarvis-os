@@ -69,7 +69,7 @@ _SOLO_CIERRE = {"br", "img"}
 
 # Selector de proyectos arriba del panel: el mismo que en el panel de Hallazgos Viales (allá usa
 # la misma variable). Formato "Nombre|URL;Nombre|URL". Para sumar un proyecto, agrégalo en los dos.
-PANELES_DEFECTO = "Hallazgos Viales|https://api.ubuntulabs.co/panel;Orión Equipo|https://api.ubuntulabs.co/equipo"
+PANELES_DEFECTO = "Hallazgos Viales|https://api.lampolabs.com/panel;Orión Equipo|https://api.lampolabs.com/equipo"
 # El panel también responde en /equipo (mismo contenido que /panel) para vivir junto al de Hallazgos en
 # un solo dominio: el Caddy de ese dominio manda /equipo* a esta sala (lo arma ./equipo/instalar.sh).
 ALIAS_PANEL = "/equipo"
