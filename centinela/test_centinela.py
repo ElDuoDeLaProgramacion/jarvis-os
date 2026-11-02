@@ -99,7 +99,7 @@ def acceso(uri, ip="45.10.0.2", cf_ip="", ua="Mozilla/5.0", metodo="GET", estado
     cab = {"User-Agent": [ua], "Cookie": []}
     if cf_ip:
         cab["Cf-Connecting-Ip"] = [cf_ip]
-    return json.dumps({"logger": "http.log.access", "request": {"remote_ip": ip, "method": metodo, "host": "api.ubuntulabs.co",
+    return json.dumps({"logger": "http.log.access", "request": {"remote_ip": ip, "method": metodo, "host": "api.lampolabs.com",
                        "uri": uri, "headers": cab}, "status": estado, "size": size})
 
 
@@ -316,7 +316,7 @@ class Decisiones(unittest.TestCase):
         aviso = self.avisos()[0]
         self.assertIn("¿Se llevó datos? ⚠️ POSIBLE:* 1 de 1", aviso)
         self.assertIn("3.4 KB", aviso)
-        self.assertIn("Pasó: `GET api.ubuntulabs.co/.env` → 200", aviso)
+        self.assertIn("Pasó: `GET api.lampolabs.com/.env` → 200", aviso)
         self.assertIn("🚨", aviso)
 
     def test_web_aviso_dice_que_no_se_llevo_nada(self):

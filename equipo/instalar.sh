@@ -74,10 +74,10 @@ ORION_EQUIPO_URL=https://$dominio
 # Selector de proyectos del panel (el mismo del panel de Hallazgos). Vacío = Hallazgos Viales y
 # Orión Equipo. Para sumar uno: "Nombre|https://...;Otro|https://..."
 PANELES=
-# Dominio donde vive tu panel junto al de Hallazgos (https://ESTE/equipo). Vacío = api.ubuntulabs.co
+# Dominio donde vive tu panel junto al de Hallazgos (https://ESTE/equipo). Vacío = api.lampolabs.com
 PANEL_UNIDO=
 # Login único con Cloudflare Access: pon tu correo (el dueño) para entrar al panel sin la clave+código,
-# cuando ya pusiste Cloudflare Access delante de api.ubuntulabs.co. Vacío = como siempre. Ver CLOUDFLARE.md.
+# cuando ya pusiste Cloudflare Access delante de api.lampolabs.com. Vacío = como siempre. Ver CLOUDFLARE.md.
 # IMPORTANTE: solo con el origen detrás de Cloudflare (nube naranja + 443 solo para Cloudflare, o un túnel).
 ORION_EQUIPO_ACCESS_EMAIL=
 EOF
@@ -178,11 +178,11 @@ grep -q 'import /etc/caddy/conf.d/\*.caddy' /etc/caddy/Caddyfile \
   || echo 'import /etc/caddy/conf.d/*.caddy' | sudo tee -a /etc/caddy/Caddyfile >/dev/null
 sudo systemctl reload caddy || sudo systemctl restart caddy
 
-# Tu panel también en el dominio del panel de Hallazgos (https://api.ubuntulabs.co/equipo), para tener
+# Tu panel también en el dominio del panel de Hallazgos (https://api.lampolabs.com/equipo), para tener
 # los dos en una sola dirección. Se agrega una línea "import" al bloque de ese dominio en el Caddyfile
 # (con copia, caddy validate y vuelta atrás si algo falla). Otro dominio: PANEL_UNIDO en ~equipo/.env.
 paso "Caddy: tu panel junto al de Hallazgos"
-UNIDO="$(sudo grep -m1 '^PANEL_UNIDO=' "$CASA/.env" | cut -d= -f2- || true)"; UNIDO="${UNIDO:-api.ubuntulabs.co}"
+UNIDO="$(sudo grep -m1 '^PANEL_UNIDO=' "$CASA/.env" | cut -d= -f2- || true)"; UNIDO="${UNIDO:-api.lampolabs.com}"
 SNIP=/etc/caddy/orion-equipo-panel.caddy; PANEL_URL="https://$dominio/panel"
 printf '# Lo escribe equipo/instalar.sh. El panel de Orión Equipo en /equipo.\nhandle /equipo* {\n\treverse_proxy unix//run/orion-equipo/sala.sock\n}\n' | sudo tee "$SNIP" >/dev/null
 CF=/etc/caddy/Caddyfile

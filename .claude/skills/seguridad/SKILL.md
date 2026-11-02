@@ -24,7 +24,7 @@ David es ingeniero de sistemas y de ciberseguridad: habla técnico, con nombres 
 
 "El servidor" es la máquina donde corres si `hostname` es `jarvis`; desde el PC, usa `puertos` y `web` contra su dirección (debe estar en la lista). Para una revisión completa combina `local`, `puertos` sobre su IP pública (lo que ve internet) y `web`.
 
-**Qué mira `web` (QA del sitio, todo de solo lectura):** cabeceras de seguridad (HSTS, CSP, X-Frame-Options...), certificado y versiones de TLS, flags de las cookies (Secure/HttpOnly/SameSite), CORS permisivo, que `http://` redirija a `https://` (un login en claro es grave), y rutas sensibles expuestas (`.git`, `.env`, copias de respaldo, `server-status`...) pidiéndolas solo con GET, sin enviar formularios ni credenciales. Para un dominio con varios subdominios (p. ej. `ubuntulabs.co`, `www`, `api`, `cuenta`), corre `web` contra cada uno y júntalos en un informe.
+**Qué mira `web` (QA del sitio, todo de solo lectura):** cabeceras de seguridad (HSTS, CSP, X-Frame-Options...), certificado y versiones de TLS, flags de las cookies (Secure/HttpOnly/SameSite), CORS permisivo, que `http://` redirija a `https://` (un login en claro es grave), y rutas sensibles expuestas (`.git`, `.env`, copias de respaldo, `server-status`...) pidiéndolas solo con GET, sin enviar formularios ni credenciales. Para un dominio con varios subdominios (p. ej. `lampolabs.com`, `www`, `api`, `cuenta`), corre `web` contra cada uno y júntalos en un informe.
 
 Si falta una herramienta (nmap, lynis, pip-audit), el script lo dice: pásale a David el comando de instalación.
 

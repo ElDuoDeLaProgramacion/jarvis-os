@@ -175,12 +175,12 @@ class Panel(Base):
         pend = servidor.AUTOR / "pendientes"
         pend.mkdir(parents=True)
         (pend / "abc.json").write_text(json.dumps({"id": "abc", "persona": "ana", "herramienta": "nikto",
-                                                    "objetivo": "https://api.ubuntulabs.co", "tipo": "activa",
-                                                    "clave": "https___api.ubuntulabs.co__nikto", "args": ""}))
+                                                    "objetivo": "https://api.lampolabs.com", "tipo": "activa",
+                                                    "clave": "https___api.lampolabs.com__nikto", "args": ""}))
         ck = self.entrar_panel()
         self.assertEqual(self.pedir("GET", "/panel/api/autorizaciones", cookie=ck)[1]["pendientes"][0]["herramienta"], "nikto")
         self.assertTrue(self.pedir("POST", "/panel/api/autorizar", {"id": "abc", "horas": 2}, cookie=ck)[1]["ok"])
-        self.assertTrue((servidor.AUTOR / "aprobadas" / "https___api.ubuntulabs.co__nikto.json").exists())
+        self.assertTrue((servidor.AUTOR / "aprobadas" / "https___api.lampolabs.com__nikto.json").exists())
         self.assertFalse((pend / "abc.json").exists())
 
     def test_pausa_y_quitar(self):
@@ -201,7 +201,7 @@ class Panel(Base):
         # Con Cloudflare Access delante, el correo del dueño entra sin clave ni cookie.
         self.assertTrue(self.pedir("GET", "/panel/api/sesion", cabeceras=dueno)[1]["dentro"])
         self.assertEqual(self.pedir("GET", "/panel/api/estado", cabeceras=dueno)[0], 200)
-        # Funciona igual en el alias /equipo (el mismo panel en api.ubuntulabs.co/equipo).
+        # Funciona igual en el alias /equipo (el mismo panel en api.lampolabs.com/equipo).
         self.assertEqual(self.pedir("GET", "/equipo/api/estado", cabeceras=dueno)[0], 200)
         # Otro correo no entra.
         self.assertEqual(self.pedir("GET", "/panel/api/estado",
@@ -241,7 +241,7 @@ class Panel(Base):
         self.assertEqual(self.pedir("POST", "/panel/api/empezar", cookie=ck)[0], 409)
 
     def test_panel_en_equipo(self):
-        # /equipo es el mismo panel (para vivir junto al de Hallazgos en api.ubuntulabs.co/equipo)
+        # /equipo es el mismo panel (para vivir junto al de Hallazgos en api.lampolabs.com/equipo)
         c = http.client.HTTPConnection("127.0.0.1", self.puerto, timeout=5)
         c.request("GET", "/equipo")
         r = c.getresponse(); html = r.read().decode(); c.close()
