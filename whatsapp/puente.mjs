@@ -556,11 +556,18 @@ async function proponer({ para, nombre: quien, mensajes }) {
     '\n\nResponde 1, 2 o 3 (sí = la 1), no para dejarlo así, o dime qué le contesto.')
 }
 
+/** La promesa, o `siNo` si tarda más de `ms`. */
+function conTope(promesa, ms, siNo) {
+  let reloj
+  return Promise.race([promesa, new Promise((r) => { reloj = setTimeout(() => r(siNo), ms) })]).finally(() => clearTimeout(reloj))
+}
+
 /** El número (jid PN) detrás de un @lid, según lo que Baileys ya sabe; null si no lo sabe. */
 async function pnDeLid(sock, lid) {
   const visto = pnVisto.get(digitosLid(lid))   // el número que trajo el stanza (sender_pn), si lo vimos
   if (visto) return `${visto}@s.whatsapp.net`
-  try { return await sock.signalRepository.lidMapping.getPNForLID(lid) } catch { return null }
+  // Con tope de 5 s: si WhatsApp no contesta, la orden no puede quedarse colgada para siempre sin respuesta.
+  try { return await conTope(sock.signalRepository.lidMapping.getPNForLID(lid), 5000, null) } catch { return null }
 }
 
 /** ¿Este chat es David? Llega por su número o por su @lid, y no siempre trae el otro al lado. */
@@ -685,7 +692,7 @@ async function iniciar(rol) {
           } catch {}
         }
       } else if (DOS) {
-        log(`Leyendo tus chats (vinculado a +${numeroDe(yo)}). Orión te habla desde su número.`)
+        log(`Leyendo tus chats (vinculado a +${numeroDe(yo)}${david.lid ? `, tu @lid ${david.lid}` : ', sin @lid conocido'}). Orión te habla desde su número.`)
       } else {
         log(`WhatsApp de Orión en línea (vinculado a +${numeroDe(yo)}). Escríbele en tu chat contigo mismo.`)
       }
@@ -775,13 +782,19 @@ async function iniciar(rol) {
           continue
         }
         if (sinLeer.has(k.id)) { clearTimeout(sinLeer.get(k.id)); sinLeer.delete(k.id) }
-        if (!chat || !msg.message || vistos.has(k.id)) continue
+        const aOrion = rol === 'orion' && chat && !k.fromMe
+        if (!chat || !msg.message) continue
+        if (vistos.has(k.id)) { if (aOrion) log(`Ese mensaje (${k.id}) ya lo había atendido; lo salto.`); continue }
         vistos.add(k.id)
         if (vistos.size > 5000) vistos.delete(vistos.values().next().value)
         if (isJidStatusBroadcast(chat) || isJidNewsletter(chat)) continue
         const contenido = normalizeMessageContent(msg.message)
         let texto = textoDe(contenido)
-        if (texto == null) continue
+        if (texto == null) {
+          // Reacciones, ediciones, mensajes de protocolo... En el número de Orión se dice qué era, por si era una orden.
+          if (aOrion) log(`Al número de Orión llegó algo que no es texto ni archivo (${Object.keys(contenido || {}).join(', ') || 'vacío'}); lo salto.`)
+          continue
+        }
         const cuando = new Date(Number(msg.messageTimestamp || 0) * 1000 || Date.now())
         const reciente = Date.now() - cuando.getTime() < ORDEN_VIEJA_MIN * 60000 && cuando.getTime() > arranque - ORDEN_VIEJA_MIN * 60000
         const grupo = isJidGroup(chat)
@@ -791,6 +804,7 @@ async function iniciar(rol) {
         const remitente = numeroDe(pnChat)
         // En el número de Orión, David es un contacto más (puede llegar por su número o por su @lid).
         const deDavid = rol === 'orion' && !grupo && !k.fromMe && await esDavid(sock, chat, pnChat)
+        if (aOrion) log(`Remitente: ${chat} -> ${pnChat}; ${deDavid ? 'es David' : 'no sé si es David'}.`)
         // Al chat contigo mismo (o al de David con Orión) se responde siempre por el número (jid PN), no por
         // el @lid: es el mismo destino que usan los avisos y evita que la respuesta se pierda en un chat "lid".
         const destino = conmigo || deDavid ? david.pn || yoPn : chat
@@ -826,7 +840,10 @@ async function iniciar(rol) {
           // Las respuestas de JARVIS también llegan a este chat: esas no son órdenes.
           // Los archivos que manda Orión llevan su prefijo como pie: "(foto) *Orión:*".
           const sinEtiqueta = texto.replace(/^\([^)]*\)\s*/, '')
-          if (enviados.has(k.id) || [texto, sinEtiqueta].some((t) => t.startsWith(PREFIJO.trim()) || t.startsWith(PREFIJO_VIEJO.trim()))) continue
+          if (enviados.has(k.id) || [texto, sinEtiqueta].some((t) => t.startsWith(PREFIJO.trim()) || t.startsWith(PREFIJO_VIEJO.trim()))) {
+            if (rol === 'orion') log('Era una respuesta de Orión, no una orden; la salto.')
+            continue
+          }
           if (!reciente) { log(`Orden vieja ignorada (${hora(cuando)}): ${texto}`); continue }
           let orden = dicho || contenido.conversation || contenido.extendedTextMessage?.text
           // Fotos y documentos (PDF, Excel, Word...): se bajan para que Orión los lea. Con pie de foto, el pie
