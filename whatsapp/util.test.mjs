@@ -94,3 +94,15 @@ test('tipos de archivo', async () => {
   assert.equal(extensionDe('application/pdf', 'Factura Enero.pdf'), 'pdf')
   assert.equal(nombreSeguro('../../etc/passwd'), 'passwd')
 })
+
+test('explicarError: traduce el motivo de jarvis.sh', async () => {
+  const { explicarError } = await import('./util.mjs')
+  assert.equal(explicarError(''), '')
+  assert.equal(explicarError('SESION=abc\n'), '')
+  const login = explicarError('algo\nERROR=Invalid API key · Please run /login\n')
+  assert.match(login, /Invalid API key/)
+  assert.match(login, /\/login/)
+  assert.match(explicarError('ERROR=Claude AI usage limit reached|1730000000'), /límite de uso/)
+  assert.match(explicarError('ERROR=no encuentro el programa claude en el PATH (/usr/bin)'), /reinstálalo/)
+  assert.match(explicarError('ERROR=otra cosa rara'), /^Hubo un error al ejecutar el pedido: otra cosa rara$/)
+})
