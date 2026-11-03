@@ -692,7 +692,7 @@ async function iniciar(rol) {
           } catch {}
         }
       } else if (DOS) {
-        log(`Leyendo tus chats (vinculado a +${numeroDe(yo)}). Orión te habla desde su número.`)
+        log(`Leyendo tus chats (vinculado a +${numeroDe(yo)}${david.lid ? `, tu @lid ${david.lid}` : ', sin @lid conocido'}). Orión te habla desde su número.`)
       } else {
         log(`WhatsApp de Orión en línea (vinculado a +${numeroDe(yo)}). Escríbele en tu chat contigo mismo.`)
       }
