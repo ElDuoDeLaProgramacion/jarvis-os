@@ -241,8 +241,11 @@ class Conversacion:
             return "Se me acabó el tiempo con eso. Pídemelo otra vez, más concreto."
         respuesta = r.stdout.strip()
         if r.returncode != 0 or not respuesta:
-            ultima = (r.stderr.strip().splitlines() or ["sin detalle"])[-1]
-            return f"No pude hacerlo ({ultima[:200]})."
+            lineas = r.stderr.strip().splitlines()
+            # scripts/jarvis.sh deja el motivo real como "ERROR=..." (sesión de Claude caducada, límite, etc.).
+            ultima = next((l[6:] for l in reversed(lineas) if l.startswith("ERROR=")), None) \
+                or (lineas or ["sin detalle"])[-1]
+            return f"No pude hacerlo ({ultima[:300]})."
         sesion = next((l[7:].strip() for l in r.stderr.splitlines() if l.startswith("SESION=")), None)
         with self.cerrojo:
             if sesion:

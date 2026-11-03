@@ -170,3 +170,26 @@ export function extensionDe(mime, nombre = '') {
 export function nombreSeguro(nombre) {
   return (nombre || 'archivo').split(/[\\/]/).pop().replace(/[^\w.\- áéíóúñÁÉÍÓÚÑ]/g, '_').slice(-80) || 'archivo'
 }
+
+/**
+ * El motivo que scripts/jarvis.sh deja como "ERROR=..." en stderr, traducido a algo que David pueda arreglar.
+ * Vacío si no hay motivo (entonces el puente usa el aviso genérico).
+ */
+export function explicarError(stderr) {
+  const linea = String(stderr ?? '').split('\n').reverse().find((l) => l.startsWith('ERROR='))
+  const motivo = linea ? linea.slice(6).trim() : ''
+  if (!motivo) return ''
+  const m = motivo.toLowerCase()
+  let consejo = ''
+  if (/\/login|not logged in|invalid api key|authentication|401|oauth|token (has )?expired|credit balance/.test(m)) {
+    consejo = 'La sesión o la clave de Claude en el servidor ya no vale. Entra por SSH, escribe claude y usa /login ' +
+      '(si en ~/jarvis-os/.env hay una ANTHROPIC_API_KEY vencida, bórrala o cámbiala).'
+  } else if (/usage limit|rate limit|429|limit reached|overloaded|529/.test(m)) {
+    consejo = 'Claude llegó a su límite de uso o está saturado; vuelve a funcionar solo en un rato.'
+  } else if (/no encuentro el programa claude|command not found|enoent/.test(m)) {
+    consejo = 'El servidor no encuentra el programa claude; reinstálalo o revisa el PATH.'
+  } else if (/no space left|enospc/.test(m)) {
+    consejo = 'El disco del servidor está lleno.'
+  }
+  return `Hubo un error al ejecutar el pedido: ${motivo.slice(0, 300)}${consejo ? `\n${consejo}` : ''}`
+}

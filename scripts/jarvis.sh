@@ -125,7 +125,30 @@ if [ -n "$reanudar" ]; then opciones+=(--resume "$reanudar"); fi
 if [ "$voz" = "1" ]; then opciones+=(--model "${JARVIS_MODELO_VOZ:-sonnet}"); fi
 
 # </dev/null: sin esto claude espera 3 s una entrada que nunca llega y avisa "no stdin data received".
-salida=$(claude "${opciones[@]}" </dev/null)
+# Si claude falla (sesión caducada, clave vencida, límite de uso...), antes el script moría aquí sin dejar
+# rastro y WhatsApp solo decía "Hubo un error". Ahora el motivo queda en logs/jarvis.log y sale por stderr
+# como "ERROR=<motivo>" para que el puente y la app se lo digan a David.
+errores=$(mktemp)
+codigo=0
+salida=$(claude "${opciones[@]}" </dev/null 2>"$errores") || codigo=$?
+if [ "$codigo" != "0" ]; then
+  motivo=$(printf '%s' "$salida" | python3 -c 'import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get("result") or d.get("error") or d.get("subtype") or "")
+except Exception:
+    pass' 2>/dev/null || true)
+  [ -n "$motivo" ] || motivo=$(grep -v '^[[:space:]]*$' "$errores" | tail -n 3 | tr '\n' ' ')
+  [ -n "$motivo" ] || motivo=$(printf '%s' "$salida" | tail -c 300 | tr '\n' ' ')
+  [ -n "$motivo" ] || motivo="claude terminó con código $codigo sin decir por qué"
+  [ -x "$(command -v claude)" ] || motivo="no encuentro el programa claude en el PATH ($PATH)"
+  motivo=$(printf '%s' "$motivo" | tr '\n' ' ' | cut -c1-400)
+  echo "$(date -Iseconds) ! ERROR (código $codigo): $motivo" >> logs/jarvis.log
+  echo "ERROR=$motivo" >&2
+  rm -f "$errores"
+  exit "$codigo"
+fi
+cat "$errores" >&2; rm -f "$errores"
 # La salida JSON trae la respuesta ("result") y la conversación ("session_id").
 if datos=$(printf '%s' "$salida" | python3 -c 'import json, sys
 d = json.load(sys.stdin)

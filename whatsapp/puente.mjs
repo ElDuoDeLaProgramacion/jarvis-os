@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url'
 import pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import {
-  cargarEnv, digitosLid, eleccion, esDavidConocido, esNo, esPregunta, esSi, esTeclaMusica, extensionDe, limpiar, lineaChat,
+  cargarEnv, digitosLid, eleccion, esDavidConocido, explicarError, esNo, esPregunta, esSi, esTeclaMusica, extensionDe, limpiar, lineaChat,
   nombreSeguro, numeroDe, opcionesDe, partir, pideOpciones, soloDigitos, textoDe, tipoDe,
 } from './util.mjs'
 
@@ -178,12 +178,13 @@ function jarvis(args) {
     p.on('error', (e) => {
       clearTimeout(reloj)
       log(`No pude ejecutar scripts/jarvis.sh: ${e.code || e.message}`)
-      resolve({ codigo: -1, out: '', sesion: null })
+      resolve({ codigo: -1, out: '', sesion: null, err: `No pude ejecutar scripts/jarvis.sh: ${e.code || e.message}` })
     })
     p.on('close', (codigo) => {
       clearTimeout(reloj)
       const sesion = err.split('\n').find((l) => l.startsWith('SESION='))?.slice(7).trim() || null
-      resolve({ codigo, out: out.trim(), sesion })
+      if (codigo !== 0) log(`jarvis.sh terminó con código ${codigo}: ${err.trim().split('\n').slice(-3).join(' | ')}`)
+      resolve({ codigo, out: out.trim(), sesion, err })
     })
   })
 }
@@ -481,7 +482,8 @@ async function atenderOrden(jid, texto, adjuntos = []) {
       'le escribió por WhatsApp. Si David habla de responderle, usa la habilidad whatsapp con ese jid.)'
   }
   const r = await jarvis([...args, '--', pedido])
-  let respuesta = r.codigo === 0 ? limpiar(r.out) || 'Listo.' : 'Hubo un error al ejecutar el pedido. Quedó en logs/jarvis.log.'
+  let respuesta = r.codigo === 0 ? limpiar(r.out) || 'Listo.'
+    : explicarError(r.err) || 'Hubo un error al ejecutar el pedido. Quedó en logs/jarvis.log.'
   if (r.sesion) sesiones[jid] = { id: r.sesion, hasta: Date.now() + SEGUIR_MIN * 60000, pregunto: esPregunta(respuesta) }
   log(`Orión: ${respuesta}`)
   registrar(texto, respuesta)
