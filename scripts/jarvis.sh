@@ -49,6 +49,8 @@ if [ -f .env ]; then set -a; . ./.env; set +a; fi
 permitidas=(
   Read Write Edit Glob Grep WebSearch WebFetch
   "Bash(date:*)" "Bash(mkdir:*)" "Bash(ls:*)" "Bash(mv:*)"
+  # Estado del servidor, solo lectura: "¿cuánto espacio/memoria queda?" (antes Orión no podía mirarlo).
+  "Bash(df:*)" "Bash(free:*)" "Bash(du:*)" "Bash(uptime:*)"
   "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git init:*)" "Bash(git checkout -b:*)"
   "Bash(git add:*)" "Bash(git commit:*)" "Bash(npm test:*)" "Bash(npm ci:*)" "Bash(npm run build:*)" "Bash(python3:*)" "Bash(pdftotext:*)"
   # Pruebas de seguridad (QA de solo lectura): el script solo revisa (no cambia nada) y solo apunta a
