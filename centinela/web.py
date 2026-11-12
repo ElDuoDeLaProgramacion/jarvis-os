@@ -56,7 +56,15 @@ def linea(texto):
         "cf_ip": cab.get("cf-connecting-ip", ""), "host": req.get("host", ""), "metodo": req.get("method", ""),
         "uri": req.get("uri", ""), "ua": cab.get("user-agent", ""), "estado": int(d.get("status") or 0),
         "bytes": int(d.get("size") or 0),
+        # Caddy no guarda la clave (pone "REDACTED"), pero sí deja ver que la petición traía una.
+        "auth": bool(cab.get("authorization")),
     }
+
+
+def es_del_dueno(acceso):
+    """¿Esta petición la hizo David con su clave? La API de Orión (/api/*) exige la clave en cada llamada y
+    responde 401 si no es buena: un 2xx a /api/ con clave solo lo consigue quien la tiene."""
+    return acceso.get("auth") and acceso["uri"].startswith("/api/") and 200 <= acceso["estado"] < 300
 
 
 def ip_real(acceso, es_cloudflare):

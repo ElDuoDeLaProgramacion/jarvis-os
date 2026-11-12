@@ -106,3 +106,14 @@ test('explicarError: traduce el motivo de jarvis.sh', async () => {
   assert.match(explicarError('ERROR=no encuentro el programa claude en el PATH (/usr/bin)'), /reinstálalo/)
   assert.match(explicarError('ERROR=otra cosa rara'), /^Hubo un error al ejecutar el pedido: otra cosa rara$/)
 })
+
+test('orden de respaldo en el chat contigo mismo', async () => {
+  const { ordenDeRespaldo } = await import('./util.mjs')
+  assert.equal(ordenDeRespaldo('Orión, ¿qué tengo hoy?'), '¿qué tengo hoy?')
+  assert.equal(ordenDeRespaldo('orion pon música'), 'pon música')
+  assert.equal(ordenDeRespaldo('ORIÓN: resume mis correos'), 'resume mis correos')
+  assert.equal(ordenDeRespaldo('Jarvis ¿estás?'), '¿estás?')
+  for (const t of ['*Orión:* Listo, ya quedó.', 'Orión', 'nota para mí', 'Orionte', '', undefined]) {
+    assert.equal(ordenDeRespaldo(t), null, String(t))
+  }
+})

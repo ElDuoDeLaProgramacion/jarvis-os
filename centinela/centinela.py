@@ -539,7 +539,26 @@ class Centinela:
             self._elemento("delete", "bloqueados", ip)
             self._elemento("add", "confianza", ip, dias * 86400)
         self.e["bloqueos"].pop(ip, None)
+        cf = self.e["cf_bloqueos"].pop(ip, None)
+        if cf and self.cf:
+            self.cf.soltar(cf["id"])
         self.anotar("confianza", ip=ip, dias=dias, motivo=motivo)
+
+    def reconocer_dueno(self, ip):
+        """David usó la app/API de Orión con su clave desde esta IP: es suya mientras la use (la de la universidad,
+        la del celular...). Así el centinela nunca le cierra la puerta a él aunque esa red la compartan cientos
+        de personas y alguna haga algo raro. Se renueva sola cada día que la use."""
+        if self.protegida(ip) and ip not in self.e["confianza"]:
+            return                                   # su casa, la red privada, Cloudflare: ya protegidas
+        quedan = self.e["confianza"].get(ip, 0) - ahora()
+        if quedan > (self.c["CONFIANZA_DIAS"] - 1) * 86400:
+            return                                   # ya renovada hoy
+        estaba = ip in self.e["bloqueos"] or ip in self.e["cf_bloqueos"]
+        self.confiar(ip, self.c["CONFIANZA_DIAS"], "usó la app de Orión con tu clave")
+        if estaba:
+            self.avisar(f"dueno-{ip}", "media", f"Tenía bloqueada {ip}, pero desde ahí acabas de usar la app de Orión "
+                        "con tu clave: la solté y queda de confianza. Seguramente es una red compartida "
+                        "(universidad, wifi pública) y otra persona de esa red hizo algo raro.")
 
     # --- las revisiones ---
 
@@ -638,6 +657,8 @@ class Centinela:
                 continue
             total += 1
             ip, via_cf = web.ip_real(a, self.es_cloudflare)
+            if ip_valida(ip) and web.es_del_dueno(a):
+                self.reconocer_dueno(str(ip_valida(ip)))
             if not ip_valida(ip) or self.protegida(ip):
                 continue
             ip = str(ip_valida(ip))
