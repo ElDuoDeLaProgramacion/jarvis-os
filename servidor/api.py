@@ -32,6 +32,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import formularios  # noqa: E402
 import sitios  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -48,6 +49,12 @@ TRANSCRIBIR = [str(RAIZ / "whatsapp" / ".venv" / "bin" / "python"), str(RAIZ / "
 TIPOS = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".css": "text/css; charset=utf-8", ".json": "application/manifest+json", ".svg": "image/svg+xml",
          ".png": "image/png"}
+# Lo que puede llevar la página de un formulario (servidor/formularios.py).
+TIPOS_FORMULARIO = {**TIPOS, ".htm": "text/html; charset=utf-8", ".json": "application/json", ".jpg": "image/jpeg",
+                    ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".ico": "image/x-icon",
+                    ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".mp3": "audio/mpeg",
+                    ".mp4": "video/mp4", ".txt": "text/plain; charset=utf-8"}
+FORMULARIO = re.compile(r"^/f/([a-z0-9]{10})(?:/(.*))?$")
 
 SI = re.compile(r"^(si|sí|sip|dale|claro|confirmo|confirmado|hazlo|envialo|envíalo|mandalo|mándalo"
                 r"|de una|ok|okay|listo|adelante)(?=$|[\s.,!?¡¿])", re.I)
@@ -394,8 +401,82 @@ class Manejador(BaseHTTPRequestHandler):
         finally:
             self.sin_cuerpo = False
 
+    def _cuerpo_formulario(self, cuerpo, tipo, codigo=200):
+        self.send_response(codigo)
+        self.send_header("Content-Type", tipo)
+        self.send_header("Content-Length", str(len(cuerpo)))
+        self.send_header("Cache-Control", "no-cache")
+        # La página la hizo Orión y la abre cualquiera con el enlace: corre en un origen aparte (sandbox sin
+        # allow-same-origin), así no puede leer la clave que la app del celular guarda en este mismo dominio.
+        self.send_header("Content-Security-Policy", formularios.CSP)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.end_headers()
+        if not self.sin_cuerpo:
+            self.wfile.write(cuerpo)
+
+    def _formulario_get(self, fid, resto):
+        if resto is None:   # /f/<id> -> /f/<id>/, para que las rutas relativas de la página funcionen
+            self.send_response(301)
+            self.send_header("Location", f"/f/{fid}/")
+            self.send_header("Content-Length", "0")
+            return self.end_headers()
+        ruta = formularios.archivo(fid, unquote(resto))
+        if not ruta:
+            return self._cuerpo_formulario(formularios.pagina("No existe", "Este formulario no existe o ya lo borraron.", False),
+                                           "text/html; charset=utf-8", 404)
+        meta = formularios._meta(fid)
+        if ruta.name == "index.html" and ruta.parent == formularios.raiz().resolve() / fid / "sitio" \
+                and not formularios.abierto(meta):
+            return self._cuerpo_formulario(formularios.pagina(meta.get("titulo", "Formulario"), "Este formulario ya está cerrado. ¡Gracias!", False),
+                                           "text/html; charset=utf-8", 410)
+        self._cuerpo_formulario(ruta.read_bytes(), TIPOS_FORMULARIO.get(ruta.suffix.lower(), "application/octet-stream"))
+
+    def _formulario_post(self, fid):
+        quiere_json = "application/json" in self.headers.get("Accept", "") or \
+            "application/json" in self.headers.get("Content-Type", "")
+        meta = formularios._meta(fid) or {}
+
+        def contestar(codigo, mensaje, n=None):
+            if quiere_json:
+                cuerpo = json.dumps({"ok": codigo == 200, "mensaje": mensaje, **({"n": n} if n else {})}, ensure_ascii=False).encode()
+                return self._cuerpo_formulario(cuerpo, "application/json; charset=utf-8", codigo)
+            gracias = formularios.archivo(fid, "gracias.html") if codigo == 200 else None
+            cuerpo = gracias.read_bytes() if gracias else formularios.pagina(meta.get("titulo", "Formulario"), mensaje, codigo == 200)
+            return self._cuerpo_formulario(cuerpo, "text/html; charset=utf-8", codigo)
+
+        if not formularios.LIMITE.permitido(self._ip()):
+            return contestar(429, "Demasiadas respuestas seguidas; intenta en unos minutos.")
+        try:
+            largo = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            largo = -1
+        if not 0 < largo <= formularios.MAX_CUERPO:
+            return contestar(413, "La respuesta está vacía o es demasiado larga.")
+        try:
+            datos = formularios.leer_cuerpo(self.headers.get("Content-Type", ""), self.rfile.read(largo))
+            n = formularios.responder(fid, datos)
+        except formularios.Error as e:
+            return contestar(404 if "no existe" in str(e) else 400, str(e)[:1].upper() + str(e)[1:] + ".")
+        contestar(200, "¡Listo! Tu respuesta quedó guardada.", n)
+
+    def do_OPTIONS(self):
+        # fetch() desde la página del formulario (origen aparte por el sandbox) pregunta antes de mandar JSON.
+        if not FORMULARIO.match(urlparse(self.path).path):
+            return self._json({"error": "no existe"}, 404)
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Accept")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_GET(self):
         url = urlparse(self.path)
+        formulario = FORMULARIO.match(url.path)
+        if formulario:
+            return self._formulario_get(formulario.group(1), formulario.group(2))
         if url.path in ("/", "/app"):
             self.send_response(302)
             self.send_header("Location", "/app/")
@@ -449,6 +530,9 @@ class Manejador(BaseHTTPRequestHandler):
 
     def do_POST(self):
         ruta = urlparse(self.path).path
+        formulario = FORMULARIO.match(ruta)
+        if formulario:   # un formulario público: sin clave, con su propio límite por IP
+            return self._formulario_post(formulario.group(1))
         if ruta not in ("/api/pedir", "/api/voz", "/api/ia", "/api/propuestas/borrar",
                         "/api/sitios/publicar", "/api/sitios/quitar"):
             return self._json({"error": "no existe"}, 404)

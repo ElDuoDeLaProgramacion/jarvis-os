@@ -28,13 +28,14 @@ import { spawn } from 'node:child_process'
 import { setDefaultResultOrder } from 'node:dns'
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import {
-  cargarEnv, digitosLid, eleccion, esDavidConocido, explicarError, esNo, esPregunta, esSi, esTeclaMusica, extensionDe, limpiar, lineaChat,
-  nombreSeguro, numeroDe, opcionesDe, ordenDeRespaldo, partir, pideOpciones, soloDigitos, textoDe, tipoDe,
+  cargarEnv, copiaDe, digitosLid, eleccion, esDavidConocido, esNo, esPregunta, esSi, esTeclaMusica, explicarError, extensionDe, leerEstado,
+  limpiar, lineaChat, medioDe, MODOS_REENVIO, nombreSeguro, numeroDe, opcionesDe, ordenDeRespaldo, ordenReenvios, partir, pesoDe,
+  pideOpciones, soloDigitos, textoDe, tipoDe, vistosPor,
 } from './util.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -46,6 +47,10 @@ const CONTACTOS = join(DATOS, 'contactos.json')
 const BORRADOR = join(DATOS, 'borrador.json')
 const ADJUNTOS = join(DATOS, 'adjuntos')                 // lo que David le manda a Orión (fotos, PDF, Excel...)
 const SALIDA = join(DATOS, 'salida')                     // lo que Orión le devuelve como archivo
+const ESTADO = join(DATOS, 'estado.json')                // un estado de WhatsApp que Orión preparó (se publica con "sí")
+const AJUSTES = join(DATOS, 'ajustes.json')              // reenvíos encendidos o apagados (lo cambia David por WhatsApp)
+// Avisos de Orión que no son respuesta a una orden (p. ej. "llegó una respuesta a tu formulario", de servidor/api.py).
+const AVISOS_ORION = join(DATOS, 'avisos')
 const MAX_ARCHIVO = 25 * 1024 * 1024
 const CHATS = join(RAIZ, 'boveda', 'raw', 'whatsapp', 'chats')
 const LOG = join(RAIZ, 'logs', 'whatsapp.log')
@@ -65,7 +70,20 @@ cargarEnv(join(RAIZ, '.env'))
 setDefaultResultOrder('ipv4first')
 const PERMITIDOS = new Set((process.env.WHATSAPP_PERMITIDOS || '').split(',').map(soloDigitos).filter(Boolean))
 const GUARDAR_GRUPOS = process.env.WHATSAPP_GUARDAR_GRUPOS === '1'
-const AVISAR = process.env.WHATSAPP_AVISAR !== '0'    // avisar en tu chat de cada mensaje
+// Reenvíos: avisar en tu chat de cada mensaje que te llega, con el sticker, la foto o el audio tal cual ('todo'),
+// solo el aviso en texto ('texto') o nada ('nada'). David lo cambia por WhatsApp ("desactiva los reenvíos").
+const REENVIOS_INICIAL = MODOS_REENVIO.includes(process.env.WHATSAPP_REENVIOS) ? process.env.WHATSAPP_REENVIOS
+  : process.env.WHATSAPP_AVISAR === '0' ? 'nada' : 'todo'
+let ajustes = { reenvios: REENVIOS_INICIAL }
+try {
+  const a = JSON.parse(readFileSync(AJUSTES, 'utf8'))
+  if (MODOS_REENVIO.includes(a.reenvios)) ajustes.reenvios = a.reenvios
+} catch {}
+function guardarAjustes() {
+  try { mkdirSync(DATOS, { recursive: true }); writeFileSync(AJUSTES, JSON.stringify(ajustes, null, 1)) } catch (e) { log('No pude guardar los ajustes:', e.message) }
+}
+// Estados: a quién se le muestran. Vacío = a los contactos con número que conoce el puente.
+const ESTADO_PARA = (process.env.WHATSAPP_ESTADO_PARA || '').split(',').map(soloDigitos).filter(Boolean)
 // Respuestas propuestas: solo cuando David las pide ("opciones", "qué le respondo"), salvo WHATSAPP_OPCIONES=1.
 const OPCIONES = process.env.WHATSAPP_OPCIONES === '1'
 const AVISO_SEG = Number(process.env.WHATSAPP_AVISO_SEG) || 20         // espera a que la persona termine de escribir antes de avisar
@@ -330,11 +348,11 @@ const esDeOrion = (jid, pn) => !!jid && ((!!orion.lid && jidNormalizedUser(jid) 
  * reintenta una vez a los 3 s. Si el segundo intento también falla, lanza el error.
  * Por defecto sale por el socket que le habla a David; lo que va a sus contactos sale de su número.
  */
-async function enviar(jid, contenido, sock = habla()) {
+async function enviar(jid, contenido, sock = habla(), opciones = undefined) {
   for (let intento = 1; ; intento++) {
     try {
       if (!sock) throw new Error('esa vinculación de WhatsApp no está conectada')
-      const m = await sock.sendMessage(jid, contenido)
+      const m = await sock.sendMessage(jid, contenido, opciones)
       if (m?.key?.id) {
         enviados.set(m.key.id, m.message)
         if (enviados.size > 500) enviados.delete(enviados.keys().next().value)
@@ -355,18 +373,23 @@ async function enviar(jid, contenido, sock = habla()) {
  */
 async function mandarAvisosCentinela(yo) {
   if (mandandoAvisos) return
-  let nombres
-  try { nombres = readdirSync(CENTINELA).filter((f) => f.endsWith('.txt') && !avisosMandados.has(f)).sort().slice(0, 5) } catch { return }
+  const nombres = []
+  for (const carpeta of [CENTINELA, AVISOS_ORION]) {
+    try {
+      for (const f of readdirSync(carpeta)) if (f.endsWith('.txt') && !avisosMandados.has(join(carpeta, f))) nombres.push(join(carpeta, f))
+    } catch {}
+  }
+  nombres.sort((a, b) => a.split('/').pop().localeCompare(b.split('/').pop())).splice(5)
   if (!nombres.length) return
   mandandoAvisos = true
   try {
-    for (const f of nombres) {
-      const ruta = join(CENTINELA, f)
+    for (const ruta of nombres) {
+      const f = ruta.split('/').pop()
       let texto
       try { texto = readFileSync(ruta, 'utf8').trim() } catch { continue }
       if (texto) await responder(yo, `${PREFIJO}${texto}`)
-      log(`Aviso del centinela enviado: ${f}`)
-      try { rmSync(ruta, { force: true }) } catch { avisosMandados.add(f) }
+      log(`Aviso enviado: ${f}`)
+      try { rmSync(ruta, { force: true }) } catch { avisosMandados.add(ruta) }
     }
   } catch (e) {
     log('No pude mandar un aviso del centinela:', e.message)
@@ -380,7 +403,77 @@ async function responder(jid, texto, sock = habla()) {
 }
 
 async function mostrarBorrador(jid) {
+  if (borrador.estado) return mostrarEstado(jid)
   await responder(jid, `${PREFIJO}Mensaje para *${nombreDe(borrador.para)}*:\n\n${borrador.texto}\n\n¿Lo envío? Responde sí o no.`)
+}
+
+// ---------- Estados: Orión los prepara, David los ve y se publican solo con "sí" ----------
+
+/** Lee el estado que dejó Orión (cola/whatsapp/estado.json) con su foto o video ya en memoria. null si no hay. */
+function leerEstadoPendiente() {
+  if (!existsSync(ESTADO)) return null
+  let crudo
+  try { crudo = JSON.parse(readFileSync(ESTADO, 'utf8')) } catch { crudo = null }
+  rmSync(ESTADO, { force: true })
+  // El archivo tiene que estar dentro de jarvis-os (lo que David mandó, o lo que hizo Orión): nada de leer el resto del disco.
+  const e = leerEstado(crudo, (ruta) => {
+    const completa = resolve(RAIZ, ruta)
+    return completa.startsWith(resolve(RAIZ) + '/') && existsSync(completa)
+  })
+  if (!e) { if (crudo) log('El estado que dejó Orión no sirve (sin texto ni foto válida); lo descarto.'); return null }
+  let datos = null
+  if (e.archivo) {
+    const ruta = resolve(RAIZ, e.archivo)
+    if (statSync(ruta).size > MAX_ARCHIVO) { log('La foto o el video del estado pesa más de 25 MB.'); return null }
+    datos = readFileSync(ruta)
+  }
+  return { estado: { ...e, datos, video: /\.(mp4|mov|3gp)$/i.test(e.archivo) }, texto: e.texto, hasta: Date.now() + SEGUIR_MIN * 60000 }
+}
+
+/** El contenido del estado, igual para la vista previa y para publicarlo. */
+function contenidoEstado(e) {
+  if (!e.datos) return { text: e.texto }
+  return e.video ? { video: e.datos, caption: e.texto || undefined } : { image: e.datos, caption: e.texto || undefined }
+}
+
+async function mostrarEstado(jid) {
+  const e = borrador.estado
+  const cuantos = vistosPor(contactos, david.pn, ESTADO_PARA).length
+  if (e.datos) await enviar(jid, contenidoEstado(e))
+  await responder(jid, `${PREFIJO}Estado listo para publicar${e.datos ? ' (la foto o el video de arriba)' : ''}:` +
+    `${e.texto && !e.datos ? `\n\n${e.texto}` : ''}\n\nLo verán ${ESTADO_PARA.length ? 'solo' : 'tus'} ${cuantos} contactos. ` +
+    '¿Lo publico? Responde sí o no.')
+}
+
+/** Publica el estado desde el WhatsApp de David (nunca desde el número de Orión). */
+async function publicarEstado(e) {
+  const sock = socks.personal
+  if (!sock) throw new Error('tu WhatsApp no está vinculado al puente; solo el número de Orión lo está')
+  const para = vistosPor(contactos, david.pn, ESTADO_PARA)
+  if (para.length < 2) throw new Error('no conozco a ninguno de tus contactos todavía (pon WHATSAPP_ESTADO_PARA en .env)')
+  const opciones = { statusJidList: para, broadcast: true }
+  if (!e.datos) Object.assign(opciones, { backgroundColor: e.color, font: e.fuente })
+  await enviar('status@broadcast', contenidoEstado(e), sock, opciones)
+  return para.length - 1
+}
+
+// ---------- Reenvíos: lo que te mandan, tal cual ----------
+
+/** Manda a David una copia exacta de un mensaje que le llegó (el sticker, la foto, el audio...). */
+async function reenviarExacto(yo, msg) {
+  const contenido = normalizeMessageContent(msg.message)
+  if (pesoDe(contenido) > MAX_ARCHIVO) return responder(yo, `${PREFIJO}Ese archivo pesa más de 25 MB; ábrelo en el chat.`)
+  let copia = copiaDe(contenido, null)
+  if (!copia) {
+    try { copia = copiaDe(contenido, await downloadMediaMessage(msg, 'buffer', {})) } catch (e) { log('No pude bajar lo que te mandaron:', e.message) }
+  }
+  try {
+    await enviar(yo, copia || { forward: msg })
+  } catch (e) {
+    // Si rehacerlo falló, el reenvío de WhatsApp (sin bajar nada) casi siempre funciona.
+    if (!copia) throw e
+    await enviar(yo, { forward: msg })
+  }
 }
 
 // ---------- Cola de órdenes: nunca en silencio ----------
@@ -506,10 +599,32 @@ async function atenderOrden(jid, texto, adjuntos = []) {
     writeFileSync(join(ESCRITOS, `${Date.now()}-whatsapp.txt`), texto.replace(/^\s*(jarvis|ori[oó]n)[\s,]*/i, ''))
     return responder(jid, `${PREFIJO}Hecho.`)
   }
+  // "desactiva los reenvíos", "reenvíos solo texto", "activa los reenvíos": al instante, sin pasar por el modelo.
+  const modo = !adjuntos.length && ordenReenvios(texto)
+  if (modo) {
+    if (modo !== 'consulta') { ajustes.reenvios = modo; guardarAjustes(); log(`Reenvíos: ${modo}.`) }
+    const como = { todo: 'encendidos: te aviso de cada mensaje y te reenvío tal cual stickers, fotos, audios y archivos.',
+      texto: 'solo en texto: te aviso de cada mensaje, sin reenviarte stickers, fotos ni audios.',
+      nada: 'apagados: no te aviso de lo que te escriban (sigo anotando los chats). Para volver: activa los reenvíos.' }
+    return responder(jid, `${PREFIJO}${modo === 'consulta' ? 'Los reenvíos están ' : 'Listo, reenvíos '}${como[ajustes.reenvios]}`)
+  }
   // 1) ¿Es la respuesta a un borrador o a un aviso con opciones? Se decide aquí, sin pasar por el modelo.
   if (borrador && Date.now() < borrador.hasta) {
     const b = borrador
     const n = b.opciones ? eleccion(texto, b.opciones.length) : -1
+    if (b.estado && esSi(texto)) {
+      borrador = null
+      try {
+        const cuantos = await publicarEstado(b.estado)
+        log(`Estado publicado para ${cuantos} contactos.`)
+        registrar(texto, `Estado publicado: ${b.estado.texto || '(foto o video)'}`)
+        return responder(jid, `${PREFIJO}Publicado en tu estado. Lo pueden ver ${cuantos} contactos.`)
+      } catch (e) {
+        log('No pude publicar el estado:', e.message)
+        return responder(jid, `${PREFIJO}No pude publicar el estado: ${e.message}.`)
+      }
+    }
+    if (b.estado && esNo(texto)) { borrador = null; return responder(jid, `${PREFIJO}No lo publiqué.`) }
     if (esSi(texto) || n >= 0) {
       borrador = null
       const mensaje = n >= 0 ? b.opciones[n] : b.texto
@@ -539,6 +654,7 @@ async function atenderOrden(jid, texto, adjuntos = []) {
   }
   try { await habla()?.sendPresenceUpdate('composing', jid) } catch {}
   rmSync(BORRADOR, { force: true })
+  rmSync(ESTADO, { force: true })
   const salida = join(SALIDA, String(Date.now()))
   let pedido = `${texto}\n\n(Llega por WhatsApp desde el celular de David: responde corto, apto para leer en el móvil.)`
   if (adjuntos.length) {
@@ -559,23 +675,27 @@ async function atenderOrden(jid, texto, adjuntos = []) {
   if (r.sesion) sesiones[jid] = { id: r.sesion, hasta: Date.now() + SEGUIR_MIN * 60000, pregunto: esPregunta(respuesta) }
   log(`Orión: ${respuesta}`)
   registrar(texto, respuesta)
+  // El estado se lee antes de mandar los archivos: si su foto quedó en la carpeta de salida, esa carpeta se borra.
+  const estado = r.codigo === 0 ? leerEstadoPendiente() : (rmSync(ESTADO, { force: true }), null)
   await responder(jid, PREFIJO + respuesta)
   log('Respuesta enviada.')
   await enviarArchivos(jid, salida)
 
-  borrador = r.codigo === 0 ? leerBorrador() : null
+  borrador = estado || (r.codigo === 0 ? leerBorrador() : null)
+  if (estado) rmSync(BORRADOR, { force: true })
   if (borrador) await mostrarBorrador(jid)
 }
 
 // ---------- Avisos: "Te escribió Ana", con opciones de respuesta ----------
 
-function programarAviso(chat, texto) {
-  const p = porAvisar.get(chat) || { mensajes: [] }
+function programarAviso(chat, texto, msg = null) {
+  const p = porAvisar.get(chat) || { mensajes: [], medios: [] }
   clearTimeout(p.reloj)
   p.mensajes.push(texto)
+  if (msg) p.medios.push(msg)
   p.reloj = setTimeout(() => {
     porAvisar.delete(chat)
-    cadena = cadena.then(() => conOcupado(() => avisar(chat, p.mensajes)))
+    cadena = cadena.then(() => conOcupado(() => avisar(chat, p.mensajes, p.medios)))
       .catch((e) => log('No pude avisar de un mensaje:', e.message))
   }, AVISO_SEG * 1000)
   porAvisar.set(chat, p)
@@ -593,15 +713,23 @@ async function conOcupado(fn) {
   try { await fn() } finally { ocupado = false }
 }
 
-async function avisar(chat, mensajes) {
+async function avisar(chat, mensajes, medios = []) {
+  if (ajustes.reenvios === 'nada') return
   const quien = chatDe(chat)
   const para = jidNormalizedUser(chat)
   const yo = david.pn
   ultimoAviso = { para, chat, nombre: quien, mensajes, hasta: Date.now() + SEGUIR_MIN * 60000 }
-  if (OPCIONES) return proponer(ultimoAviso)
-  const cita = mensajes.map((m) => `> ${m.replace(/\n/g, ' ')}`).join('\n')
-  log(`Aviso: ${quien} escribió.`)
-  await responder(yo, `${PREFIJO}Te escribió *${quien}*:\n${cita}`)
+  if (OPCIONES) await proponer(ultimoAviso)
+  else {
+    const cita = mensajes.map((m) => `> ${m.replace(/\n/g, ' ')}`).join('\n')
+    log(`Aviso: ${quien} escribió.`)
+    await responder(yo, `${PREFIJO}Te escribió *${quien}*:\n${cita}`)
+  }
+  // Y lo que mandó, tal cual: el sticker, la foto, el audio... no solo "(sticker)".
+  if (ajustes.reenvios !== 'todo') return
+  for (const msg of medios.slice(0, 10)) {
+    try { await reenviarExacto(yo, msg) } catch (e) { log(`No pude reenviarte lo que mandó ${quien}:`, e.message) }
+  }
 }
 
 /** Las 3 respuestas propuestas para el último aviso (cuando David dice "opciones"). */
@@ -785,8 +913,8 @@ async function iniciar(rol) {
         vigilante = setInterval(() => {
           if (!david.pn) return
           mandarAvisosCentinela(david.pn)
-          if (ocupado || !existsSync(BORRADOR)) return
-          borrador = leerBorrador()
+          if (ocupado || (!existsSync(BORRADOR) && !existsSync(ESTADO))) return
+          borrador = leerEstadoPendiente() || leerBorrador()
           if (borrador) {
             cadena = cadena.then(() => mostrarBorrador(david.pn))
               .catch((e) => log('No pude mostrar el borrador:', e.message))
@@ -981,7 +1109,9 @@ async function iniciar(rol) {
         } else {
           anotarChat(lineaChat({ hora: hora(cuando), chat: chatDe(chat), autor: k.fromMe ? 'yo' : chatDe(chat), texto }))
           if (k.fromMe && !enviados.has(k.id)) cancelarAviso(chat)
-          else if (!k.fromMe && AVISAR && Date.now() - cuando.getTime() < SEGUIR_MIN * 60000) programarAviso(chat, texto)
+          else if (!k.fromMe && ajustes.reenvios !== 'nada' && Date.now() - cuando.getTime() < SEGUIR_MIN * 60000) {
+            programarAviso(chat, texto, medioDe(contenido) ? msg : null)
+          }
         }
         log(`Anotado: mensaje ${k.fromMe ? 'tuyo a' : 'de'} ${grupo ? 'un grupo' : chatDe(chat)}.`)
       } catch (e) {
