@@ -33,9 +33,9 @@ import { fileURLToPath } from 'node:url'
 import pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import {
-  cargarEnv, copiaDe, digitosLid, eleccion, esDavidConocido, explicarError, esNo, esPregunta, esSi, esTeclaMusica, extensionDe, leerEstado,
-  limpiar, lineaChat, medioDe, MODOS_REENVIO, nombreSeguro, numeroDe, opcionesDe, ordenReenvios, partir, pesoDe, pideOpciones, soloDigitos,
-  textoDe, tipoDe, vistosPor,
+  cargarEnv, copiaDe, digitosLid, eleccion, esDavidConocido, esNo, esPregunta, esSi, esTeclaMusica, explicarError, extensionDe, leerEstado,
+  limpiar, lineaChat, medioDe, MODOS_REENVIO, nombreSeguro, numeroDe, opcionesDe, ordenDeRespaldo, ordenReenvios, partir, pesoDe,
+  pideOpciones, soloDigitos, textoDe, tipoDe, vistosPor,
 } from './util.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -54,6 +54,7 @@ const AVISOS_ORION = join(DATOS, 'avisos')
 const MAX_ARCHIVO = 25 * 1024 * 1024
 const CHATS = join(RAIZ, 'boveda', 'raw', 'whatsapp', 'chats')
 const LOG = join(RAIZ, 'logs', 'whatsapp.log')
+const EN_CURSO = join(DATOS, 'en-curso.json')            // órdenes aceptadas y aún sin responder (sobreviven a un reinicio)
 const SEGUIR_MIN = 30          // minutos en que un mensaje sigue la misma conversación con JARVIS
 const ORDEN_VIEJA_MIN = 10     // órdenes que llegan con el PC apagado más de esto no se ejecutan
 const PREFIJO = '*Orión:* '
@@ -335,7 +336,8 @@ function aprenderLidDavid(chat) {
   log(`Aprendí que ${chat} es David; reconozco sus órdenes a mi número aunque WhatsApp no mande su número.`)
 }
 /** El socket que le habla a David: el de Orión si tiene número propio; si no, el de David (chat consigo mismo). */
-const habla = () => DOS ? socks.orion : socks.personal
+let hablaPor = null   // mientras se atiende una orden de respaldo (chat contigo mismo), se responde por ahí
+const habla = () => hablaPor || (DOS ? socks.orion : socks.personal)
 const esDeOrion = (jid, pn) => !!jid && ((!!orion.lid && jidNormalizedUser(jid) === orion.lid) ||
   (!!orion.pn && numeroDe(pn) === numeroDe(orion.pn)))
 
@@ -474,12 +476,82 @@ async function reenviarExacto(yo, msg) {
   }
 }
 
-async function atender(jid, texto, adjuntos = []) {
+// ---------- Cola de órdenes: nunca en silencio ----------
+// Las órdenes van de una en una. Un pedido largo (el panel de IAs, una búsqueda) puede tardar varios minutos,
+// y si el puente se reinicia (actualización automática, caída) la cola en memoria se pierde. Antes, en esos
+// dos casos David no recibía nada. Ahora: si hay algo en curso, se le dice al momento; y lo aceptado queda
+// apuntado en disco, así que tras un reinicio Orión avisa de lo que se quedó a medias.
+let enCola = 0
+let ordenActual = null
+
+function leerEnCurso() {
+  try { return JSON.parse(readFileSync(EN_CURSO, 'utf8')) } catch { return [] }
+}
+function guardarEnCurso(lista) {
+  try { mkdirSync(DATOS, { recursive: true }); writeFileSync(EN_CURSO, JSON.stringify(lista)) } catch (e) { log('No pude apuntar la orden en curso:', e.message) }
+}
+
+function encolar(jid, orden, adjuntos = [], sock = null) {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  guardarEnCurso([...leerEnCurso(), { id, jid, orden, t: Date.now() }])
+  if (ocupado || enCola) {
+    const antes = ordenActual ? ` («${ordenActual.slice(0, 60)}${ordenActual.length > 60 ? '…' : ''}»)` : ''
+    log(`Orden en espera (hay ${enCola + (ocupado ? 1 : 0)} antes): ${orden}`)
+    responder(jid, `${PREFIJO}Recibido. Termino lo anterior${antes} y sigo con esto.`, sock || habla())
+      .catch((e) => log('No pude avisar de la espera:', e.message))
+  }
+  enCola++
+  cadena = cadena.then(async () => {
+    enCola--
+    ordenActual = orden
+    try { await atender(jid, orden, adjuntos, sock) } finally {
+      ordenActual = null
+      guardarEnCurso(leerEnCurso().filter((o) => o.id !== id))
+    }
+  }).catch((e) => {
+    log('Error atendiendo una orden:', e.message)
+    responder(jid, `${PREFIJO}Se me cruzó un error con «${orden.slice(0, 60)}»: ${e.message}. ¿Me lo repites?`, sock || habla()).catch(() => {})
+  })
+}
+
+/** Tras arrancar: lo que se quedó a medias por un reinicio se le dice a David (no se repite solo: podría tener efectos). */
+async function avisarPendientesDelReinicio() {
+  const lista = leerEnCurso()
+  if (!lista.length) return
+  guardarEnCurso([])
+  const recientes = lista.filter((o) => Date.now() - o.t < 3 * 3600000)
+  if (!recientes.length || !david.pn) return
+  const cuales = recientes.map((o) => `• ${o.orden.slice(0, 120)}`).join('\n')
+  log(`Tras reiniciar quedaron ${recientes.length} órdenes sin responder; aviso a David.`)
+  try {
+    await responder(david.pn, `${PREFIJO}Me reinicié y ${recientes.length > 1 ? 'se me quedaron' : 'se me quedó'} sin terminar:\n${cuales}\n` +
+      `Si aún lo quieres, mándamelo otra vez.`)
+  } catch (e) { log('No pude avisar de lo que quedó a medias:', e.message) }
+}
+
+/** Una orden que llega tarde (Orión estuvo sin conexión con WhatsApp) no se ejecuta sola, pero tampoco se calla. */
+function avisarOrdenTardia(jid, cuando, orden, sock = null) {
+  const min = Math.round((Date.now() - cuando.getTime()) / 60000)
+  if (min > 180) return
+  responder(jid, `${PREFIJO}Tu mensaje me llegó ${min} min tarde (estuve sin conexión con WhatsApp): ` +
+    `«${String(orden).slice(0, 100)}». No lo hice por si ya no aplica; si aún lo quieres, repítemelo.`, sock || habla())
+    .catch((e) => log('No pude avisar de la orden tardía:', e.message))
+}
+
+async function atender(jid, texto, adjuntos = [], sock = null) {
   ocupado = true
+  hablaPor = sock
+  // Si va para largo, que David sepa que Orión sigue en ello y no que lo ignoró.
+  const largo = setTimeout(() => {
+    responder(jid, `${PREFIJO}Sigo en ello, esto va para largo. Te respondo en cuanto termine.`, sock || habla())
+      .catch((e) => log('No pude avisar que sigo en ello:', e.message))
+  }, 90000)
   try { await atenderOrden(jid, texto, adjuntos) } finally {
+    clearTimeout(largo)
     ocupado = false
     // Que el "escribiendo..." no se quede colgado si la orden o el envío fallaron.
     try { await habla()?.sendPresenceUpdate('paused', jid) } catch {}
+    hablaPor = null
   }
 }
 
@@ -723,6 +795,7 @@ async function quizaDavidPrivado(sock, chat, alt) {
 }
 
 let ultimoNoIdentificado = 0
+let yaAvisePendientes = false
 /** Avisar a David (por su propio chat) que llegó algo a Orión que no se pudo identificar, sin repetirlo seguido. */
 function avisarNoIdentificado(chat) {
   log(`Le escribió al número de Orión alguien que no pude identificar (${chatDe(chat)}); no lo atiendo, aviso a David.`)
@@ -730,7 +803,8 @@ function avisarNoIdentificado(chat) {
   ultimoNoIdentificado = Date.now()
   responder(david.pn,
     `${PREFIJO}Me llegó un mensaje a mi número de alguien que WhatsApp no me dejó identificar. ` +
-    'Si eras tú, mándamelo otra vez; a veces pasa justo después de cambiar de red o de configuración.',
+    'Si eras tú, mándamelo otra vez; a veces pasa justo después de cambiar de red o de configuración. ' +
+    'Si sigue sin pasar, escríbeme aquí mismo empezando por "Orión, ..." y te respondo por este chat.',
     socks.personal || habla(),
   ).catch((e) => log('No pude avisar del mensaje sin identificar:', e.message))
 }
@@ -829,6 +903,10 @@ async function iniciar(rol) {
         log(`Ojo: también obedezco a ${otros.map((n) => '+' + n).join(', ')} (WHATSAPP_PERMITIDOS en .env). ` +
           'Si vinculaste tu número personal, deja esa línea vacía.')
       }
+      if (sock === habla() && !yaAvisePendientes) {
+        yaAvisePendientes = true
+        setTimeout(() => avisarPendientesDelReinicio().catch(() => {}), 5000)
+      }
       if (sock === habla()) {
         // Borradores pedidos por voz o desde el HUD: se confirman igual, en el chat donde Orión te habla.
         clearInterval(vigilante)
@@ -882,7 +960,7 @@ async function iniciar(rol) {
     }))
   }
 
-  sock.ev.on('messages.upsert', async ({ messages }) => {
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
     const yoPn = jidNormalizedUser(sock.user?.id)
     const yoLid = sock.user?.lid ? jidNormalizedUser(sock.user.lid) : null
     if (VINCULAR_ORION) return
@@ -903,7 +981,7 @@ async function iniciar(rol) {
             sinLeer.set(k.id, setTimeout(() => {
               sinLeer.delete(k.id)
               log('Un mensaje para el número de Orión nunca se pudo descifrar.')
-              responder(david.pn, `${PREFIJO}Me llegó un mensaje que WhatsApp no me dejó leer. Si eras tú, ¿me lo repites?`, socks.personal || habla())
+              responder(david.pn, `${PREFIJO}Me llegó un mensaje que WhatsApp no me dejó leer. Si eras tú, ¿me lo repites? Si no pasa, escríbeme aquí mismo empezando por "Orión, ...".`, socks.personal || habla())
                 .catch((e) => log('No pude avisar del mensaje sin leer:', e.message))
             }, 60000))
           }
@@ -947,6 +1025,16 @@ async function iniciar(rol) {
             else log(`Alguien (${chatDe(chat)}) le escribió al número de Orión; no lo atiendo.`)
             continue
           }
+        } else if (DOS && conmigo && ordenDeRespaldo(texto) && !enviados.has(k.id)) {
+          // Respaldo: si el número de Orión no le llega a David (le pasa al cambiar de red, p. ej. en la
+          // universidad, cuando WhatsApp rehace el cifrado o no manda su número), David puede escribir en su
+          // chat consigo mismo empezando por "Orión, ...". Aquí no hay duda de que es él (sale de su teléfono).
+          const orden = ordenDeRespaldo(texto)
+          if (!reciente) { log(`Orden de respaldo vieja ignorada (${hora(cuando)}): ${orden}`); if (type === 'notify') avisarOrdenTardia(david.pn || yoPn, cuando, orden, socks.personal); continue }
+          log(`Orden por tu chat contigo mismo (respaldo): ${orden}`)
+          // Respondo en ese mismo chat, desde tu número: si te escribe el de Orión y no te llega, esto sí.
+          encolar(david.pn || yoPn, orden, [], socks.personal)
+          continue
         } else if (DOS && (conmigo || esDeOrion(chat, pnChat))) {
           // Con número propio, tu chat contigo mismo vuelve a ser tuyo, y la charla con Orión no se anota.
           continue
@@ -972,7 +1060,12 @@ async function iniciar(rol) {
             if (rol === 'orion') log('Era una respuesta de Orión, no una orden; la salto.')
             continue
           }
-          if (!reciente) { log(`Orden vieja ignorada (${hora(cuando)}): ${texto}`); continue }
+          if (!reciente) {
+            log(`Orden vieja ignorada (${hora(cuando)}): ${texto}`)
+            // Solo lo que WhatsApp entrega ahora (notify), no el historial que sincroniza al vincular.
+            if (type === 'notify' && Date.now() - cuando.getTime() >= ORDEN_VIEJA_MIN * 60000) avisarOrdenTardia(destino, cuando, texto)
+            continue
+          }
           let orden = dicho || contenido.conversation || contenido.extendedTextMessage?.text
           // Fotos y documentos (PDF, Excel, Word...): se bajan para que Orión los lea. Con pie de foto, el pie
           // es la orden; sin pie, Orión pregunta qué hacer y el archivo acompaña la siguiente orden.
@@ -992,7 +1085,7 @@ async function iniciar(rol) {
               continue
             }
             pendientes.delete(destino)
-            cadena = cadena.then(() => atender(destino, orden, lista)).catch((e) => log('Error atendiendo una orden:', e.message))
+            encolar(destino, orden, lista)
             continue
           }
           if (!orden) {
@@ -1002,7 +1095,7 @@ async function iniciar(rol) {
           const p = pendientes.get(destino)
           const lista = p && Date.now() < p.hasta ? p.rutas : []
           pendientes.delete(destino)
-          cadena = cadena.then(() => atender(destino, orden, lista)).catch((e) => log('Error atendiendo una orden:', e.message))
+          encolar(destino, orden, lista)
           continue
         }
 

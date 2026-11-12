@@ -95,8 +95,10 @@ class Lectura(unittest.TestCase):
         self.assertIsNone(c.ip_valida("1.2.3.4; rm -rf /"))
 
 
-def acceso(uri, ip="45.10.0.2", cf_ip="", ua="Mozilla/5.0", metodo="GET", estado=200, size=100):
+def acceso(uri, ip="45.10.0.2", cf_ip="", ua="Mozilla/5.0", metodo="GET", estado=200, size=100, clave=False):
     cab = {"User-Agent": [ua], "Cookie": []}
+    if clave:
+        cab["Authorization"] = ["REDACTED"]          # así lo deja Caddy en el registro
     if cf_ip:
         cab["Cf-Connecting-Ip"] = [cf_ip]
     return json.dumps({"logger": "http.log.access", "request": {"remote_ip": ip, "method": metodo, "host": "api.lampolabs.com",
@@ -299,6 +301,39 @@ class Decisiones(unittest.TestCase):
         self.assertIn("45.77.8.9", self.cen.e["cf_bloqueos"])
         self.cen.desbloquear("45.77.8.9")
         self.assertEqual(llamados[-1], ("soltar", "r1"))
+
+    def test_web_ip_de_david_por_la_app_queda_de_confianza(self):
+        # Red de la universidad: alguien de esa misma IP escanea la web, y luego David usa la app desde ahí.
+        llamados = []
+
+        class CF:
+            def bloquear(self, ip, nota):
+                llamados.append(ip)
+                return "r9", {"success": True}
+
+            def soltar(self, regla):
+                llamados.append(("soltar", regla))
+                return {"success": True}
+        self.cen.cf = CF()
+        self._registro([acceso("/.env", ip="104.16.0.5", cf_ip="152.200.3.4")])
+        self.cen.revisar_web(rapida=True)
+        self.assertIn("152.200.3.4", self.cen.e["cf_bloqueos"])
+        self._registro([acceso("/api/conversacion", ip="104.16.0.5", cf_ip="152.200.3.4", clave=True)])
+        self.cen.revisar_web(rapida=True)
+        self.assertNotIn("152.200.3.4", self.cen.e["cf_bloqueos"])
+        self.assertEqual(llamados[-1], ("soltar", "r9"))
+        self.assertTrue(self.cen.protegida("152.200.3.4"))
+        self.assertTrue(any("usar la app de Orión" in a for a in self.avisos()))
+        # Desde ahí, aunque otra persona de esa red ataque, a David no se le cierra la puerta.
+        self._registro([acceso("/.env", ip="104.16.0.5", cf_ip="152.200.3.4")])
+        self.cen.revisar_web(rapida=True)
+        self.assertNotIn("152.200.3.4", self.cen.e["cf_bloqueos"])
+
+    def test_web_clave_mala_no_da_confianza(self):
+        self._registro([acceso("/api/pedir", metodo="POST", estado=401, clave=True),
+                        acceso("/app/", clave=True), acceso("/api/x", estado=404, clave=True)])
+        self.cen.revisar_web(rapida=True)
+        self.assertFalse(self.cen.protegida("45.10.0.2"))
 
     def test_web_sin_token_avisa_como_bloquear(self):
         self._registro([acceso("/.env", ip="104.16.0.5", cf_ip="45.77.8.9") for _ in range(5)])

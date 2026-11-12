@@ -304,3 +304,15 @@ export function vistosPor(contactos, yo, soloNumeros = []) {
   if (yo && numeroDe(yo)) lista.add(`${numeroDe(yo)}@s.whatsapp.net`)
   return [...lista]
 }
+
+/**
+ * Orden de respaldo en el chat de David consigo mismo cuando Orión tiene número propio: "Orión, ¿qué tengo hoy?"
+ * -> "¿qué tengo hoy?". Devuelve null si el mensaje no empieza nombrando a Orión (o a JARVIS).
+ * Las respuestas de Orión empiezan con "*Orión:*" (con asterisco), así que nunca cuentan como orden.
+ */
+export function ordenDeRespaldo(texto) {
+  const m = /^\s*(?:ori[oó]n|jarvis)\b[\s,:.!-]*/i.exec(texto || '')
+  if (!m) return null
+  const resto = texto.slice(m[0].length).trim()
+  return resto || null
+}

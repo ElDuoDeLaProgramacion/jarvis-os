@@ -154,3 +154,14 @@ test('vistosPor junta contactos con número, sin repetir, y a uno mismo', () => 
   assert.deepEqual(vistosPor(c, '573009@s.whatsapp.net').sort(), ['573001@s.whatsapp.net', '573002@s.whatsapp.net', '573009@s.whatsapp.net'])
   assert.deepEqual(vistosPor(c, '573009@s.whatsapp.net', ['+57 3005']).sort(), ['573005@s.whatsapp.net', '573009@s.whatsapp.net'])
 })
+
+test('orden de respaldo en el chat contigo mismo', async () => {
+  const { ordenDeRespaldo } = await import('./util.mjs')
+  assert.equal(ordenDeRespaldo('Orión, ¿qué tengo hoy?'), '¿qué tengo hoy?')
+  assert.equal(ordenDeRespaldo('orion pon música'), 'pon música')
+  assert.equal(ordenDeRespaldo('ORIÓN: resume mis correos'), 'resume mis correos')
+  assert.equal(ordenDeRespaldo('Jarvis ¿estás?'), '¿estás?')
+  for (const t of ['*Orión:* Listo, ya quedó.', 'Orión', 'nota para mí', 'Orionte', '', undefined]) {
+    assert.equal(ordenDeRespaldo(t), null, String(t))
+  }
+})
