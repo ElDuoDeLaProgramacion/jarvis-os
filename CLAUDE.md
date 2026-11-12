@@ -24,7 +24,8 @@ Cada petición va a la habilidad adecuada de `.claude/skills/`. Elige por intenc
 | tendencias, qué hay de nuevo en un tema, GitHub trending | `tendencias` |
 | canales, redes, seguidores, vistas, métricas | `canales` |
 | música, Spotify, "pon...", "reproduce...", qué está sonando | `musica` |
-| WhatsApp, chats, "qué me escribieron", "qué dijo X", "respóndele a X por WhatsApp" | `whatsapp` |
+| WhatsApp, chats, "qué me escribieron", "qué dijo X", "respóndele a X por WhatsApp", "sube a mi estado..." | `whatsapp` |
+| formulario, encuesta, votación, quiz, inscripción, "pregúntales a todos", respuestas de un formulario | `formularios` |
 | ataques, "¿me están atacando?", centinela, alertas de intrusión, bloquear o desbloquear una IP | `centinela` |
 | seguridad, auditoría, pruebas de seguridad, puertos abiertos, vulnerabilidades, certificados, "prueba la seguridad del servidor" | `seguridad` |
 | suscripciones, cobros recurrentes, renovaciones, pruebas gratis, "cuánto pago al mes", cancelar un servicio | `suscripciones` |

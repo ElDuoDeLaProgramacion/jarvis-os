@@ -430,3 +430,81 @@ class PruebaSitios(Base):
         with urllib.request.urlopen(req) as r:
             self.assertTrue(json.loads(r.read())["ok"])
         self.assertFalse((self.dir / "sitios" / "angele").exists())
+
+
+class PruebaFormularios(Base):
+    """Formularios propios: la página se sirve aislada en /f/<id>/ y las respuestas llegan sin clave."""
+
+    def setUp(self):
+        super().setUp()
+        api.formularios.LIMITE = api.formularios.Limite()
+        os.environ["JARVIS_FORMULARIOS"] = str(self.dir / "formularios")
+        os.environ["JARVIS_AVISOS_WHATSAPP"] = str(self.dir / "avisos")
+        os.environ["JARVIS_SITIOS_URL"] = "https://sitios.ejemplo.sslip.io"
+        os.environ.pop("JARVIS_FORMULARIOS_URL", None)
+        pagina = self.dir / "encuesta"
+        pagina.mkdir()
+        (pagina / "index.html").write_text('<form method="post"><input name="plan"></form>')
+        (pagina / "logo.svg").write_text("<svg/>")
+        self.fid, self.url = api.formularios.crear(pagina, "Plan del sábado")
+
+    def abrir(self, ruta, datos=None, tipo=None, accept=None):
+        cab = {}
+        if tipo:
+            cab["Content-Type"] = tipo
+        if accept:
+            cab["Accept"] = accept
+        req = urllib.request.Request(self.base + ruta, data=datos, headers=cab)
+        try:
+            with urllib.request.urlopen(req) as r:
+                return r.status, dict(r.headers), r.read()
+        except urllib.error.HTTPError as e:
+            return e.code, dict(e.headers), e.read()
+
+    def test_enlace_y_pagina_aislada(self):
+        self.assertEqual(self.url, f"https://ejemplo.sslip.io/f/{self.fid}/")
+        codigo, cab, cuerpo = self.abrir(f"/f/{self.fid}/")
+        self.assertEqual(codigo, 200)
+        self.assertIn(b'method="post"', cuerpo)
+        self.assertTrue(cab["Content-Security-Policy"].startswith("sandbox"))
+        self.assertNotIn("allow-same-origin", cab["Content-Security-Policy"])
+        self.assertEqual(self.abrir(f"/f/{self.fid}/logo.svg")[0], 200)
+        # Lo que no es la página no se sirve: ni meta.json ni las respuestas ni nada fuera de sitio/.
+        for ruta in ("../meta.json", "..%2Fmeta.json", "../respuestas.jsonl", "../../../.env"):
+            self.assertEqual(self.abrir(f"/f/{self.fid}/{ruta}")[0], 404, ruta)
+        self.assertEqual(self.abrir("/f/noexiste12/")[0], 404)
+
+    def test_respuesta_de_form_normal_y_json(self):
+        codigo, _, cuerpo = self.abrir(f"/f/{self.fid}/", "plan=Cine&nombre=Ana&_trampa=".encode(),
+                                       "application/x-www-form-urlencoded")
+        self.assertEqual(codigo, 200)
+        self.assertIn("Listo".encode(), cuerpo)
+        codigo, cab, cuerpo = self.abrir(f"/f/{self.fid}/", json.dumps({"plan": "Asado", "extras": ["a", "b"]}).encode(),
+                                         "application/json", "application/json")
+        self.assertEqual((codigo, json.loads(cuerpo)["n"]), (200, 2))
+        self.assertEqual(cab["Access-Control-Allow-Origin"], "*")
+        rs = api.formularios.respuestas(self.fid)
+        self.assertEqual([r["respuesta"] for r in rs], [{"plan": "Cine", "nombre": "Ana"}, {"plan": "Asado", "extras": ["a", "b"]}])
+        avisos = sorted((self.dir / "avisos").iterdir())
+        self.assertEqual(len(avisos), 2)
+        self.assertIn("Plan del sábado", avisos[0].read_text())
+        self.assertIn("- plan: Cine", avisos[0].read_text())
+
+    def test_preflight_cerrado_vacio_y_limite(self):
+        req = urllib.request.Request(f"{self.base}/f/{self.fid}/", method="OPTIONS")
+        with urllib.request.urlopen(req) as r:
+            self.assertEqual(r.status, 204)
+        self.assertEqual(self.abrir(f"/f/{self.fid}/", b"plan=", "application/x-www-form-urlencoded")[0], 400)
+        for _ in range(api.formularios.POR_IP):
+            self.abrir(f"/f/{self.fid}/", b"plan=x", "application/x-www-form-urlencoded")
+        self.assertEqual(self.abrir(f"/f/{self.fid}/", b"plan=x", "application/x-www-form-urlencoded")[0], 429)
+        api.formularios.LIMITE = api.formularios.Limite()
+        api.formularios.cambiar(self.fid, cerrado=True)
+        self.assertEqual(self.abrir(f"/f/{self.fid}/")[0], 410)
+        self.assertEqual(self.abrir(f"/f/{self.fid}/", b"plan=x", "application/x-www-form-urlencoded")[0], 400)
+
+    def test_sin_avisos(self):
+        api.formularios.cambiar(self.fid, avisar=False)
+        self.abrir(f"/f/{self.fid}/", b"plan=x", "application/x-www-form-urlencoded")
+        self.assertFalse((self.dir / "avisos").exists())
+        self.assertEqual(len(api.formularios.respuestas(self.fid)), 1)

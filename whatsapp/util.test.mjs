@@ -1,6 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { digitosLid, eleccion, esDavidConocido, esNo, esSi, esTeclaMusica, opcionesDe, limpiar, lineaChat, numeroDe, partir, textoDe } from './util.mjs'
+import {
+  copiaDe, digitosLid, eleccion, esDavidConocido, esNo, esSi, esTeclaMusica, leerEstado, limpiar, lineaChat, medioDe, numeroDe, opcionesDe,
+  ordenReenvios, partir, pesoDe, textoDe, vistosPor,
+} from './util.mjs'
 
 test('sí y no', () => {
   for (const t of ['sí', 'Si.', 'dale', 'ok envíalo', '¡Sí!']) assert.ok(esSi(t), t)
@@ -105,4 +108,49 @@ test('explicarError: traduce el motivo de jarvis.sh', async () => {
   assert.match(explicarError('ERROR=Claude AI usage limit reached|1730000000'), /límite de uso/)
   assert.match(explicarError('ERROR=no encuentro el programa claude en el PATH (/usr/bin)'), /reinstálalo/)
   assert.match(explicarError('ERROR=otra cosa rara'), /^Hubo un error al ejecutar el pedido: otra cosa rara$/)
+})
+
+test('ordenReenvios entiende encender, apagar, solo texto y consulta', () => {
+  for (const t of ['desactiva los reenvíos', 'Apaga los avisos', 'Orión, pausa los reenvíos.', 'no me reenvies nada', 'reenvíos off'])
+    assert.equal(ordenReenvios(t), 'nada', t)
+  for (const t of ['activa los reenvíos', 'Enciende los avisos de WhatsApp', 'reenvíame todo', 'reenvios on'])
+    assert.equal(ordenReenvios(t), 'todo', t)
+  for (const t of ['reenvíos solo texto', 'avisos sin stickers', 'reenviame solo el texto'])
+    assert.equal(ordenReenvios(t), 'texto', t)
+  assert.equal(ordenReenvios('¿cómo están los reenvíos?'), 'consulta')
+  for (const t of ['reenvíale a Ana la foto', 'activa la alarma', 'qué avisos hay del centinela hoy y por qué', 'hola'])
+    assert.equal(ordenReenvios(t), null, t)
+})
+
+test('medioDe y copiaDe rehacen stickers, fotos, audios, ubicaciones y contactos', () => {
+  const buf = Buffer.from('x')
+  assert.equal(medioDe({ conversation: 'hola' }), null)
+  assert.equal(medioDe({ stickerMessage: {} }), 'sticker')
+  assert.deepEqual(copiaDe({ stickerMessage: {} }, buf), { sticker: buf })
+  assert.equal(copiaDe({ stickerMessage: {} }, null), null)   // sin bajar el archivo no se puede
+  assert.deepEqual(copiaDe({ audioMessage: { ptt: true } }, buf), { audio: buf, mimetype: 'audio/ogg; codecs=opus', ptt: true })
+  assert.equal(copiaDe({ imageMessage: { caption: 'mira' } }, buf).caption, 'mira')
+  const doc = { documentWithCaptionMessage: { message: { documentMessage: { fileName: 'a.pdf', mimetype: 'application/pdf', fileLength: 9 } } } }
+  assert.equal(medioDe(doc), 'documento')
+  assert.equal(copiaDe(doc, buf).fileName, 'a.pdf')
+  assert.equal(pesoDe(doc), 9)
+  assert.deepEqual(copiaDe({ locationMessage: { degreesLatitude: 4.6, degreesLongitude: -74 } }, null).location.degreesLatitude, 4.6)
+  assert.equal(copiaDe({ contactMessage: { displayName: 'Ana', vcard: 'BEGIN:VCARD' } }, null).contacts.contacts[0].vcard, 'BEGIN:VCARD')
+})
+
+test('leerEstado acepta texto o foto dentro del repo y rechaza lo demás', () => {
+  assert.deepEqual(leerEstado({ texto: ' Hola ', color: 'azul' }), { texto: 'Hola', archivo: '', color: '#1e3a8a', fuente: 0 })
+  assert.equal(leerEstado({ texto: 'x', color: '#ABCDEF' }).color, '#abcdef')
+  assert.equal(leerEstado({ texto: 'x', color: 'url(x)' }).color, '#111111')
+  assert.equal(leerEstado({ texto: 'x', color: '#abcdef' }).color, '#abcdef')
+  assert.equal(leerEstado({}), null)
+  assert.equal(leerEstado({ archivo: '/etc/passwd' }), null)
+  assert.equal(leerEstado({ archivo: 'cola/x.png' }, () => false), null)
+  assert.equal(leerEstado({ archivo: 'cola/x.png' }, () => true).archivo, 'cola/x.png')
+})
+
+test('vistosPor junta contactos con número, sin repetir, y a uno mismo', () => {
+  const c = { '573001@s.whatsapp.net': { nombre: 'Ana' }, '999@lid': { numero: '573001' }, '888@lid': { nombre: 'sin número' }, '573002@s.whatsapp.net': {} }
+  assert.deepEqual(vistosPor(c, '573009@s.whatsapp.net').sort(), ['573001@s.whatsapp.net', '573002@s.whatsapp.net', '573009@s.whatsapp.net'])
+  assert.deepEqual(vistosPor(c, '573009@s.whatsapp.net', ['+57 3005']).sort(), ['573005@s.whatsapp.net', '573009@s.whatsapp.net'])
 })

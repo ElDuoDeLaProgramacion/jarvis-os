@@ -193,3 +193,114 @@ export function explicarError(stderr) {
   }
   return `Hubo un error al ejecutar el pedido: ${motivo.slice(0, 300)}${consejo ? `\n${consejo}` : ''}`
 }
+
+// ---------- Reenvíos: el contenido real de lo que te escriben, no solo "(sticker)" ----------
+
+export const MODOS_REENVIO = ['todo', 'texto', 'nada']
+
+/**
+ * Órdenes para encender o apagar los reenvíos (los avisos de "Te escribió X" con lo que mandó).
+ * Devuelve 'todo' | 'texto' | 'nada' | 'consulta', o null si no es una de esas órdenes.
+ */
+export function ordenReenvios(texto) {
+  const t = String(texto ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[¿?¡!.,]/g, '').replace(/^(jarvis|orion)\s+/, '').replace(/\s+/g, ' ').trim()
+  if (t.length > 60) return null
+  const que = '(?:los |las )?(?:reenvios|reenvio|avisos|aviso|notificaciones|alertas)(?: de (?:whatsapp|mensajes|los mensajes|chats))?'
+  if (new RegExp(`^(?:como (?:estan|van|esta|va) |estado de )${que}$`).test(t)) return 'consulta'
+  if (new RegExp(`^${que} (?:solo|solamente|nada mas que|nomas) (?:de |con |el |en )?texto$`).test(t) ||
+      new RegExp(`^${que} sin (?:archivos|stickers|fotos|medios|multimedia)$`).test(t) ||
+      /^(?:reenviame|mandame) solo (?:el )?texto$/.test(t)) return 'texto'
+  if (new RegExp(`^(?:desactiva|apaga|pausa|para|deten|detén|quita|silencia|cancela|suspende)(?:me)? ${que}$`).test(t) ||
+      new RegExp(`^${que} (?:off|apagados?|desactivados?)$`).test(t) ||
+      /^no me (?:reenvies|mandes|avises) (?:nada|mas|los mensajes)$/.test(t)) return 'nada'
+  if (new RegExp(`^(?:activa|enciende|prende|reanuda|vuelve a activar|pon|devuelveme)(?:me)? ${que}(?: completos?)?$`).test(t) ||
+      new RegExp(`^${que} (?:on|encendidos?|activados?)$`).test(t) ||
+      /^(?:reenviame|mandame) todo$/.test(t)) return 'todo'
+  return null
+}
+
+/** Qué tipo de contenido trae un mensaje que vale la pena reenviar tal cual (null si es solo texto o nada). */
+export function medioDe(m) {
+  if (!m) return null
+  if (m.documentWithCaptionMessage) return medioDe(m.documentWithCaptionMessage.message)
+  for (const [clave, tipo] of [['stickerMessage', 'sticker'], ['imageMessage', 'imagen'], ['videoMessage', 'video'],
+    ['audioMessage', 'audio'], ['documentMessage', 'documento'], ['locationMessage', 'ubicacion'],
+    ['liveLocationMessage', 'ubicacion'], ['contactMessage', 'contacto'], ['contactsArrayMessage', 'contactos']]) {
+    if (m[clave]) return tipo
+  }
+  return null
+}
+
+/**
+ * El contenido para sendMessage que reproduce el mensaje recibido. `datos` es el archivo ya bajado
+ * (sticker, foto, video, audio o documento); ubicaciones y contactos no necesitan bajar nada.
+ * null si no se puede rehacer (entonces el puente prueba con un reenvío normal).
+ */
+export function copiaDe(m, datos) {
+  if (!m) return null
+  if (m.documentWithCaptionMessage) return copiaDe(m.documentWithCaptionMessage.message, datos)
+  if (m.locationMessage || m.liveLocationMessage) {
+    const l = m.locationMessage || m.liveLocationMessage
+    return { location: { degreesLatitude: l.degreesLatitude, degreesLongitude: l.degreesLongitude, name: l.name || undefined, address: l.address || undefined } }
+  }
+  if (m.contactMessage) return { contacts: { displayName: m.contactMessage.displayName, contacts: [{ vcard: m.contactMessage.vcard }] } }
+  if (m.contactsArrayMessage) {
+    return { contacts: { displayName: m.contactsArrayMessage.displayName, contacts: (m.contactsArrayMessage.contacts || []).map((c) => ({ vcard: c.vcard })) } }
+  }
+  if (!datos) return null
+  if (m.stickerMessage) return { sticker: datos }
+  if (m.imageMessage) return { image: datos, mimetype: m.imageMessage.mimetype || undefined, caption: m.imageMessage.caption || undefined }
+  if (m.videoMessage) {
+    return { video: datos, mimetype: m.videoMessage.mimetype || undefined, caption: m.videoMessage.caption || undefined, gifPlayback: !!m.videoMessage.gifPlayback }
+  }
+  if (m.audioMessage) return { audio: datos, mimetype: m.audioMessage.mimetype || 'audio/ogg; codecs=opus', ptt: !!m.audioMessage.ptt }
+  if (m.documentMessage) {
+    return { document: datos, mimetype: m.documentMessage.mimetype || 'application/octet-stream', fileName: m.documentMessage.fileName || 'archivo', caption: m.documentMessage.caption || undefined }
+  }
+  return null
+}
+
+/** Peso declarado del archivo de un mensaje (0 si no trae). */
+export function pesoDe(m) {
+  if (!m) return 0
+  if (m.documentWithCaptionMessage) return pesoDe(m.documentWithCaptionMessage.message)
+  const x = m.stickerMessage || m.imageMessage || m.videoMessage || m.audioMessage || m.documentMessage
+  return Number(x?.fileLength || 0)
+}
+
+// ---------- Estados de WhatsApp ----------
+
+const COLORES = { negro: '#111111', azul: '#1e3a8a', verde: '#065f46', morado: '#5b21b6', rojo: '#9f1239', naranja: '#c2410c', gris: '#374151', rosado: '#be185d', rosa: '#be185d', cafe: '#78350f' }
+
+/**
+ * Lo que Orión dejó en cola/whatsapp/estado.json, revisado: { texto, archivo, color, fuente }.
+ * Texto solo: estado de texto con fondo de color. Con archivo (foto o video): el texto va de pie.
+ * `dentro(ruta)` dice si la ruta del archivo es una que el puente puede leer. null si no sirve.
+ */
+export function leerEstado(datos, dentro = () => true) {
+  if (!datos || typeof datos !== 'object') return null
+  const texto = typeof datos.texto === 'string' ? datos.texto.trim().slice(0, 700) : ''
+  let archivo = typeof datos.archivo === 'string' ? datos.archivo.trim() : ''
+  if (archivo && (!/\.(jpe?g|png|webp|mp4|mov|3gp)$/i.test(archivo) || !dentro(archivo))) return null
+  if (!texto && !archivo) return null
+  let color = typeof datos.color === 'string' ? datos.color.trim().toLowerCase() : ''
+  color = COLORES[color] || (/^#[0-9a-f]{6}$/.test(color) ? color : '#111111')
+  const fuente = Number.isInteger(datos.fuente) && datos.fuente >= 0 && datos.fuente <= 9 ? datos.fuente : 0
+  return { texto, archivo, color, fuente }
+}
+
+/** A quién se le muestra un estado: los contactos con número (jid @s.whatsapp.net), sin repetir, y uno mismo. */
+export function vistosPor(contactos, yo, soloNumeros = []) {
+  const lista = new Set()
+  if (soloNumeros.length) {
+    for (const n of soloNumeros) if (soloDigitos(n)) lista.add(`${soloDigitos(n)}@s.whatsapp.net`)
+  } else {
+    for (const [jid, c] of Object.entries(contactos || {})) {
+      const n = numeroDe(jid) || soloDigitos(c?.numero)
+      if (n) lista.add(`${n}@s.whatsapp.net`)
+    }
+  }
+  if (yo && numeroDe(yo)) lista.add(`${numeroDe(yo)}@s.whatsapp.net`)
+  return [...lista]
+}

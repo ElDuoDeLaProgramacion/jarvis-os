@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>¿Qué hacemos el sábado?</title>
+<!-- Plantilla de Orión (habilidad formularios). Cambia todo: colores, textos, preguntas, el diseño entero.
+     Lo único que se mantiene: un <form method="post"> sin action, campos con name, y el script de abajo. -->
+<style>
+  :root { --fondo: #0d0b1e; --tinta: #f4f1ff; --suave: #b9b2e8; --acento: #ff7a59; --acento2: #7c5cff; --tarjeta: #ffffff10; --borde: #ffffff22; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif; color: var(--tinta);
+    background: radial-gradient(60rem 40rem at 10% -10%, #7c5cff55, transparent), radial-gradient(50rem 40rem at 110% 110%, #ff7a5944, transparent), var(--fondo); }
+  main { max-width: 34rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  .sello { display: inline-block; padding: .3rem .8rem; border-radius: 99px; background: var(--tarjeta); border: 1px solid var(--borde); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--suave); }
+  h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1.05; margin: 1rem 0 .5rem; }
+  h1 em { font-style: normal; background: linear-gradient(90deg, var(--acento), var(--acento2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  p.intro { color: var(--suave); margin: 0 0 2rem; }
+  fieldset { border: 0; padding: 0; margin: 0 0 2rem; }
+  legend { font-weight: 700; font-size: 1.1rem; margin-bottom: .8rem; }
+  .opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .7rem; }
+  .opcion input { position: absolute; opacity: 0; pointer-events: none; }
+  .opcion span { display: flex; flex-direction: column; gap: .35rem; padding: 1rem; border-radius: 1.1rem; background: var(--tarjeta); border: 1.5px solid var(--borde); cursor: pointer; transition: transform .15s, border-color .15s, background .15s; }
+  .opcion b { font-size: 1.9rem; line-height: 1; }
+  .opcion small { color: var(--suave); }
+  .opcion span:hover { transform: translateY(-2px); }
+  .opcion input:checked + span { border-color: var(--acento); background: #ff7a5922; transform: translateY(-2px) scale(1.02); }
+  .opcion input:focus-visible + span { outline: 3px solid var(--acento2); outline-offset: 2px; }
+  .escala { display: flex; gap: .5rem; }
+  .escala .opcion { flex: 1; }
+  .escala .opcion span { align-items: center; padding: .8rem 0; }
+  textarea, input[type=text] { width: 100%; padding: .9rem 1rem; border-radius: 1rem; border: 1.5px solid var(--borde); background: var(--tarjeta); color: var(--tinta); font: inherit; }
+  textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acento2); }
+  button { width: 100%; padding: 1.05rem; border: 0; border-radius: 1.1rem; font: inherit; font-weight: 800; font-size: 1.05rem; color: #1a0f0a; background: linear-gradient(90deg, var(--acento), #ffb347); cursor: pointer; box-shadow: 0 10px 30px #ff7a5955; }
+  button:disabled { opacity: .6; }
+  .oculto { display: none; }
+  #gracias { text-align: center; padding: 4rem 1rem; }
+  #gracias b { font-size: 4rem; display: block; animation: brinco .6s ease; }
+  @keyframes brinco { 0% { transform: scale(.3); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  .trampa { position: absolute; left: -9999px; }
+</style>
+</head>
+<body>
+<main>
+  <form id="f" method="post">
+    <span class="sello">Encuesta rápida</span>
+    <h1>¿Qué hacemos <em>el sábado</em>?</h1>
+    <p class="intro">Elige lo que te provoque. Toma 20 segundos.</p>
+
+    <fieldset>
+      <legend>Plan</legend>
+      <div class="opciones">
+        <label class="opcion"><input type="radio" name="plan" value="Cine" required><span><b>🎬</b>Cine<small>Estreno de la semana</small></span></label>
+        <label class="opcion"><input type="radio" name="plan" value="Asado"><span><b>🔥</b>Asado<small>En la casa de siempre</small></span></label>
+        <label class="opcion"><input type="radio" name="plan" value="Caminata"><span><b>⛰️</b>Caminata<small>Salimos a las 7 a. m.</small></span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>¿Qué tantas ganas tienes?</legend>
+      <div class="escala">
+        <label class="opcion"><input type="radio" name="ganas" value="1"><span>1</span></label>
+        <label class="opcion"><input type="radio" name="ganas" value="2"><span>2</span></label>
+        <label class="opcion"><input type="radio" name="ganas" value="3"><span>3</span></label>
+        <label class="opcion"><input type="radio" name="ganas" value="4"><span>4</span></label>
+        <label class="opcion"><input type="radio" name="ganas" value="5"><span>5</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Tu nombre</legend>
+      <input type="text" name="nombre" maxlength="80" autocomplete="name" required>
+    </fieldset>
+
+    <fieldset>
+      <legend>¿Algo más? <small style="color:var(--suave)">(opcional)</small></legend>
+      <textarea name="comentario" rows="3" maxlength="1000"></textarea>
+    </fieldset>
+
+    <!-- Campo trampa para bots: los nombres con _ no se guardan. -->
+    <input class="trampa" type="text" name="_trampa" tabindex="-1" autocomplete="off">
+    <button>Enviar</button>
+  </form>
+
+  <section id="gracias" class="oculto" aria-live="polite">
+    <b>🎉</b>
+    <h1>¡Gracias!</h1>
+    <p class="intro">Tu respuesta ya le llegó a David.</p>
+  </section>
+</main>
+
+<script>
+// Envía sin recargar y muestra el agradecimiento. Sin JavaScript el <form> se envía normal y también funciona.
+const f = document.getElementById('f')
+f.addEventListener('submit', async (e) => {
+  e.preventDefault()
+  if (f._trampa.value) return
+  const datos = {}
+  for (const [k, v] of new FormData(f)) datos[k] = k in datos ? [].concat(datos[k], v) : v
+  const boton = f.querySelector('button')
+  boton.disabled = true; boton.textContent = 'Enviando…'
+  try {
+    const r = await fetch(location.href.split('#')[0].split('?')[0], { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(datos) })
+    const j = await r.json()
+    if (!r.ok) throw new Error(j.mensaje || 'No se pudo enviar')
+    f.classList.add('oculto'); document.getElementById('gracias').classList.remove('oculto')
+  } catch (err) {
+    boton.disabled = false; boton.textContent = 'Enviar'
+    alert(err.message)
+  }
+})
+</script>
+</body>
+</html>
