@@ -34,7 +34,7 @@ import pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import {
   cargarEnv, digitosLid, eleccion, esDavidConocido, explicarError, esNo, esPregunta, esSi, esTeclaMusica, extensionDe, limpiar, lineaChat,
-  nombreSeguro, numeroDe, opcionesDe, partir, pideOpciones, soloDigitos, textoDe, tipoDe,
+  nombreSeguro, numeroDe, opcionesDe, ordenDeRespaldo, partir, pideOpciones, soloDigitos, textoDe, tipoDe,
 } from './util.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -317,7 +317,8 @@ function aprenderLidDavid(chat) {
   log(`Aprendí que ${chat} es David; reconozco sus órdenes a mi número aunque WhatsApp no mande su número.`)
 }
 /** El socket que le habla a David: el de Orión si tiene número propio; si no, el de David (chat consigo mismo). */
-const habla = () => DOS ? socks.orion : socks.personal
+let hablaPor = null   // mientras se atiende una orden de respaldo (chat contigo mismo), se responde por ahí
+const habla = () => hablaPor || (DOS ? socks.orion : socks.personal)
 const esDeOrion = (jid, pn) => !!jid && ((!!orion.lid && jidNormalizedUser(jid) === orion.lid) ||
   (!!orion.pn && numeroDe(pn) === numeroDe(orion.pn)))
 
@@ -381,12 +382,14 @@ async function mostrarBorrador(jid) {
   await responder(jid, `${PREFIJO}Mensaje para *${nombreDe(borrador.para)}*:\n\n${borrador.texto}\n\n¿Lo envío? Responde sí o no.`)
 }
 
-async function atender(jid, texto, adjuntos = []) {
+async function atender(jid, texto, adjuntos = [], sock = null) {
   ocupado = true
+  hablaPor = sock
   try { await atenderOrden(jid, texto, adjuntos) } finally {
     ocupado = false
     // Que el "escribiendo..." no se quede colgado si la orden o el envío fallaron.
     try { await habla()?.sendPresenceUpdate('paused', jid) } catch {}
+    hablaPor = null
   }
 }
 
@@ -602,7 +605,8 @@ function avisarNoIdentificado(chat) {
   ultimoNoIdentificado = Date.now()
   responder(david.pn,
     `${PREFIJO}Me llegó un mensaje a mi número de alguien que WhatsApp no me dejó identificar. ` +
-    'Si eras tú, mándamelo otra vez; a veces pasa justo después de cambiar de red o de configuración.',
+    'Si eras tú, mándamelo otra vez; a veces pasa justo después de cambiar de red o de configuración. ' +
+    'Si sigue sin pasar, escríbeme aquí mismo empezando por "Orión, ..." y te respondo por este chat.',
     socks.personal || habla(),
   ).catch((e) => log('No pude avisar del mensaje sin identificar:', e.message))
 }
@@ -775,7 +779,7 @@ async function iniciar(rol) {
             sinLeer.set(k.id, setTimeout(() => {
               sinLeer.delete(k.id)
               log('Un mensaje para el número de Orión nunca se pudo descifrar.')
-              responder(david.pn, `${PREFIJO}Me llegó un mensaje que WhatsApp no me dejó leer. Si eras tú, ¿me lo repites?`, socks.personal || habla())
+              responder(david.pn, `${PREFIJO}Me llegó un mensaje que WhatsApp no me dejó leer. Si eras tú, ¿me lo repites? Si no pasa, escríbeme aquí mismo empezando por "Orión, ...".`, socks.personal || habla())
                 .catch((e) => log('No pude avisar del mensaje sin leer:', e.message))
             }, 60000))
           }
@@ -819,6 +823,17 @@ async function iniciar(rol) {
             else log(`Alguien (${chatDe(chat)}) le escribió al número de Orión; no lo atiendo.`)
             continue
           }
+        } else if (DOS && conmigo && ordenDeRespaldo(texto) && !enviados.has(k.id)) {
+          // Respaldo: si el número de Orión no le llega a David (le pasa al cambiar de red, p. ej. en la
+          // universidad, cuando WhatsApp rehace el cifrado o no manda su número), David puede escribir en su
+          // chat consigo mismo empezando por "Orión, ...". Aquí no hay duda de que es él (sale de su teléfono).
+          const orden = ordenDeRespaldo(texto)
+          if (!reciente) { log(`Orden de respaldo vieja ignorada (${hora(cuando)}): ${orden}`); continue }
+          log(`Orden por tu chat contigo mismo (respaldo): ${orden}`)
+          // Respondo en ese mismo chat, desde tu número: si te escribe el de Orión y no te llega, esto sí.
+          cadena = cadena.then(() => atender(david.pn || yoPn, orden, [], socks.personal))
+            .catch((e) => log('Error atendiendo una orden de respaldo:', e.message))
+          continue
         } else if (DOS && (conmigo || esDeOrion(chat, pnChat))) {
           // Con número propio, tu chat contigo mismo vuelve a ser tuyo, y la charla con Orión no se anota.
           continue
